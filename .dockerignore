@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python bytecode & cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Virtualenv / Conda env
+.env
+.venv
+venv/
+env/
+.conda
+*.conda
+*.ipynb_checkpoints
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Log / temp
+*.log
+logs/
+tmp/
+temp/
+
+# Dati grandi (se non vuoi copiarli nell'immagine)
+data/
+datasets/
+checkpoints/
+models/
+outputs/
+
+# Altro
+.DS_Store
