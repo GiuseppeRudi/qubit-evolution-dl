@@ -1,4 +1,4 @@
-name: tf-project
+name: qubit
 channels:
   - conda-forge
 dependencies:

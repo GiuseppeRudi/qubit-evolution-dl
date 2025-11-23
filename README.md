@@ -38,7 +38,7 @@ sequence models to reconstruct and predict qubit behavior.
 
 ```bash
 conda env create -f environment.yml
-conda activate tf-project
+conda activate qubit
 python install_tf.py
 python main.py
 Docker (recommended)
