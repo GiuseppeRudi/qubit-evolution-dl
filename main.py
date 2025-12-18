@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 import tensorflow as tf
 import numpy as np
 import tensorflow as tf
@@ -11,40 +14,11 @@ from numpy import random
 from src.qubit.core.data import load_and_process_data
 from src.qubit.rnn.models import build_rnn_model
 from src.qubit.transformer.models import build_transformer_model  
+from src.qubit.core.seed import set_seed
+from src.qubit.core.utils import get_device
 
 
-def get_device():
-    """Returns '/GPU:0' if at least one GPU is available, otherwise '/CPU:0'."""
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        print("✅ GPU found, using GPU:")
-        for gpu in gpus:
-            print("   -", gpu)
-        return "/GPU:0"
-    else:
-        print("⚠️ No GPU found, running on CPU.")
-        return "/CPU:0"
 
-
-def demo_matmul(device_str: str):
-    """Small computation example to verify that everything works."""
-    print(f"Running demo_matmul on {device_str}...")
-    with tf.device(device_str):
-        a = tf.random.normal((2000, 2000))
-        b = tf.random.normal((2000, 2000))
-        c = tf.matmul(a, b)
-    print("Operation completed. Result shape:", c.shape)
-
-
-def set_seed(seed_value=42):
-    os.environ['PYTHONHASHSEED'] = str(seed_value)
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    tf.random.set_seed(seed_value)
-    # Per Keras (se non usa tf.random.set_seed)
-    # from tensorflow.keras.utils import set_random_seed
-    # set_random_seed(seed_value)
-    print(f"Seed di riproducibilità impostato a {seed_value}")
 
 # --- Parametri di configurazione (corrispondenti al dataset reale) ---
 INPUT_SEQ_LEN = 100
@@ -178,9 +152,8 @@ def generate_all_plots(X_test, Y_test, transformer_prediction, rnn_prediction, s
 def main():
 
     device = get_device()
-    demo_matmul(device)
-    # Imposta il seed per la riproducibilità
-    set_seed(42)
+    set_seed(42, deterministic=True)
+
 
     # 1. Caricamento dei dati
     X, Y = load_data()
