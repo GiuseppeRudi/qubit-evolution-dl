@@ -4,14 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from .seed import set_seed
-from .config_loader import load_dataset_config
 from ..model.dataset_splits import DatasetSplits
 
 import numpy as np
 import pandas as pd
 
-from .config_loader import get_project_root
-from .config_loader import load_yaml
 
 
 
@@ -78,26 +75,24 @@ def build_seq2seq(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarray, np
     return X, Y
 
 
-def load_or_prepare_dataset(cfg_path: Path | str) -> DatasetSplits:
+def load_or_prepare_dataset(m: Dict[str, Any]) -> DatasetSplits:
 
-    # given a configurations file path , result => dictionary with dataset config
-    cfg = load_dataset_config(cfg_path)
 
     # given a file path of csv data, result => pandaas dataframe
-    df = load_raw_dataframe(cfg["dataset"]["csv_path"])
+    df = load_raw_dataframe(m["dataset"]["csv_path"])
 
 
-    X, Y = build_seq2seq(df, cfg)
+    X, Y = build_seq2seq(df, m)
 
     # take the split parameters
-    seed = int(cfg["split"]["seed"])
+    seed = int(m["split"]["seed"])
 
     # set for all libraries the seed
     set_seed(seed, deterministic=True)
     
     # take the value of splitting
-    val_ratio = float(cfg["split"]["val_ratio"])
-    test_ratio = float(cfg["split"]["test_ratio"])
+    val_ratio = float(m["split"]["val_ratio"])
+    test_ratio = float(m["split"]["test_ratio"])
 
 
     splits = split_by_trajectory(X, Y, val_ratio=val_ratio, test_ratio=test_ratio)

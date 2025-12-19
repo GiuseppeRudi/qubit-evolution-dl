@@ -2,7 +2,23 @@ run:
   name: "exp_trn_encoderdense_v1"
 
 data:
-  cfg_path: "src/qubit/core/config/dataset_base.yaml"
+  dataset:
+    csv_path: data/trajectories.csv
+    n: 10
+    time_steps: 1001
+    n_traj: 400
+    traj_fraction: 0.025
+
+  windowing:
+    input_seq_len: 100
+    output_seq_len: 900
+    stride: 1         
+    mode: seq2seq      
+
+  split:
+    seed: 42
+    val_ratio: 0.1
+    test_ratio: 0.1
 
 model:
   name: "transformer_baseline_v1"

@@ -1,3 +1,4 @@
+'''
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -117,3 +118,6 @@ def generate_all_plots(
         )
         paths.append(p)
     return paths
+
+
+''' 

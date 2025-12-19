@@ -6,7 +6,6 @@ import os
 
 from src.qubit.core.data import load_or_prepare_dataset
 from src.qubit.core.utils import get_device, parse_args
-from src.qubit.core.plots import generate_all_plots
 from src.qubit.core.config_loader import load_run_config
 from src.qubit.registry import get_builder,get_trainer
 from src.qubit.core.config_loader import load_model_config
@@ -21,9 +20,7 @@ def main():
     args = parse_args()
     run_cfg = load_run_config(args.run_cfg)
  
-    data_cfg_path = run_cfg["data"]["cfg_path"]
-    splits = load_or_prepare_dataset(data_cfg_path)
-
+    splits = load_or_prepare_dataset(run_cfg["data"])
 
     model_cfg = load_model_config(run_cfg["model"])
 
