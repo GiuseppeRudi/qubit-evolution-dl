@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 from .seed import set_seed
-from .types import DatasetSplits
+from .config_loader import load_dataset_config
+from ..model.dataset_splits import DatasetSplits
 
 import numpy as np
 import pandas as pd
@@ -26,19 +27,7 @@ def load_raw_dataframe(csv_path: Path | str) -> pd.DataFrame:
     return pd.read_csv(csv_path, header=None)
 
 
-# return a dictionary with dataset config
-def load_dataset_config(cfg_path: Path | str) -> Dict[str, Any]:
-    root = get_project_root()
-    cfg = load_yaml(cfg_path)
 
-    csv_path = cfg["dataset"]["csv_path"]
-
-    # if the path is not start from project root, make it start from it
-    cfg["dataset"]["csv_path"] = str((root / csv_path).resolve()) if not str(csv_path).startswith("/") else csv_path
-
-    print(cfg)
-
-    return cfg
 
 
 def build_seq2seq(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:

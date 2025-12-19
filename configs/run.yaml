@@ -1,0 +1,32 @@
+run:
+  name: "exp_trn_encoderdense_v1"
+
+data:
+  cfg_path: "src/qubit/core/config/dataset_base.yaml"
+
+model:
+  name: "transformer_baseline_v1"
+  type: "TRN"
+  variant: "EncoderDense"
+
+  params:
+    embed_dim: 64
+    num_heads: 4
+    ff_dim: 128
+
+  compile:
+    optimizer: "adam"
+    loss: "mse"
+
+  training:
+    epochs: 30
+    batch_size: 32
+
+training:
+  strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
+
+evaluation:
+  sample_index: 0
+  print_steps: 5
+  save_plots: true
+  predictions_dir: "predictions"

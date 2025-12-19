@@ -2,8 +2,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.qubit.core.types import DatasetSplits  # oppure dove hai messo la dataclass
 
+from ..model.dataset_splits import DatasetSplits
 
 def _pick_pred(pred, sample_index: int):
     """

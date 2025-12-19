@@ -1,8 +1,9 @@
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, LSTM, Dense, RepeatVector, TimeDistributed
+from ..registry import register_model
 
-
+@register_model("RNN", "SEQ2SEQ")
 def build_rnn_model(x_train , y_train , latent_dim):
 
     # x_train.shape == (N, input_seq_len, feature_dim)
