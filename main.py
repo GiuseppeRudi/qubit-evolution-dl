@@ -142,6 +142,10 @@ def main():
         os.makedirs('predictions')
 
     # 4. Visualizzazione dei risultati
+    # for i in range(FEATURE_DIM):
+    #    generate_all_plots(X, Y, transformer_prediction, rnn_prediction, sample_index=0, feature_index=i)
+
+    # 4. Visualizzazione dei risultati
     for i in range(FEATURE_DIM):
         generate_all_plots(X, Y, transformer_prediction, rnn_prediction, sample_index=0, feature_index=i)
 
