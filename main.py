@@ -11,7 +11,7 @@ from pathlib import Path
 
 from numpy import random
 
-from src.qubit.core.data import load_and_process_data
+from src.qubit.core.data import load_or_prepare_dataset
 from src.qubit.rnn.models import build_rnn_model
 from src.qubit.transformer.models import build_transformer_model  
 from src.qubit.core.seed import set_seed
@@ -27,52 +27,24 @@ FEATURE_DIM = 55 # 10 Magnetizzazioni + 45 Correlazioni
 EPOCHS = 100 # Aumentato per un addestramento più significativo
 BATCH_SIZE = 32
 
-def load_data(file_path=None, traj_fraction=0.025):
-    """
-    Carica (o genera) i dati per l'addestramento.
 
-    - Se file_path è None, usa <project_root>/data/trajectories.csv
-    - Se il file non esiste, prova comunque a chiamare load_and_process_data()
-      (che può avere il suo default o può fallire e tornare None).
-    """
-    # main.py è nella root progetto -> parent è il project root
-    project_root = Path(__file__).resolve().parent
-
-    if file_path is None:
-        file_path = project_root / "data" / "trajectories.csv"
-    else:
-        file_path = Path(file_path).expanduser().resolve()
-
-    if not file_path.exists():
-        print(f"⚠️ File non trovato: {file_path}")
-        print("↪️ Provo a generare i dati chiamando load_and_process_data()...")
-
-    # Passo esplicitamente il path, così non dipendo da default strani tipo ../../../...
-    X, Y = load_and_process_data(file_path=str(file_path), traj_fraction=traj_fraction)
-
-    if X is None or Y is None:
-        print("❌ Impossibile caricare/generare i dati.")
-        return None, None
-
-    return X, Y
-
-def train_and_evaluate(model, X_train, Y_train, model_name):
+def train_and_evaluate(model, splits, model_name):
     """Addestra e valuta un modello."""
     print(f"\n--- Addestramento del Modello: {model_name} ---")
     
     # Addestramento simulato
     history = model.fit(
-        X_train, 
-        Y_train, 
+        splits.X_train, 
+        splits.Y_train, 
         epochs=EPOCHS, 
         batch_size=BATCH_SIZE, 
-        validation_split=0.1
+        validation_data=(splits.X_val, splits.Y_val),
     )
     
     print(f"Addestramento completato. Perdita finale (MSE): {history.history['loss'][-1]:.4f}")
     
     # Simulazione della previsione
-    sample_input = X_train[0:1]
+    sample_input = splits.X_train[0:1]
     print(f"Sample Input: {sample_input.tolist()}")
     prediction = model.predict(sample_input)
     
@@ -151,27 +123,19 @@ def generate_all_plots(X_test, Y_test, transformer_prediction, rnn_prediction, s
 
 def main():
 
-    device = get_device()
-    set_seed(42, deterministic=True)
+    get_device()
 
-
-    # 1. Caricamento dei dati
-    X, Y = load_data()
-    if X is None:
-        return
-
-    print(tf.sysconfig.get_build_info())
-    print("GPU available:", tf.config.list_physical_devices('GPU'))
+    splits = load_or_prepare_dataset("src/qubit/core/config/dataset_base.yaml")
 
     input_shape = (INPUT_SEQ_LEN, FEATURE_DIM)
 
     # 2. Modello RNN (LSTM Seq2Seq)
-    rnn_model = build_rnn_model(input_shape, OUTPUT_SEQ_LEN, FEATURE_DIM)
-    rnn_history, rnn_prediction = train_and_evaluate(rnn_model, X, Y, "RNN (LSTM Seq2Seq)")
+    # rnn_model = build_rnn_model(input_shape, OUTPUT_SEQ_LEN, FEATURE_DIM)
+    # rnn_history, rnn_prediction = train_and_evaluate(rnn_model, X, Y, "RNN (LSTM Seq2Seq)")
 
     # 3. Modello Transformer
     transformer_model = build_transformer_model(input_shape, OUTPUT_SEQ_LEN, FEATURE_DIM)
-    transformer_history, transformer_prediction = train_and_evaluate(transformer_model, X, Y, "Transformer (Encoder Semplificato)")
+    transformer_history, transformer_prediction = train_and_evaluate(transformer_model, splits, "Transformer (Encoder Semplificato)")
 
 
     if not os.path.exists('predictions'):
