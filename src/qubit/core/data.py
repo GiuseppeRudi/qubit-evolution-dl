@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
-from qubit.core.seed import set_seed
-from qubit.core.types import DatasetSplits
+from .seed import set_seed
+from .types import DatasetSplits
 
 import numpy as np
 import pandas as pd
 
-from config_loader import get_project_root
-from config_loader import load_yaml
+from .config_loader import get_project_root
+from .config_loader import load_yaml
 
 
 

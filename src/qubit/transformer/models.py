@@ -69,66 +69,51 @@ class TransformerBlock(Layer):
         # Add & Norm
         return self.layernorm2(out1 + ffn_output)
 
+from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling1D, Reshape
+from tensorflow.keras.models import Model
 
-# --- 3. Modello Transformer Completo (Encoder-Decoder Semplificato) ---
-def build_transformer_model(input_shape, output_seq_len, feature_dim):
-    """
-    Costruisce un modello Transformer semplificato per la previsione Seq2Seq.
-    Utilizza un Encoder per estrarre le feature e un Dense layer per mappare
-    l'output alla sequenza di previsione.
+def build_transformer_model(
+    x_train,
+    y_train,
+    embed_dim=64,
+    num_heads=4,
+    ff_dim=128,
+):
+    # x_train: (N, in_len, feat)
+    # y_train: (N, out_len, feat)
+    if x_train.ndim != 3 or y_train.ndim != 3:
+        raise ValueError(f"Expected 3D tensors. Got x:{x_train.shape}, y:{y_train.shape}")
 
-    Args:
-        input_shape (tuple): (input_seq_len, feature_dim)
-        output_seq_len (int): Lunghezza della sequenza di output da prevedere.
-        feature_dim (int): Dimensione delle feature.
+    input_seq_len, x_feat = x_train.shape[1], x_train.shape[2]
+    output_seq_len, y_feat = y_train.shape[1], y_train.shape[2]
 
-    Returns:
-        tf.keras.Model: Il modello Transformer compilato.
-    """
-    input_seq_len, _ = input_shape
-    embed_dim = 64  # Dimensione dell'embedding per il Transformer (Aumentata)
-    num_heads = 4  # Numero di teste di attenzione
-    ff_dim = 128  # Dimensione del layer Feed Forward (Aumentata)
+    if x_feat != y_feat:
+        raise ValueError(f"Feature dim mismatch: x has {x_feat}, y has {y_feat}")
+
+    input_shape = (input_seq_len, x_feat)
+    feature_dim = x_feat
 
     inputs = Input(shape=input_shape)
 
-    # 1. Proiezione dell'input alla dimensione dell'embedding
+    # 1) Proiezione alla dimensione embedding
     x = Dense(embed_dim, activation="relu")(inputs)
 
-    # 2. Aggiunta dell'Encoding Posizionale
-    x = PositionalEmbedding(input_seq_len, input_seq_len, embed_dim)(
-        x)  # Usiamo input_seq_len come vocab_size per l'embedding posizionale
+    # 2) Positional embedding (come nel tuo codice)
+    x = PositionalEmbedding(input_seq_len, input_seq_len, embed_dim)(x)
 
-    # 3. Blocco Transformer (Encoder)
+    # 3) Blocco Transformer (Encoder)
     transformer_block = TransformerBlock(embed_dim, num_heads, ff_dim)
     x = transformer_block(x, training=False)
 
-    # 4. Pooling per ottenere un singolo vettore di contesto
+    # 4) Pooling -> vettore contesto
     x = GlobalAveragePooling1D()(x)
 
-    # 5. Mappatura all'output desiderato (output_seq_len * feature_dim)
-    # Questo è il "Decoder" semplificato per la regressione.
+    # 5) "Decoder" denso per regressione
     x = Dense(output_seq_len * feature_dim, activation="linear")(x)
 
-    # 6. Rimodellamento per ottenere la forma (output_seq_len, feature_dim)
+    # 6) reshape in (out_len, feat)
     outputs = Reshape((output_seq_len, feature_dim))(x)
 
     model = Model(inputs=inputs, outputs=outputs, name="Transformer_Model")
-
-    model.compile(optimizer='adam', loss='mse')
-
+    model.compile(optimizer="adam", loss="mse")
     return model
-
-
-if __name__ == '__main__':
-    # Parametri aggiornati (corrispondenti al dataset trajectories.csv)
-    INPUT_SEQ_LEN = 100
-    OUTPUT_SEQ_LEN = 901  # 1001 - 100 = 901
-    FEATURE_DIM = 55  # 10 Magnetizzazioni + 45 Correlazioni
-
-    input_shape = (INPUT_SEQ_LEN, FEATURE_DIM)
-
-    transformer_model = build_transformer_model(input_shape, OUTPUT_SEQ_LEN, FEATURE_DIM)
-    transformer_model.summary()
-
-    print("\nModello Transformer creato con successo.")
