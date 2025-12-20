@@ -1,0 +1,46 @@
+run:
+  name: "Lstm_prova"
+
+data:
+  dataset:
+    csv_path: data/trajectories.csv
+    n: 10
+    time_steps: 1001
+    n_traj: 400
+    traj_fraction: 0.025
+
+  windowing:
+    input_seq_len: 100
+    output_seq_len: 900
+    stride: 1         
+    mode: seq2seq      
+
+  split:
+    seed: 42
+    val_ratio: 0.1
+    test_ratio: 0.1
+
+model:
+  name: "lstm_baseline_v1"
+  type: "RNN"
+  variant: "SEQ2SEQ"
+
+  params:
+    latent_dim: 64
+
+  compile:
+    optimizer: "adam"
+    loss: "mse"
+
+  training:
+    epochs: 30
+    batch_size: 32
+
+training:
+  strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
+
+evaluation:
+  sample_index: 0
+  print_steps: 5
+  save_plots: true
+  predictions_dir: "predictions"

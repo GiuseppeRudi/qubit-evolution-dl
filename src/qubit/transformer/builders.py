@@ -1,3 +1,7 @@
+from typing import cast
+
+from ..model.transformer_config import TransformerConfig
+from ..model.model_config import ModelConfig
 from ..registry import register_model
 from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling1D, Reshape
 from tensorflow.keras.models import Model
@@ -8,12 +12,14 @@ from .struct import *
 def build_transformer_model(
     x_train,
     y_train,
-    model_cfg
+    model_cfg: ModelConfig
 ):
-    
-    embed_dim=64
-    num_heads=4
-    ff_dim=128
+    params = cast(TransformerConfig,model_cfg.params)
+
+    embed_dim=params.embed_dim
+    num_heads=params.num_heads
+    ff_dim=params.ff_dim
+
     # x_train: (N, in_len, feat)
     # y_train: (N, out_len, feat)
     if x_train.ndim != 3 or y_train.ndim != 3:
@@ -30,25 +36,19 @@ def build_transformer_model(
 
     inputs = Input(shape=input_shape)
 
-    # 1) Proiezione alla dimensione embedding
     x = Dense(embed_dim, activation="relu")(inputs)
 
-    # 2) Positional embedding (come nel tuo codice)
     x = PositionalEmbedding(input_seq_len, input_seq_len, embed_dim)(x)
 
-    # 3) Blocco Transformer (Encoder)
     transformer_block = TransformerBlock(embed_dim, num_heads, ff_dim)
     x = transformer_block(x, training=False)
 
-    # 4) Pooling -> vettore contesto
     x = GlobalAveragePooling1D()(x)
 
-    # 5) "Decoder" denso per regressione
     x = Dense(output_seq_len * feature_dim, activation="linear")(x)
 
-    # 6) reshape in (out_len, feat)
     outputs = Reshape((output_seq_len, feature_dim))(x)
 
-    model = Model(inputs=inputs, outputs=outputs, name="Transformer_Model")
-    model.compile(optimizer="adam", loss="mse")
+    model = Model(inputs=inputs, outputs=outputs, name=model_cfg.name)
+    model.compile(optimizer=model_cfg.compile.optimizer, loss=model_cfg.compile.loss)
     return model

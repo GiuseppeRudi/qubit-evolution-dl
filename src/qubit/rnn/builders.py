@@ -1,10 +1,13 @@
+from ..model.model_config import ModelConfig
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, LSTM, Dense, RepeatVector, TimeDistributed
 from ..registry import register_model
 
 @register_model("RNN", "SEQ2SEQ")
-def build_rnn_model(x_train , y_train , latent_dim):
+def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
+
+    latent_dim=model_cfg.params.latent_dim
 
     # x_train.shape == (N, input_seq_len, feature_dim)
     # y_train.shape == (N, output_seq_len, feature_dim)
@@ -31,7 +34,7 @@ def build_rnn_model(x_train , y_train , latent_dim):
     decoder_lstm = LSTM(latent_dim, return_sequences=True)(decoder_input, initial_state=encoder_states)
     decoder_outputs = TimeDistributed(Dense(feature_dim))(decoder_lstm)
 
-    model = Model(encoder_inputs, decoder_outputs, name="RNN_Seq2Seq_Model")
-    model.compile(optimizer="adam", loss="mse")
+    model = Model(encoder_inputs, decoder_outputs, name=model_cfg.name)
+    model.compile(optimizer=model_cfg.compile.optimizer, loss=model_cfg.compile.loss)
 
     return model

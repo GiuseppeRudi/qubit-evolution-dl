@@ -12,7 +12,7 @@ from src.qubit.core.config_loader import load_model_config
 from src.qubit.core.save import save_outputs
 import src.qubit.rnn.builders  
 import src.qubit.transformer.builders
-import qubit.training.standard_trainer
+import src.qubit.training.standard_trainer
 
 def main():
 
