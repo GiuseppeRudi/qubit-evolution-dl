@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 import numpy as np
 import json
+from .plot import save_loss_plots_keras
 
 def make_run_output_dir(model_cfg, root_dir: str | Path) -> Path:
     root_dir = Path(root_dir)
@@ -19,6 +20,7 @@ def save_outputs(
     splits,
     pred,
     model_cfg,
+    history,
     eval_cfg: dict | None = None,
 ) -> Path:
     eval_cfg = eval_cfg or {}
@@ -26,6 +28,8 @@ def save_outputs(
     root_dir = eval_cfg.get("predictions_dir", "predictions")
 
     run_dir = make_run_output_dir(model_cfg=model_cfg, root_dir=root_dir)
+
+    save_loss_plots_keras(run_dir,history)
 
     np.savez_compressed(
         run_dir / "data_splits.npz",

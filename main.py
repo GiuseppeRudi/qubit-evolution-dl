@@ -10,6 +10,7 @@ from src.qubit.core.config_loader import load_run_config
 from src.qubit.registry import get_builder,get_trainer
 from src.qubit.core.config_loader import load_model_config
 from src.qubit.core.save import save_outputs
+
 import src.qubit.rnn.builders  
 import src.qubit.transformer.builders
 import src.qubit.training.standard_trainer
@@ -44,8 +45,7 @@ def main():
     eval_cfg = run_cfg.get("evaluation", {})
 
 
-    save_outputs(splits, pred, model_cfg, eval_cfg )
-
+    save_outputs(splits, pred, model_cfg, history,eval_cfg )
 
     #TODO create a mini plot for the validation error 
 
