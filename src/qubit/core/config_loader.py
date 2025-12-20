@@ -32,14 +32,8 @@ def load_yaml(path: Path | str) -> Dict[str, Any]:
 
 
 def load_model_config(m: Dict[str, Any]) -> ModelConfig:
-    """
-    Build a ModelConfig from a dict representing the 'model' section.
-    Expected keys: name (optional), type, variant, params, compile, training.
-    """
-    if not isinstance(m, dict):
-        raise TypeError(f"Expected dict for model config, got {type(m)}")
 
-    # free label (for logging/saving)
+    # free label (for distinction)
     name = m.get("name", "experiment")
 
     # discriminants (fixed)
@@ -51,34 +45,28 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     if variant is None:
         raise ValueError("Missing required field: model.variant")
 
+
+    # Parse the  config dict into a dataclass (dict is unpacked as kwargs).
     # common blocks
     compile_cfg = CompileConfig(**(m.get("compile", {}) or {}))
     training_cfg = TrainingConfig(**(m.get("training", {}) or {}))
     params_dict = m.get("params", {}) or {}
 
-    # normalize strings
     model_type_norm = str(model_type).strip().upper()
     variant_norm = str(variant).strip().upper()
 
-    # choose params class
+    #TODO create a enum withou this harcoding value, the same thing in ModelConfig
     if model_type_norm == "RNN":
-        # accetta "Seq2Seq" ecc.
-        if variant_norm in {"SEQ2SEQ", "SEQ_2_SEQ", "SEQ-2-SEQ"}:
+        if variant_norm in {"SEQ2SEQ", "ALTRE..", "ALTRE.."}:
             params = RNNConfig(**params_dict)
         else:
             raise ValueError(f"Unknown RNN variant: {variant}")
-        # forza type a valori canonici
-        model_type_norm = "RNN"
 
-    elif model_type_norm in {"TRN", "TRANSFORMER"}:
-        # per il tuo transformer attuale è più corretto usare "ENCODERDENSE" o simili,
-        # ma lasciamo compatibilità anche con vecchi nomi:
-        if variant_norm in {"ENCODERDENSE", "ENCODER_DENSE", "ENCODER", "ENCODER_ONLY", "SEQ2SEQ"}:
+    elif model_type_norm in {"TRN"}:
+        if variant_norm in {"ENCODERDENSE", "ALTRE.."}:
             params = TransformerConfig(**params_dict)
         else:
             raise ValueError(f"Unknown Transformer variant: {variant}")
-        model_type_norm = "TRN"
-
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -93,8 +81,11 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
 
 def load_run_config(path: str) -> dict:
+
+    # dictionary from yaml file 
     cfg = load_yaml(path)
-    # valida campi minimi
+
+    # verify if in the dicitionary are the mandatory key
     for k in ["data", "model", "training"]:
         if k not in cfg:
             raise ValueError(f"Missing '{k}' in run config")

@@ -4,5 +4,5 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CompileConfig:
-    optimizer: str = "adam"
-    loss: str = "mse"
+    optimizer: str 
+    loss: str

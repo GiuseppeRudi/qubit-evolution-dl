@@ -1,6 +1,7 @@
 import numpy as np
 from ..registry import register_trainer
 
+
 @register_trainer("standard")
 class StandardTrainer:
     def __init__(self, model, model_cfg, eval_cfg=None):

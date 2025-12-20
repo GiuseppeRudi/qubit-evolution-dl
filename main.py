@@ -9,9 +9,10 @@ from src.qubit.core.utils import get_device, parse_args
 from src.qubit.core.config_loader import load_run_config
 from src.qubit.registry import get_builder,get_trainer
 from src.qubit.core.config_loader import load_model_config
+from src.qubit.core.save import save_outputs
 import src.qubit.rnn.builders  
 import src.qubit.transformer.builders
-import src.qubit.training.trainers
+import qubit.training.standard_trainer
 
 def main():
 
@@ -27,6 +28,7 @@ def main():
     builder = get_builder(model_cfg.type, model_cfg.variant)
     model = builder(splits.X_train, splits.Y_train, model_cfg)
 
+
     strategy = run_cfg["training"]["strategy"]
     TrainerCls = get_trainer(strategy)
 
@@ -39,17 +41,13 @@ def main():
 
     sample_x, pred = trainer.predict_sample(splits)
     trainer.report_sample(sample_x, pred)
-    '''
-    # 5) plots
     eval_cfg = run_cfg.get("evaluation", {})
-    if eval_cfg.get("save_plots", True):
-        pred_dir = eval_cfg.get("predictions_dir", "predictions")
-        os.makedirs(pred_dir, exist_ok=True)
-        generate_all_plots(splits, transformer_prediction=pred if model_cfg.type=="TRN" else None,
-                           rnn_prediction=pred if model_cfg.type=="RNN" else None,
-                           sample_index=int(eval_cfg.get("sample_index", 0)))
-    '''
 
+
+    save_outputs(splits, pred, model_cfg, eval_cfg )
+
+
+    #TODO create a mini plot for the validation error 
 
 if __name__ == "__main__":
     main()

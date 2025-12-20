@@ -77,13 +77,11 @@ def build_seq2seq(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarray, np
 
 def load_or_prepare_dataset(m: Dict[str, Any]) -> DatasetSplits:
 
-
-    # given a file path of csv data, result => pandaas dataframe
+    # given a string  path of csv data, result => pandaas dataframe
     df = load_raw_dataframe(m["dataset"]["csv_path"])
 
-
     X, Y = build_seq2seq(df, m)
-
+    
     # take the split parameters
     seed = int(m["split"]["seed"])
 
@@ -93,7 +91,6 @@ def load_or_prepare_dataset(m: Dict[str, Any]) -> DatasetSplits:
     # take the value of splitting
     val_ratio = float(m["split"]["val_ratio"])
     test_ratio = float(m["split"]["test_ratio"])
-
 
     splits = split_by_trajectory(X, Y, val_ratio=val_ratio, test_ratio=test_ratio)
     return splits
