@@ -10,8 +10,8 @@ data:
     traj_fraction: 0.025
 
   windowing:
-    input_seq_len: 100
-    output_seq_len: 900
+    input_seq_len: 900
+    output_seq_len: 10
     stride: 1         
     mode: seq2seq      
 

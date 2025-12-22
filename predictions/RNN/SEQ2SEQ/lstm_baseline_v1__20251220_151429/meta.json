@@ -1,0 +1,22 @@
+{
+  "experiment_name": "lstm_baseline_v1",
+  "model_type": "RNN",
+  "variant": "SEQ2SEQ",
+  "timestamp": "2025-12-20T15:14:29",
+  "sample_index": 0,
+  "x_test_shape": [
+    1,
+    900,
+    55
+  ],
+  "y_test_shape": [
+    1,
+    10,
+    55
+  ],
+  "pred_shape": [
+    1,
+    10,
+    55
+  ]
+}
