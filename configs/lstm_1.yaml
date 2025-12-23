@@ -5,7 +5,7 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10
-    used_qubits: 2
+    used_qubits: 10
     time_steps: 1001
     n_traj: 400
     traj_fraction: 1
@@ -35,8 +35,8 @@ model:
     metrics: ["mae"]
 
   training:
-    epochs: 100
-    batch_size: 16
+    epochs: 30
+    batch_size: 32
 
 training:
   strategy: "standard"   # standard | teacher_forcing | autoregressive (future)

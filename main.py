@@ -1,9 +1,6 @@
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-
-import os
-
 from src.qubit.core.data import load_or_prepare_dataset
 from src.qubit.core.utils import get_device, parse_args
 from src.qubit.core.config_loader import load_run_config

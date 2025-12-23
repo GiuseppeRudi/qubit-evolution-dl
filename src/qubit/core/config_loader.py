@@ -17,7 +17,7 @@ def get_project_root() -> Path:
 
 
 def load_yaml(path: Path | str) -> Dict[str, Any]:
-    path = Path(path).expanduser().resolve()
+    path = Path("configs/" + path + ".yaml").expanduser().resolve()
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
