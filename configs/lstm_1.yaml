@@ -5,10 +5,10 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10
-    used_qubits: 10
+    used_qubits: 2
     time_steps: 1001
     n_traj: 400
-    traj_fraction: 0.025
+    traj_fraction: 1
 
   windowing:
     input_seq_len: 200
@@ -27,15 +27,16 @@ model:
   variant: "SEQ2SEQ"
 
   params:
-    latent_dim: 64
+    latent_dim: 32
 
   compile:
     optimizer: "adam"
     loss: "mse"
+    metrics: ["mae"]
 
   training:
-    epochs: 30
-    batch_size: 32
+    epochs: 100
+    batch_size: 16
 
 training:
   strategy: "standard"   # standard | teacher_forcing | autoregressive (future)

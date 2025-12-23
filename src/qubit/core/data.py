@@ -24,8 +24,6 @@ def load_raw_dataframe(csv_path: Path | str) -> pd.DataFrame:
 
 
 
-
-
 def build_seq2seq(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
 
     # number of rows => n_points * n_traj => 400.400
@@ -139,12 +137,24 @@ def split_by_trajectory(
     val_idx = idx[n_test:n_test + n_val]
     train_idx = idx[n_test + n_val:]
 
+    mean, std = fit_standardizer(X[train_idx])
+
     return DatasetSplits(
-        X_train=X[train_idx],
-        Y_train=Y[train_idx],
-        X_val=X[val_idx],
-        Y_val=Y[val_idx],
-        X_test=X[test_idx],
-        Y_test=Y[test_idx],
+        X_train=apply_standardizer(X[train_idx], mean, std),
+        Y_train=apply_standardizer(Y[train_idx], mean, std),
+        X_val=apply_standardizer(X[val_idx], mean, std),
+        Y_val=apply_standardizer(Y[val_idx], mean, std),
+        X_test=apply_standardizer(X[test_idx], mean, std),
+        Y_test=apply_standardizer(Y[test_idx], mean, std),
     )
 
+
+
+def fit_standardizer(X_train: np.ndarray, eps: float = 1e-8):
+
+    mean = X_train.mean(axis=(0, 1), keepdims=True)  
+    std  = X_train.std(axis=(0, 1), keepdims=True) + eps
+    return mean, std
+
+def apply_standardizer(A: np.ndarray, mean: np.ndarray, std: np.ndarray):
+    return (A - mean) / std
