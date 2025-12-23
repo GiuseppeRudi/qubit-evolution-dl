@@ -55,7 +55,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     model_type_norm = str(model_type).strip().upper()
     variant_norm = str(variant).strip().upper()
 
-    #TODO create a enum withou this harcoding value, the same thing in ModelConfig
+    #TODO create a enum without this harcoding value, the same thing in ModelConfig
     if model_type_norm == "RNN":
         if variant_norm in {"SEQ2SEQ", "ALTRE..", "ALTRE.."}:
             params = RNNConfig(**params_dict)

@@ -47,7 +47,6 @@ def main():
 
     save_outputs(splits, pred, model_cfg, history,eval_cfg )
 
-    #TODO create a mini plot for the validation error 
 
 if __name__ == "__main__":
     main()
