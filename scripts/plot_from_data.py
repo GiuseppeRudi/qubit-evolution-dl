@@ -9,6 +9,33 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import re
+
+RUN_RE = re.compile(r"_(\d{8})_(\d{6})$")  # prende la data/ora alla fine del nome
+
+def find_latest_run_dir() -> str:
+    base_dir = Path("predictions")
+    if not base_dir.exists():
+        raise FileNotFoundError(f"Directory non trovata: {base_dir}")
+
+    best = None  # (datetime, Path)
+
+    for p in base_dir.rglob("*"):
+        if not p.is_dir():
+            continue
+
+        m = RUN_RE.search(p.name)
+        if not m:
+            continue
+
+        dt = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
+        if best is None or dt > best[0]:
+            best = (dt, p)
+
+    if best is None:
+        raise ValueError(f"Nessuna cartella con pattern *_YYYYMMDD_HHMMSS trovata sotto {base_dir}")
+    
+    return str(best[1].relative_to(base_dir))
 
 def load_run_artifacts(run_dir: str | Path):
     run_dir = Path("predictions") / Path(run_dir)
@@ -144,7 +171,7 @@ def parse_args():
         description="Generate plots from saved raw artifacts (data_splits.npz + predictions.npz). "
                     "Supports single model or comparison between two runs."
     )
-    ap.add_argument("--run-a", required=True, help="Path to run directory A (contains data_splits.npz and predictions.npz)")
+    ap.add_argument("--run-a", default=None, help="Path to run directory A (contains data_splits.npz and predictions.npz)")
     ap.add_argument("--run-b", default=None, help="Optional path to run directory B for comparison")
     ap.add_argument("--label-a", default="Model A", help="Legend label for run A")
     ap.add_argument("--label-b", default="Model B", help="Legend label for run B")
@@ -155,6 +182,9 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    if args.run_a is None and args.run_b is None:
+        args.run_a = find_latest_run_dir()
 
     splits_a, pred_a, meta_a = load_run_artifacts(args.run_a)
 
