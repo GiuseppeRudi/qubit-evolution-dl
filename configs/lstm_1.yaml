@@ -5,7 +5,7 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10
-    used_qubits: 10
+    used_qubits: 8
     time_steps: 1001
     n_traj: 400
     traj_fraction: 1
@@ -13,7 +13,7 @@ data:
   windowing:
     input_seq_len: 200
     output_seq_len: 100
-    stride: 1         
+    stride: 20
     mode: seq2seq      
 
   split:
@@ -27,7 +27,7 @@ model:
   variant: "SEQ2SEQ"
 
   params:
-    latent_dim: 32
+    latent_dim: 128
 
   compile:
     optimizer: "adam"
@@ -42,7 +42,7 @@ training:
   strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
 
 evaluation:
-  sample_index: 0
+  sample_index: 2
   print_steps: 5
   save_plots: true
   predictions_dir: "predictions"

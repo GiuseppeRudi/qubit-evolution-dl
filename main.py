@@ -19,7 +19,7 @@ def main():
     args = parse_args()
     run_cfg = load_run_config(args.run_cfg)
  
-    splits = load_or_prepare_dataset(run_cfg["data"])
+    splits, feat_names = load_or_prepare_dataset(run_cfg["data"])
 
     model_cfg = load_model_config(run_cfg["model"])
 
@@ -37,12 +37,12 @@ def main():
 
     print(f"Final loss: {history.history['loss'][-1]:.4f}")
 
-    sample_x, pred = trainer.predict_sample(splits)
+    sample_x, pred = trainer.predict_from_test(splits)
     trainer.report_sample(sample_x, pred)
     eval_cfg = run_cfg.get("evaluation", {})
 
 
-    save_outputs(splits, pred, model_cfg, history,eval_cfg )
+    save_outputs(splits, pred, model_cfg, history,feat_names,eval_cfg  )
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ def save_outputs(
     pred,
     model_cfg,
     history,
+    feat_names,
     eval_cfg: dict | None = None,
 ) -> Path:
     eval_cfg = eval_cfg or {}
@@ -54,6 +55,7 @@ def save_outputs(
         "x_test_shape": list(splits.X_test.shape),
         "y_test_shape": list(splits.Y_test.shape),
         "pred_shape": list(np.asarray(pred).shape),
+        "feature_names": feat_names,
     }
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 

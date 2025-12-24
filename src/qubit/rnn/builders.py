@@ -20,10 +20,11 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
     input_shape = (input_seq_len, feature_dim)
     output_shape = (output_seq_len, feature_dim)
 
-    # --- Encoder ---
+    # --- Encoder (2 stacked LSTM) ---
 
     # analyze one trajectory at time
     encoder_inputs = Input(shape=input_shape)
+    decoder_input = Input(shape = output_shape)
 
     # return_sequences = True => return the output for all timesteps => output(batch, timesteps, latent_dim)
     # return_sequences = False (default) => return only the last output => output(batch, latent_dim)
@@ -31,23 +32,21 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
     # return_state = False (default) => don't return the hidden states 
     # return_state = True => return the hidden state and cell state => state_h(batch, latent_dim), state_c(batch, latent_dim)
 
-    _, h, c = LSTM(latent_dim, return_state=True)(encoder_inputs)
+    enc_seq = LSTM(latent_dim, return_sequences=True, name = "enc_lstm_1")(encoder_inputs)
+    _, h, c = LSTM(latent_dim, return_state=True , name = "enc_lstm_2")(enc_seq)
 
-    # --- Decoder ---
+    enc_states = [h, c]
+    # --- Decoder  (2 stacked LSTM) ---
 
     # the encoder need the 3d array so that we use this line to repeat the context vector h for each output time step
     # h(batch, latent_dim) => decoder_input(batch, output_seq_len, latent_dim)
     # decoder_input = RepeatVector(output_seq_len)(h)
-
-    
-
-    #TODO we need to use a different approach for example the teacher forcing or autoregressive
-    decoder_input = Input(shape = output_shape)
+    dec_seq_1, d_h_1 , d_c_1 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_1")(decoder_input , initial_state = enc_states)
 
     # RNN encoder-decoder seq2seq => final states of encoder as initial states of decoder => inizial_state=[h, c]
-    decoder_seq = LSTM(latent_dim, return_sequences=True)(decoder_input, initial_state=[h, c])
+    dec_seq_2 = LSTM(latent_dim, return_sequences=True, name = "dec_lstm_2")(dec_seq_1, initial_state=[d_h_1, d_c_1])
 
-    decoder_outputs = Dense(feature_dim)(decoder_seq) 
+    decoder_outputs = Dense(feature_dim)(dec_seq_2) 
     
     model = Model([encoder_inputs, decoder_input], decoder_outputs)
 

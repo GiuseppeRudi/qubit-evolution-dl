@@ -8,18 +8,20 @@ from datetime import datetime
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-
+import json
 
 def load_run_artifacts(run_dir: str | Path):
-    run_dir = Path("predictions/" + run_dir)
+    run_dir = Path("predictions") / Path(run_dir)
     data_path = run_dir / "data_splits.npz"
     pred_path = run_dir / "predictions.npz"
+    meta_path = run_dir / "meta.json"
 
     if not data_path.exists():
         raise FileNotFoundError(f"Missing {data_path}")
     if not pred_path.exists():
         raise FileNotFoundError(f"Missing {pred_path}")
+    if not meta_path.exists():
+        raise FileNotFoundError(f"Missing {meta_path}")
 
     data = np.load(data_path)
     X_test = data["X_test"]
@@ -28,10 +30,10 @@ def load_run_artifacts(run_dir: str | Path):
     pred_npz = np.load(pred_path, allow_pickle=True)
     pred = pred_npz["pred"]
 
-    # create a class with two params (X_test and Y_test)
-    splits = SimpleNamespace(X_test=X_test, Y_test=Y_test)
-    return splits, pred
+    meta = json.loads(meta_path.read_text())
 
+    splits = SimpleNamespace(X_test=X_test, Y_test=Y_test)
+    return splits, pred, meta
 
 def _pick_pred(pred, sample_index: int):
     pred = np.asarray(pred)
@@ -41,23 +43,14 @@ def _pick_pred(pred, sample_index: int):
         return pred
     raise ValueError(f"Unsupported prediction shape: {pred.shape}")
 
-
-def feature_name_from_index(feature_dim: int, feature_index: int) -> str:
-    num_mag = int((-1 + math.sqrt(1 + (8 * feature_dim))) / 2)
-
-    if feature_index < num_mag:
-        return f"m{feature_index + 1}"
-    return f"c{feature_index - (num_mag - 1)}"
-
-
 def generate_plot_for_feature(
+    feature_names,
     splits,
     pred_a,
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
     sample_index: int = 0,
-    feature_dim: int = 55,
     feature_index: int = 0,
     out_dir: str | Path = "predictions",
 ) -> str:
@@ -102,14 +95,14 @@ def generate_plot_for_feature(
 
     plt.axvline(x=input_len - 1, linestyle=":", label="Fine Input")
 
-    fname = feature_name_from_index(feature_dim,feature_index)
+    fname = feature_names[feature_index]
     plt.title(f"Comparison Prediction Quantum Dynamics: {fname}")
     plt.xlabel(f"Time Steps (Input: 0-{input_len-1}, Output: {input_len}-{input_len+out_len-1})")
     plt.ylabel("Feature Value")
     plt.legend()
     plt.grid(True)
 
-    filename = f"s{sample_index}_f{feature_index+1}_{fname}.jpg"
+    filename = f"s({sample_index})_f({feature_index+1})_{fname}.jpg"
     plot_path = out_dir / filename
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
     plt.close()
@@ -123,6 +116,7 @@ def generate_all_plots(
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
+    feature_names: list[str] = [],
     sample_index: int = 0,
     out_dir: str = "predictions",
 ):
@@ -136,14 +130,14 @@ def generate_all_plots(
             label_a=label_a,
             label_b=label_b,
             sample_index=sample_index,
-            feature_dim=feature_dim,
+            feature_names=feature_names,
             feature_index=feature_index,
             out_dir=out_dir,
         )
         paths.append(p)
     return paths
 
-
+# TODO now we plot the value for pred and true value with standardized value but this is not correct for the presentations so we need to perform the denormalization
 
 def parse_args():
     ap = argparse.ArgumentParser(
@@ -162,11 +156,11 @@ def parse_args():
 def main():
     args = parse_args()
 
-    splits_a, pred_a = load_run_artifacts(args.run_a)
+    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a)
 
     pred_b = None
     if args.run_b is not None:
-        splits_b, pred_b = load_run_artifacts(args.run_b)
+        splits_b, pred_b, meta_b = load_run_artifacts(args.run_b)
 
         # safety check: to compare, X_test and Y_test should match
         if splits_a.X_test.shape != splits_b.X_test.shape or splits_a.Y_test.shape != splits_b.Y_test.shape:
@@ -194,6 +188,7 @@ def main():
             pred_b=pred_b,
             label_a=args.label_a,
             label_b=args.label_b,
+            feature_names= meta_a.get("feature_names", []),
             sample_index=args.sample,
             feature_index=args.feature,
             out_dir=str(out_dir),
@@ -206,6 +201,7 @@ def main():
             pred_b=pred_b,
             label_a=args.label_a,
             label_b=args.label_b,
+            feature_names= meta_a.get("feature_names", []),
             sample_index=args.sample,
             out_dir=str(out_dir),
         )
