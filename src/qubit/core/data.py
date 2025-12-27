@@ -138,14 +138,20 @@ def make_windows_from_trajectories(
     output_len: int,
     stride: int,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    n_traj, T, F = traj_3d.shape
+    
+    T = traj_3d.shape[1]
+
     win = input_len + output_len
+
     if T < win:
         raise ValueError(f"time_steps={T} too small for input+output={win}")
 
     X_list, Y_list = [], []
+
+    # for each trajectory, extract windows with given stride
     for tr in traj_3d:
         for s in range(0, T - win + 1, stride):
+
             X_list.append(tr[s:s+input_len, :])
             Y_list.append(tr[s+input_len:s+win, :])
 
@@ -155,17 +161,20 @@ def make_windows_from_trajectories(
 
 
 def split_by_trajectory_then_window(
-    traj_3d: np.ndarray,   # (n_traj, time_steps, feature_dim)
+    traj_3d: np.ndarray,  
     input_len: int,
     output_len: int,
     stride: int,
     val_ratio: float,
     test_ratio: float,
 ) -> DatasetSplits:
+    
     if not (0.0 <= val_ratio < 1.0 and 0.0 <= test_ratio < 1.0 and (val_ratio + test_ratio) < 1.0):
         raise ValueError("val_ratio and test_ratio must be in [0,1) and val_ratio + test_ratio < 1")
 
+    # n => number of trajectories 
     n = traj_3d.shape[0]
+
     idx = np.random.permutation(n)
 
     n_test = int(round(n * test_ratio))
@@ -175,19 +184,19 @@ def split_by_trajectory_then_window(
     val_idx   = idx[n_test:n_test + n_val]
     train_idx = idx[n_test + n_val:]
 
-    # 1) split per traiettoria
+    # split trajectories
     tr_train = traj_3d[train_idx]
     tr_val   = traj_3d[val_idx]
     tr_test  = traj_3d[test_idx]
 
-    # 2) fit scaler SOLO sul train (sulle traiettorie, non sulle finestre)
+    # standardize based on training set 
     mean, std = fit_standardizer(tr_train)
 
     tr_train = apply_standardizer(tr_train, mean, std)
     tr_val   = apply_standardizer(tr_val, mean, std)
     tr_test  = apply_standardizer(tr_test, mean, std)
 
-    # 3) windows dentro ogni split
+    # windowing after splitting to prevent data leakage
     X_train, Y_train = make_windows_from_trajectories(tr_train, input_len, output_len, stride)
     X_val,   Y_val   = make_windows_from_trajectories(tr_val,   input_len, output_len, stride)
     X_test,  Y_test  = make_windows_from_trajectories(tr_test,  input_len, output_len, stride)
@@ -197,47 +206,6 @@ def split_by_trajectory_then_window(
         X_val=X_val,     Y_val=Y_val,
         X_test=X_test,   Y_test=Y_test,
     )
-
-
-# def split_by_trajectory(
-#     X: np.ndarray,
-#     Y: np.ndarray,
-#     val_ratio: float,
-#     test_ratio: float, ) -> DatasetSplits:
-
-#     if not (0.0 <= val_ratio < 1.0 and 0.0 <= test_ratio < 1.0 and (val_ratio + test_ratio) < 1.0):
-#         raise ValueError("val_ratio and test_ratio must be in [0,1) and val_ratio + test_ratio < 1")
-
-#     # number of used trajectories 
-#     n = X.shape[0]
-    
-#     # important for seed randomization
-#     idx = np.random.permutation(n)
-
-#     # number of trajectories for test and validation
-#     n_test = int(round(n * test_ratio))
-#     n_val = int(round(n * val_ratio))
-
-#     # boundary conditions 
-#     if n_test + n_val >= n:
-#         n_test = min(n_test, n - 2) if n >= 2 else 0
-#         n_val = min(n_val, n - 1 - n_test) if n - n_test >= 1 else 0
-
-#     # generate a list of indexes to trajector
-#     test_idx = idx[:n_test]
-#     val_idx = idx[n_test:n_test + n_val]
-#     train_idx = idx[n_test + n_val:]
-
-#     mean, std = fit_standardizer(X[train_idx])
-
-#     return DatasetSplits(
-#         X_train=apply_standardizer(X[train_idx], mean, std),
-#         Y_train=apply_standardizer(Y[train_idx], mean, std),
-#         X_val=apply_standardizer(X[val_idx], mean, std),
-#         Y_val=apply_standardizer(Y[val_idx], mean, std),
-#         X_test=apply_standardizer(X[test_idx], mean, std),
-#         Y_test=apply_standardizer(Y[test_idx], mean, std),
-#     )
 
 
 

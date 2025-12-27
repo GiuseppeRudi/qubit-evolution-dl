@@ -25,7 +25,7 @@ def save_outputs(
     eval_cfg: dict | None = None,
 ) -> Path:
     eval_cfg = eval_cfg or {}
-    sample_index = int(eval_cfg.get("sample_index", 0))
+    sample_index = eval_cfg.get("sample_index", 0)
     root_dir = eval_cfg.get("predictions_dir", "predictions")
 
     run_dir = make_run_output_dir(model_cfg=model_cfg, root_dir=root_dir)

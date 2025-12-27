@@ -11,12 +11,12 @@ import matplotlib.pyplot as plt
 import json
 import re
 
-RUN_RE = re.compile(r"_(\d{8})_(\d{6})$")  # prende la data/ora alla fine del nome
+RUN_RE = re.compile(r"_(\d{8})_(\d{6})$") 
 
 def find_latest_run_dir() -> str:
     base_dir = Path("predictions")
     if not base_dir.exists():
-        raise FileNotFoundError(f"Directory non trovata: {base_dir}")
+        raise FileNotFoundError(f"Directory not found: {base_dir}")
 
     best = None  # (datetime, Path)
 
@@ -33,7 +33,7 @@ def find_latest_run_dir() -> str:
             best = (dt, p)
 
     if best is None:
-        raise ValueError(f"Nessuna cartella con pattern *_YYYYMMDD_HHMMSS trovata sotto {base_dir}")
+        raise ValueError(f"No directory with pattern *_YYYYMMDD_HHMMSS found inside {base_dir}")
     
     return str(best[1].relative_to(base_dir))
 
@@ -62,23 +62,23 @@ def load_run_artifacts(run_dir: str | Path):
     splits = SimpleNamespace(X_test=X_test, Y_test=Y_test)
     return splits, pred, meta
 
-def _pick_pred(pred, sample_index: int):
-    pred = np.asarray(pred)
-    if pred.ndim == 3:
-        return pred[sample_index]
-    if pred.ndim == 2:
-        return pred
-    raise ValueError(f"Unsupported prediction shape: {pred.shape}")
+# def _pick_pred(pred, sample_index: int):
+#     pred = np.asarray(pred)
+#     if pred.ndim == 3:
+#         return pred[sample_index]
+#     if pred.ndim == 2:
+#         return pred
+#     raise ValueError(f"Unsupported prediction shape: {pred.shape}")
 
 def generate_plot_for_feature(
     feature_names,
     splits,
     pred_a,
+    sample_index,
+    feature_index,
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
-    sample_index: int = 0,
-    feature_index: int = 0,
     out_dir: str | Path = "predictions",
 ) -> str:
     X_test = splits.X_test
@@ -101,16 +101,16 @@ def generate_plot_for_feature(
     time_axis = np.arange(full_len)
     pred_time_axis = np.arange(input_len, input_len + out_len)
 
-    pred_a_2d = _pick_pred(pred_a, sample_index)
+    pred_a_2d = pred_a[sample_index]
     out_a = pred_a_2d[:, feature_index][:out_len]
 
     out_b = None
     if pred_b is not None:
-        pred_b_2d = _pick_pred(pred_b, sample_index)
+        pred_b_2d = pred_b[sample_index]
         out_b = pred_b_2d[:, feature_index][:out_len]
 
     # 3) plot
-    out_dir = Path(out_dir)
+    out_dir = Path(str(out_dir) + "/s(" + str(sample_index) +")")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(15, 6))
@@ -136,32 +136,34 @@ def generate_plot_for_feature(
 
     return str(plot_path)
 
+# TODO make predictions for all test set and reuse a pick pred 
 
 def generate_all_plots(
     splits,
     pred_a,
+    sample_index,
+    feature_names,
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
-    feature_names: list[str] = [],
-    sample_index: int = 0,
     out_dir: str = "predictions",
 ):
     paths = []
     feature_dim = splits.X_test.shape[2]
-    for feature_index in range(feature_dim):
-        p = generate_plot_for_feature(
-            splits=splits,
-            pred_a=pred_a,
-            pred_b=pred_b,
-            label_a=label_a,
-            label_b=label_b,
-            sample_index=sample_index,
-            feature_names=feature_names,
-            feature_index=feature_index,
-            out_dir=out_dir,
-        )
-        paths.append(p)
+    for s in sample_index:
+        for feature_index in range(feature_dim):
+            p = generate_plot_for_feature(
+                splits=splits,
+                pred_a=pred_a,
+                pred_b=pred_b,
+                label_a=label_a,
+                label_b=label_b,
+                sample_index=s,
+                feature_names=feature_names,
+                feature_index=feature_index,
+                out_dir=out_dir,
+            )
+            paths.append(p)
     return paths
 
 # TODO now we plot the value for pred and true value with standardized value but this is not correct for the presentations so we need to perform the denormalization
@@ -175,7 +177,6 @@ def parse_args():
     ap.add_argument("--run-b", default=None, help="Optional path to run directory B for comparison")
     ap.add_argument("--label-a", default="Model A", help="Legend label for run A")
     ap.add_argument("--label-b", default="Model B", help="Legend label for run B")
-    ap.add_argument("--sample", type=int, default=0, help="Sample index in X_test/Y_test")
     ap.add_argument("--feature", type=int, default=None, help="If set, plot only this feature index (0-based)")
     ap.add_argument("--out-dir", default=None, help="Output directory for plots. Default: <run-a>/plots or compare dir")
     return ap.parse_args()
@@ -219,7 +220,7 @@ def main():
             label_a=args.label_a,
             label_b=args.label_b,
             feature_names= meta_a.get("feature_names", []),
-            sample_index=args.sample,
+            sample_index=meta_a.get("sample_index"),
             feature_index=args.feature,
             out_dir=str(out_dir),
         )
@@ -232,7 +233,7 @@ def main():
             label_a=args.label_a,
             label_b=args.label_b,
             feature_names= meta_a.get("feature_names", []),
-            sample_index=args.sample,
+            sample_index=meta_a.get("sample_index"),
             out_dir=str(out_dir),
         )
         print(f"Saved {len(paths)} plots in: {out_dir}")

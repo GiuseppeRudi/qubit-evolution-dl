@@ -37,8 +37,8 @@ def main():
 
     print(f"Final loss: {history.history['loss'][-1]:.4f}")
 
-    sample_x, pred = trainer.predict_from_test(splits)
-    trainer.report_sample(sample_x, pred)
+    sample_x,sample_y, pred = trainer.predict_all_test(splits)
+    trainer.report_sample(sample_x, sample_y, pred)
     eval_cfg = run_cfg.get("evaluation", {})
 
 

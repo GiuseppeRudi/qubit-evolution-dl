@@ -8,10 +8,10 @@ data:
     used_qubits: 8
     time_steps: 1001
     n_traj: 400
-    traj_fraction: 1
+    traj_fraction: 0.1
 
   windowing:
-    input_seq_len: 200
+    input_seq_len: 100
     output_seq_len: 100
     stride: 20
     mode: seq2seq      
@@ -42,7 +42,8 @@ training:
   strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
 
 evaluation:
-  sample_index: 2
+  pred_all : true
+  sample_index: [0, 2, 20]
   print_steps: 5
   save_plots: true
   predictions_dir: "predictions"

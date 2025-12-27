@@ -32,36 +32,50 @@ class StandardTrainer:
         dec_in_train = make_decoder_inputs(splits.Y_train)
         dec_in_val   = make_decoder_inputs(splits.Y_val)
         return self.model.fit(
-        [splits.X_train, dec_in_train],   # teacher forcing training 
-        splits.Y_train,
-        epochs=self.cfg.training.epochs,
-        batch_size=self.cfg.training.batch_size,
-        validation_data=([splits.X_val, dec_in_val], splits.Y_val),
-        verbose=1,
+            [splits.X_train, dec_in_train],   # teacher forcing training 
+            splits.Y_train,
+            epochs=self.cfg.training.epochs,
+            batch_size=self.cfg.training.batch_size,
+            validation_data=([splits.X_val, dec_in_val], splits.Y_val),
+            verbose=1,
         )
 
-    def predict_from_train(self, splits):
-        idx = int(self.eval_cfg.get("sample_index", 0))
-        sample_x = splits.X_train[idx:idx+1]
-        sample_y = splits.Y_train[idx:idx+1]
 
-        dec_in = make_decoder_inputs(sample_y)
-        pred = self.model.predict([sample_x, dec_in], verbose=0)
-        return sample_x, pred
-    
-    def predict_from_test(self, splits):
-        idx = int(self.eval_cfg.get("sample_index", 0))
-        sample_x = splits.X_test[idx:idx+1]
-        sample_y = splits.Y_test[idx:idx+1]
+    def predict_all_test(self, splits):
+        # TODO dont use teacher forcing for iference this is only for debug
+        X = splits.X_test                 
+        Y = splits.Y_test                
 
-        dec_in = make_decoder_inputs(sample_y)
-        pred = self.model.predict([sample_x, dec_in], verbose=0)
-        return sample_x, pred
+        dec_in = make_decoder_inputs(Y)  
+        pred = self.model.predict([X, dec_in], batch_size=self.cfg.training.batch_size, verbose=0)
+        return X, Y , pred                 
 
-    # TODO change the method or create another predict because use the Xtrain eYtrain for predict and this is not correct only for debug 
-    def report_sample(self, sample_x, pred):
-        steps = int(self.eval_cfg.get("print_steps", 5))
+
+
+
+    def report_sample(self, sample_x, sample_y, pred):
+        
+        # TODO refactor for a correct indexing 
+        steps = self.eval_cfg.get("print_steps", 5)
         print(f"  X shape: {sample_x.shape}")
+        print(f"  Y shape: {sample_y.shape}")
         print(f"  Pred shape: {pred.shape}")
+
         np.set_printoptions(suppress=True, precision=16)
-        print(pred[0, :steps, :])
+
+        print("\n step | target                | pred                  | abs_err")
+        print("------|-----------------------|-----------------------|----------------------")
+
+        for t in range(steps):
+            y_t = sample_y[0, t]
+            p_t = pred[0, t]
+            err = np.abs(p_t - y_t)
+
+            print(
+                f"{t:>5} | "
+                f"{np.array2string(y_t, precision=6)} | "
+                f"{np.array2string(p_t, precision=6)} | "
+                f"{np.array2string(err, precision=6)}"
+            )
+
+

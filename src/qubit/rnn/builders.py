@@ -44,7 +44,7 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
     dec_seq_1, d_h_1 , d_c_1 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_1")(decoder_input , initial_state = enc_states)
 
     # RNN encoder-decoder seq2seq => final states of encoder as initial states of decoder => inizial_state=[h, c]
-    dec_seq_2 = LSTM(latent_dim, return_sequences=True, name = "dec_lstm_2")(dec_seq_1, initial_state=[d_h_1, d_c_1])
+    dec_seq_2 = LSTM(latent_dim, return_sequences=True, name = "dec_lstm_2")(dec_seq_1)
 
     decoder_outputs = Dense(feature_dim)(dec_seq_2) 
     
@@ -53,3 +53,7 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
     model.compile(optimizer=model_cfg.compile.optimizer, loss=model_cfg.compile.loss, metrics = model_cfg.compile.metrics)
 
     return model
+
+ # TODO : implement the save and load model functions for keras models
+# model.save('path_dir') # to save the model
+# model = keras.models.load_model('path_dir/my_model.h5') # to load the model
