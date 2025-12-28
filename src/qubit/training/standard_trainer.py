@@ -1,6 +1,9 @@
 import numpy as np
 from ..registry import register_trainer
 
+from ..inference.seq2seq_rnn import Seq2SeqLSTM2LayerAdapter
+from ..inference.base import decode_autoregressive
+
 # TODO : implement a strategies in one approach and create a different type of approach 
 
 # teacher forcing technique
@@ -43,15 +46,38 @@ class StandardTrainer:
         )
 
 
+    # def predict_all_test(self, splits):
+    #     # TODO dont use teacher forcing for iference this is only for debug
+    #     X = splits.X_test                 
+    #     Y = splits.Y_test                
+
+    #     dec_in = make_decoder_inputs(Y)  
+    #     pred = self.model.predict([X, dec_in], batch_size=self.cfg.training.batch_size, verbose=0)
+    #     return X, Y , pred                 
+
+
+
     def predict_all_test(self, splits):
-        # TODO dont use teacher forcing for iference this is only for debug
-        X = splits.X_test                 
-        Y = splits.Y_test                
+        mode = self.eval_cfg.get("inference_mode", "free_running")
+        X = splits.X_test
+        Y = splits.Y_test
+        bs = self.cfg.training.batch_size
 
-        dec_in = make_decoder_inputs(Y)  
-        pred = self.model.predict([X, dec_in], batch_size=self.cfg.training.batch_size, verbose=0)
-        return X, Y , pred                 
+        if mode == "teacher_forcing":
+            dec_in = make_decoder_inputs(Y)  # usa labels (debug)
+            pred = self.model.predict([X, dec_in], batch_size=bs, verbose=0)
+            return X, Y, pred
 
+        # free-running (nessun aiuto / nessuna label nel decoder)
+        adapter = Seq2SeqLSTM2LayerAdapter(self.model)
+        pred = decode_autoregressive(
+            adapter,
+            X,
+            out_steps=Y.shape[1],                       # solo per sapere T_out
+            start_mode=self.eval_cfg.get("start_mode", "zeros"),
+            batch_size=bs,
+        )
+        return X, Y, pred
 
 
 
