@@ -1,6 +1,8 @@
 import numpy as np
 from ..registry import register_trainer
 
+# TODO : implement a strategies in one approach and create a different type of approach 
+
 # teacher forcing technique
 def make_decoder_inputs(Y: np.ndarray) -> np.ndarray:
     # dec_in shape = (N, output_seq_len, feature_dim)

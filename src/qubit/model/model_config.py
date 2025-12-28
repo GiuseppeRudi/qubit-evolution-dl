@@ -13,6 +13,7 @@ ModelVariant = str
 @dataclass(frozen=True)
 class ModelConfig:
     name: str 
+    save_model: bool
     type: ModelType             
     variant: ModelVariant        
     compile: CompileConfig 

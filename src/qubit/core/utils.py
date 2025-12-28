@@ -11,6 +11,20 @@ def parse_args():
         required=True
     )
 
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None
+    )
+
+    parser.add_argument(
+        "--no-training",
+        action="store_false",
+        dest="training"
+    )
+    
+    parser.set_defaults(training=True)
+
     return parser.parse_args()
 
 def get_device():

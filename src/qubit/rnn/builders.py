@@ -57,3 +57,4 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
  # TODO : implement the save and load model functions for keras models
 # model.save('path_dir') # to save the model
 # model = keras.models.load_model('path_dir/my_model.h5') # to load the model
+

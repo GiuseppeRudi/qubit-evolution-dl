@@ -17,7 +17,7 @@ def get_project_root() -> Path:
 
 
 def load_yaml(path: Path | str) -> Dict[str, Any]:
-    path = Path("configs/" + path + ".yaml").expanduser().resolve()
+    path = Path("configs/" + str(path) + ".yaml").expanduser().resolve()
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
@@ -39,6 +39,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     # discriminants (fixed)
     model_type = m.get("type")
     variant = m.get("variant")
+    save_model = m.get("save_model", False)
 
     if model_type is None:
         raise ValueError("Missing required field: model.type")
@@ -72,6 +73,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
     return ModelConfig(
         name=name,
+        save_model = save_model,
         type=model_type_norm,
         variant=variant_norm,
         compile=compile_cfg,

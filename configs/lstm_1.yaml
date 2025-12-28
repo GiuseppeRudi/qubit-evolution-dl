@@ -23,6 +23,7 @@ data:
 
 model:
   name: "lstm_baseline_v1"
+  save_model: true
   type: "RNN"
   variant: "SEQ2SEQ"
 
@@ -41,6 +42,7 @@ model:
 training:
   strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
 
+  
 evaluation:
   pred_all : true
   sample_index: [0, 2, 20]

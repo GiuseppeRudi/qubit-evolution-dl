@@ -20,9 +20,11 @@ def save_outputs(
     splits,
     pred,
     model_cfg,
-    history,
     feat_names,
+    history,
     eval_cfg: dict | None = None,
+    model = None,
+    save_model : bool = False,
 ) -> Path:
     eval_cfg = eval_cfg or {}
     sample_index = eval_cfg.get("sample_index", 0)
@@ -30,7 +32,11 @@ def save_outputs(
 
     run_dir = make_run_output_dir(model_cfg=model_cfg, root_dir=root_dir)
 
-    save_loss_plots_keras(run_dir,history)
+    if save_model and model is not None:
+        model.save(run_dir/"model.keras")
+
+    if history is not None:
+        save_loss_plots_keras(run_dir,history)
 
     np.savez_compressed(
         run_dir / "data_splits.npz",
