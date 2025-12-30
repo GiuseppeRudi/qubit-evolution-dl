@@ -35,10 +35,11 @@ def find_latest_run_dir() -> str:
     if best is None:
         raise ValueError(f"No directory with pattern *_YYYYMMDD_HHMMSS found inside {base_dir}")
     
-    return str(best[1].relative_to(base_dir))
+    return str(best[1])
 
 def load_run_artifacts(run_dir: str | Path):
-    run_dir = Path("predictions") / Path(run_dir)
+    # run_dir = Path("predictions") / Path(run_dir)
+    run_dir = Path(run_dir)
     data_path = run_dir / "data_splits.npz"
     pred_path = run_dir / "predictions.npz"
     meta_path = run_dir / "meta.json"
@@ -206,7 +207,7 @@ def main():
         out_dir = Path(args.out_dir)
     else:
         if args.run_b is None:
-            out_dir = Path("predictions/" + args.run_a) / "plots"
+            out_dir = Path(args.run_a) / "plots"
         else:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             out_dir = Path("predictions") / "compare" / f"compare__{ts}"

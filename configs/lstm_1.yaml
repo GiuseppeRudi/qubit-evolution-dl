@@ -5,21 +5,21 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10
-    used_qubits: 8
+    used_qubits: 2
     time_steps: 1001
     n_traj: 400
-    traj_fraction: 1
+    traj_fraction: 0.1
 
   windowing:
-    input_seq_len: 100
+    input_seq_len: 200
     output_seq_len: 100
     stride: 20
     mode: seq2seq      
 
   split:
     seed: 42
-    val_ratio: 0.1
-    test_ratio: 0.1
+    val_ratio: 0.2
+    test_ratio: 0.15
 
 model:
   name: "lstm_baseline_v1"
@@ -36,16 +36,44 @@ model:
     metrics: ["mae"]
 
   training:
-    epochs: 30
+    epochs: 5
     batch_size: 32
 
-training:
-  strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
 
-  
+
+training:
+  epochs: 5
+  batch_size: 32
+  strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
+  phases:
+    - name: teacher_forcing
+      epochs: 10
+      tf_ratio: 1.0
+
+    - name: masked_modeling
+      epochs: 10
+      mask_prob: 0.15
+
+    - name: scheduled_sampling
+      epochs: 5
+      tf_ratio_start: 1.0
+      tf_ratio_end: 0.2
+
+  fr_eval:
+    enabled: true
+    split: test   
+    n_eval: 128
+    every_epochs: 5
+    out_steps_eval: 30   # (se lo implementi)
+
+
+inference:
+  start_mode: "zeros"    # "zeros" | "true"
+
+
 evaluation:
   pred_all : true
-  sample_index: [0, 2, 20]
+  sample_index: [0]
   print_steps: 5
   save_plots: true
   predictions_dir: "predictions"

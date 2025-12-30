@@ -47,7 +47,49 @@ def main():
     trainer.report_sample(sample_x, sample_y, pred)
     eval_cfg = run_cfg.get("evaluation", {})
 
+    import matplotlib.pyplot as plt
+    if history is not None:
+        plt.figure()
+        plt.plot(history.history["loss"], label="train_loss (TF)")
+        plt.plot(history.history.get("val_loss", []), label="val_loss (TF)")
+
+        # se callback abilitata:
+        if "val_fr_loss" in history.history:
+            plt.plot(history.history["val_fr_loss"], label="val_fr_loss (free-running)")
+
+        plt.legend()
+        plt.show()
+
+    cmp = trainer.compare_losses(splits, split="val") 
+    print("VAL compare:", cmp)
+
+    cmp_test = trainer.compare_losses(splits, split="test")
+    print("TEST compare:", cmp_test)
+
     save_outputs(splits, pred, model_cfg, feat_names, history, eval_cfg, model, model_cfg.save_model)  
 
 if __name__ == "__main__":
     main()
+
+# TODO RESOLVE ERROR : 
+
+# TODO CAPIRE CHE FA CALL BACK IN STANDARD TRAINER
+# CAMBIARE I MODEL PER IL FILE YAML USANGO TRAINING CON DIVERSE STRATEGIE 
+# SISTEMARE STRATEIGWE 
+# PLOTTARE IL CODICE DI MATPLOT CHE ABBIAMO SUL MAIN E LO SPOSTIAMO NEL FILE DATA FROM PLOT 
+
+
+#     9/9 ━━━━━━━━━━━━━━━━━━━━ 0s 5ms/step 
+# Traceback (most recent call last):
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 72, in <module>
+#     main()
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 63, in main
+#     cmp = trainer.compare_losses(splits, split="val") 
+#           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/standard_trainer.py", line 110, in compare_losses
+#     fr_loss = self._scalar_loss(Y, pred_fr)
+#               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/standard_trainer.py", line 116, in _scalar_loss
+#     v = self.model.loss(y_true, y_pred)        
+#         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# TypeError: 'str' object is not callable

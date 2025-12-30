@@ -44,9 +44,9 @@ def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
     dec_seq_1, d_h_1 , d_c_1 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_1")(decoder_input , initial_state = enc_states)
 
     # RNN encoder-decoder seq2seq => final states of encoder as initial states of decoder => inizial_state=[h, c]
-    dec_seq_2, d_h_2, d_c_2 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_2")(dec_seq_1)
+    dec_seq_2, d_h_2, d_c_2 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_2")(dec_seq_1, initial_state = enc_states)
 
-    decoder_outputs = Dense(feature_dim)(dec_seq_2) 
+    decoder_outputs = Dense(feature_dim, name ="out_dense")(dec_seq_2) 
     
     model = Model([encoder_inputs, decoder_input], decoder_outputs)
 
