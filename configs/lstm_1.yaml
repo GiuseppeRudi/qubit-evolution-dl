@@ -24,7 +24,7 @@ data:
 model:
   name: "lstm_baseline_v1"
   save_model: true
-  type: "RNN"
+  type: "LSTM"
   variant: "SEQ2SEQ"
 
   params:
@@ -35,16 +35,16 @@ model:
     loss: "mse"
     metrics: ["mae"]
 
-  training:
-    epochs: 5
-    batch_size: 32
+  inference:
+    mode : "free_running"   # "teacher_forcing" | "free_running"
+    start_mode: "zeros"    # "zeros" | "last_x"
 
 
 
 training:
   epochs: 5
   batch_size: 32
-  strategy: "standard"   # standard | teacher_forcing | autoregressive (future)
+  approach: "standard"   # standard | teacher_forcing | autoregressive (future)
   phases:
     - name: teacher_forcing
       epochs: 10
@@ -59,21 +59,16 @@ training:
       tf_ratio_start: 1.0
       tf_ratio_end: 0.2
 
+  # Free-running evaluation 
   fr_eval:
-    enabled: true
-    split: test   
-    n_eval: 128
-    every_epochs: 5
-    out_steps_eval: 30   # (se lo implementi)
+    enabled: true  # enable/disable free-running eval callback
+    split: test    # test | val 
+    p_eval: 20    # percentage of sequences to evaluate (fixed or None for all)
+    every_epochs: 5 # frequency of evaluation (in epochs)
+  
 
-
-inference:
-  start_mode: "zeros"    # "zeros" | "true"
-
-
-evaluation:
-  pred_all : true
-  sample_index: [0]
-  print_steps: 5
+plot:
+  pred_all : true # TODO this is not usefull
+  sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
   save_plots: true
   predictions_dir: "predictions"

@@ -1,11 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Literal, Union
+from dataclasses import dataclass
+from typing import  Union
 
 from .training_config import TrainingConfig
 from .transformer_config import TransformerConfig
 from .compile_config import CompileConfig
 from .rnn_config import RNNConfig
-
+from .inference_config import InferenceConfig
 
 ModelType =  str              
 ModelVariant = str                           
@@ -17,5 +17,5 @@ class ModelConfig:
     type: ModelType             
     variant: ModelVariant        
     compile: CompileConfig 
-    training: TrainingConfig 
+    inference: InferenceConfig 
     params: Union[RNNConfig, TransformerConfig] 

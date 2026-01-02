@@ -22,14 +22,14 @@ def get_builder(model_type: str, variant: str):
 # Trainer registry
 TRAINER_REGISTRY: Dict[str, type] = {}
 
-def register_trainer(strategy: str):
+def register_trainer(approach: str):
     def deco(cls):
-        TRAINER_REGISTRY[strategy.lower()] = cls
+        TRAINER_REGISTRY[approach.lower()] = cls
         return cls
     return deco
 
-def get_trainer(strategy: str):
-    key = strategy.lower()
+def get_trainer(approach: str):
+    key = approach.lower()
     if key not in TRAINER_REGISTRY:
-        raise ValueError(f"No trainer registered for '{strategy}'. Available: {list(TRAINER_REGISTRY.keys())}")
+        raise ValueError(f"No trainer registered for '{approach}'. Available: {list(TRAINER_REGISTRY.keys())}")
     return TRAINER_REGISTRY[key]

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Literal, Sequence
+from typing import Protocol
+from ..enums.start_mode import StartMode
 import numpy as np
 
-InferenceMode = Literal["teacher_forcing", "free_running"]
-StartMode = Literal["zeros", "last_x"]
 # TODO remember to update the start mode with add the last x and this is the reason why the plots start wrong 
 
 class AutoregressiveAdapter(Protocol):

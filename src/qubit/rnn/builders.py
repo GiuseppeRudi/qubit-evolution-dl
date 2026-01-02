@@ -6,7 +6,7 @@ from ..registry import register_model
 from typing import cast
 from ..model.rnn_config import RNNConfig
 
-@register_model("RNN", "SEQ2SEQ")
+@register_model("LSTM", "SEQ2SEQ")
 def build_rnn_model(x_train , y_train , model_cfg: ModelConfig):
 
     latent_dim = cast(RNNConfig,model_cfg.params).latent_dim

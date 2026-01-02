@@ -1,16 +1,21 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, Dict, cast, List
 import yaml
 
 from ..model.model_config import ModelConfig
 from ..model.rnn_config import RNNConfig
-from ..model.training_config import TrainingConfig
 from ..model.transformer_config import TransformerConfig
 from ..model.compile_config import CompileConfig
+from ..model.inference_config import InferenceConfig
+from ..model.training_config import TrainingConfig
+from ..model.fr_eval_config import FrEvalConfig
+from ..model.plot_config import PlotConfig
 
 
+from ..enums.model_type import ModelType
+from ..enums.model_variant import ModelVariant
 
 def get_project_root() -> Path:
     return Path(__file__).resolve().parents[3]  # core -> qubit -> src -> qubit-evolution-dl
@@ -49,22 +54,21 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
     # Parse the  config dict into a dataclass (dict is unpacked as kwargs).
     # common blocks
-    compile_cfg = CompileConfig(**(m.get("compile", {}) or {}))
-    training_cfg = TrainingConfig(**(m.get("training", {}) or {}))
     params_dict = m.get("params", {}) or {}
+    compile_cfg = CompileConfig(**(m.get("compile", {}) or {}))
+    inference_cfg = InferenceConfig(**(m.get("inference", {}) or {}))
 
     model_type_norm = str(model_type).strip().upper()
     variant_norm = str(variant).strip().upper()
 
-    #TODO create a enum without this harcoding value, the same thing in ModelConfig
-    if model_type_norm == "RNN":
-        if variant_norm in {"SEQ2SEQ", "ALTRE..", "ALTRE.."}:
+    if model_type_norm == ModelType.LSTM:
+        if variant_norm in ModelVariant:
             params = RNNConfig(**params_dict)
         else:
             raise ValueError(f"Unknown RNN variant: {variant}")
 
-    elif model_type_norm in {"TRN"}:
-        if variant_norm in {"ENCODERDENSE", "ALTRE.."}:
+    elif model_type_norm == ModelType.TRN:
+        if variant_norm in ModelVariant:
             params = TransformerConfig(**params_dict)
         else:
             raise ValueError(f"Unknown Transformer variant: {variant}")
@@ -77,9 +81,10 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
         type=model_type_norm,
         variant=variant_norm,
         compile=compile_cfg,
-        training=training_cfg,
+        inference=inference_cfg,
         params=params,
     )
+
 
 
 def load_run_config(path: str) -> dict:
@@ -88,7 +93,92 @@ def load_run_config(path: str) -> dict:
     cfg = load_yaml(path)
 
     # verify if in the dicitionary are the mandatory key
-    for k in ["data", "model", "training"]:
+    for k in ["data", "model", "training","plot"]:
         if k not in cfg:
             raise ValueError(f"Missing '{k}' in run config")
     return cfg
+
+from ..enums.phase_name import PhaseName
+from ..enums.split_name import SplitName
+from ..model.phase_config import *
+
+
+def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
+    if "name" not in d:
+        raise ValueError("Phase config missing 'name' field")
+
+    name = PhaseName(d["name"])  # valida automaticamente (ValueError se typo)
+
+    if name == PhaseName.TEACHER_FORCING:
+        return TeacherForcingPhase(**d)
+    if name == PhaseName.MASKED_MODELING:
+        return MaskedModelingPhase(**d)
+    if name == PhaseName.SCHEDULED_SAMPLING:
+        return ScheduledSamplingPhase(**d)
+
+    raise ValueError(f"Unsupported phase name: {name}")
+
+
+def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
+
+    approach = t.get("approach", "standard")
+    epochs = t.get("epochs", 10)
+    batch_size = t.get("batch_size", 32)
+    phases_raw = t.get("phases", []) or []
+    phases = [parse_phase(p) for p in phases_raw]
+
+    fr_eval_raw = t.get("fr_eval", {}) or {}
+    # split deve essere enum-safe
+    if "split" in fr_eval_raw:
+        fr_eval_raw = dict(fr_eval_raw)
+        fr_eval_raw["split"] = SplitName(fr_eval_raw["split"])
+
+    fr_eval = FrEvalConfig(**fr_eval_raw)
+
+    return TrainingConfig(
+        epochs=epochs,
+        approach= approach ,
+        batch_size=batch_size,
+        phases=phases,
+        fr_eval=fr_eval,
+    )
+
+
+
+def _parse_sample_index(v: Any) -> List[int]:
+    if v is None:
+        return [0]
+
+    if isinstance(v, int):
+        return [v]
+
+    if isinstance(v, (list, tuple)):
+        out: List[int] = []
+        for x in v:
+            if isinstance(x, int):
+                out.append(x)
+            elif isinstance(x, str) and x.strip():
+                out.append(int(x.strip()))
+            else:
+                raise TypeError(f"sample_index contains unsupported type: {type(x)}")
+        return out
+
+    raise TypeError(f"Unsupported sample_index type: {type(v)}")
+
+
+def load_plot_config(p: Dict[str, Any]) -> PlotConfig:
+
+    pred_all = bool(p.get("pred_all", True))
+    save_plots = bool(p.get("save_plots", True))
+
+    sample_index = _parse_sample_index(p.get("sample_index", [0]))
+
+    predictions_dir_raw = p.get("predictions_dir", "predictions")
+    predictions_dir = Path(predictions_dir_raw)
+
+    return PlotConfig(
+        pred_all=pred_all,
+        sample_index=sample_index,
+        save_plots=save_plots,
+        predictions_dir=predictions_dir,
+    )
