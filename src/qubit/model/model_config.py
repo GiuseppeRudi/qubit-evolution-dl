@@ -7,8 +7,8 @@ from .compile_config import CompileConfig
 from .rnn_config import RNNConfig
 from .inference_config import InferenceConfig
 
-ModelType =  str              
-ModelVariant = str                           
+from ..enums.model_type import ModelType
+from ..enums.model_variant import ModelVariant                       
 
 @dataclass(frozen=True)
 class ModelConfig:

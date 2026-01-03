@@ -4,10 +4,17 @@ import numpy as np
 import json
 from .plot import save_loss_plots_keras
 
-def make_run_output_dir(model_cfg, root_dir: str | Path) -> Path:
-    root_dir = Path(root_dir)
-    model_type = str(model_cfg.type).upper()
-    variant = str(model_cfg.variant)
+from ..enums.model_type import ModelType
+from ..enums.model_variant import ModelVariant
+
+from ..model.model_config import ModelConfig
+from ..model.plot_config import PlotConfig
+
+
+def make_run_output_dir(model_cfg : ModelConfig) -> Path:
+    root_dir = Path("predictions")
+    model_type : ModelType = model_cfg.type
+    variant : ModelVariant = model_cfg.variant
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{model_cfg.name}__{ts}"
@@ -19,51 +26,54 @@ def make_run_output_dir(model_cfg, root_dir: str | Path) -> Path:
 def save_outputs(
     splits,
     pred,
-    model_cfg,
+    model_cfg : ModelConfig,
     feat_names,
     history,
-    eval_cfg: dict | None = None,
+    plot_cfg: PlotConfig,
     model = None,
-    save_model : bool = False,
 ) -> Path:
-    eval_cfg = eval_cfg or {}
-    sample_index = eval_cfg.get("sample_index", 0)
-    root_dir = eval_cfg.get("predictions_dir", "predictions")
+    sample_index = plot_cfg.sample_index
+    save_model = model_cfg.save_model
+    save_plots = plot_cfg.save_plots
+    save_artifacts  = plot_cfg.save_artifacts
 
-    run_dir = make_run_output_dir(model_cfg=model_cfg, root_dir=root_dir)
+    run_dir = make_run_output_dir(model_cfg=model_cfg)
 
     if save_model and model is not None:
         model.save(run_dir/"model.keras")
 
-    if history is not None:
+    if history is not None and save_plots:
         save_loss_plots_keras(run_dir,history)
 
-    np.savez_compressed(
-        run_dir / "data_splits.npz",
-        X_test=splits.X_test,
-        Y_test=splits.Y_test,
-    )
+    if save_artifacts:
+        np.savez_compressed(
+            run_dir / "data_splits.npz",
+            X_test=splits.X_test,
+            Y_test=splits.Y_test,
+        )
 
-    np.savez_compressed(
-        run_dir / "predictions.npz",
-        pred=np.asarray(pred),
-        model_type=str(model_cfg.type),
-        variant=str(model_cfg.variant),
-        name=str(model_cfg.name),
-    )
+        np.savez_compressed(
+            run_dir / "predictions.npz",
+            pred=np.asarray(pred),
+            model_type=str(model_cfg.type),
+            variant=str(model_cfg.variant),
+            name=str(model_cfg.name),
+        )
 
-    meta = {
-        "experiment_name": model_cfg.name,
-        "model_type": str(model_cfg.type),
-        "variant": str(model_cfg.variant),
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "sample_index": sample_index,
-        "x_test_shape": list(splits.X_test.shape),
-        "y_test_shape": list(splits.Y_test.shape),
-        "pred_shape": list(np.asarray(pred).shape),
-        "feature_names": feat_names,
-    }
-    (run_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+        meta = {
+            "experiment_name": model_cfg.name,
+            "model_type": str(model_cfg.type),
+            "variant": str(model_cfg.variant),
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "sample_index": sample_index,
+            "x_test_shape": list(splits.X_test.shape),
+            "y_test_shape": list(splits.Y_test.shape),
+            "pred_shape": list(np.asarray(pred).shape),
+            "feature_names": feat_names,
+        }
+        (run_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-    print(f"Saved artifacts to: {run_dir}")
+    
+        print(f"Saved artifacts to: {run_dir}")
+        
     return run_dir

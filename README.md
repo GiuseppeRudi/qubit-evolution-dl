@@ -39,6 +39,12 @@ sequence models to reconstruct and predict qubit behavior.
 ```bash
 conda env create -f environment.yml
 conda activate qubit
+
+conda activate qubit
+
+conda env config vars set TF_CPP_MIN_LOG_LEVEL=3
+conda env config vars set ABSL_LOGGING_LEVEL=ERROR
+
 python install_tf.py
 python main.py
 Docker (recommended)

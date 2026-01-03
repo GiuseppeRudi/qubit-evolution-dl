@@ -91,8 +91,9 @@ def build_inference_models(
 class Seq2SeqLSTM2LayerAdapter(AutoregressiveAdapter):
 
 
-    def __init__(self, trained_model: keras.Model, *, layer_names: dict | None = None):
+    def __init__(self, trained_model: keras.Model, *, verbose , layer_names: dict | None = None ):
         layer_names = layer_names or {}
+        self.verbose = verbose
         (self.encoder_model,
          self.decoder_model,
          self._feature_dim,
@@ -106,7 +107,7 @@ class Seq2SeqLSTM2LayerAdapter(AutoregressiveAdapter):
         # X = ensure_3d(X).astype(np.float32, copy=False)
 
         # h1,c1 from encoder
-        h1, c1 = self.encoder_model.predict(X, batch_size=batch_size)
+        h1, c1 = self.encoder_model.predict(X, batch_size=batch_size, verbose= self.verbose)
 
         # TODO check if it's better to initialize h2,c2 with zeros or with h1,c1
 
@@ -135,9 +136,9 @@ class Seq2SeqLSTM2LayerAdapter(AutoregressiveAdapter):
         dec_t = np.asarray(dec_t, dtype=np.float32)
         y_t, h1, c1, h2, c2 = self.decoder_model.predict(
             [dec_t, state.h1, state.c1, state.h2, state.c2],
-            batch_size=batch_size)
+            batch_size=batch_size,verbose= self.verbose)
         
         new_state = LSTM2LayerState(h1=h1, c1=c1, h2=h2, c2=c2)
         return y_t, new_state
 
-# TODO check predictions are correct whem we plot them
+

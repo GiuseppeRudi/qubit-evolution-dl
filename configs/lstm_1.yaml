@@ -35,14 +35,17 @@ model:
     loss: "mse"
     metrics: ["mae"]
 
+
   inference:
     mode : "free_running"   # "teacher_forcing" | "free_running"
     start_mode: "zeros"    # "zeros" | "last_x"
+    verbose : 0  # 0,1,2
 
 
 
 training:
-  epochs: 5
+  epochs: 3
+  verbose : 1
   batch_size: 32
   approach: "standard"   # standard | teacher_forcing | autoregressive (future)
   phases:
@@ -63,12 +66,12 @@ training:
   fr_eval:
     enabled: true  # enable/disable free-running eval callback
     split: test    # test | val 
-    p_eval: 20    # percentage of sequences to evaluate (fixed or None for all)
-    every_epochs: 5 # frequency of evaluation (in epochs)
+    p_eval: 0.2    # value beetwen  > 0 e 1 for percentual 
+    every_epochs: 1 # frequency of evaluation (in epochs)
   
 
 plot:
   pred_all : true # TODO this is not usefull
   sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
   save_plots: true
-  predictions_dir: "predictions"
+  save_artifacts : true

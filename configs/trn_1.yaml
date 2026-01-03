@@ -45,4 +45,3 @@ evaluation:
   sample_index: 0
   print_steps: 5
   save_plots: true
-  predictions_dir: "predictions"

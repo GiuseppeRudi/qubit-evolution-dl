@@ -12,10 +12,16 @@ from ..model.inference_config import InferenceConfig
 from ..model.training_config import TrainingConfig
 from ..model.fr_eval_config import FrEvalConfig
 from ..model.plot_config import PlotConfig
+from ..model.phase_config import *
 
 
+from .error import *
+
+from ..enums.phase_name import PhaseName
+from ..enums.split_name import SplitName
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
+from ..enums.verbose_mode import VerboseMode
 
 def get_project_root() -> Path:
     return Path(__file__).resolve().parents[3]  # core -> qubit -> src -> qubit-evolution-dl
@@ -40,17 +46,15 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
     # free label (for distinction)
     name = m.get("name", "experiment")
-
-    # discriminants (fixed)
-    model_type = m.get("type")
-    variant = m.get("variant")
     save_model = m.get("save_model", False)
 
-    if model_type is None:
-        raise ValueError("Missing required field: model.type")
-    if variant is None:
-        raise ValueError("Missing required field: model.variant")
-
+    try:
+        model_type = ModelType(m["type"])
+        variant = ModelVariant(m["variant"])
+    except KeyError as e:
+        raise ValueError(f"Missing required field: model.{e.args[0]}") from None
+    except ValueError as e:
+        raise ValueError(f"Invalid model config: {e}") from None
 
     # Parse the  config dict into a dataclass (dict is unpacked as kwargs).
     # common blocks
@@ -58,17 +62,15 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     compile_cfg = CompileConfig(**(m.get("compile", {}) or {}))
     inference_cfg = InferenceConfig(**(m.get("inference", {}) or {}))
 
-    model_type_norm = str(model_type).strip().upper()
-    variant_norm = str(variant).strip().upper()
 
-    if model_type_norm == ModelType.LSTM:
-        if variant_norm in ModelVariant:
+    if model_type == ModelType.LSTM:
+        if variant in ModelVariant:
             params = RNNConfig(**params_dict)
         else:
             raise ValueError(f"Unknown RNN variant: {variant}")
 
-    elif model_type_norm == ModelType.TRN:
-        if variant_norm in ModelVariant:
+    elif model_type == ModelType.TRN:
+        if variant in ModelVariant:
             params = TransformerConfig(**params_dict)
         else:
             raise ValueError(f"Unknown Transformer variant: {variant}")
@@ -78,8 +80,8 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     return ModelConfig(
         name=name,
         save_model = save_model,
-        type=model_type_norm,
-        variant=variant_norm,
+        type=model_type,
+        variant=variant,
         compile=compile_cfg,
         inference=inference_cfg,
         params=params,
@@ -98,9 +100,7 @@ def load_run_config(path: str) -> dict:
             raise ValueError(f"Missing '{k}' in run config")
     return cfg
 
-from ..enums.phase_name import PhaseName
-from ..enums.split_name import SplitName
-from ..model.phase_config import *
+
 
 
 def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
@@ -120,7 +120,7 @@ def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
 
 
 def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
-
+    verbose = t.get("verbose" , 1)
     approach = t.get("approach", "standard")
     epochs = t.get("epochs", 10)
     batch_size = t.get("batch_size", 32)
@@ -141,6 +141,7 @@ def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
         batch_size=batch_size,
         phases=phases,
         fr_eval=fr_eval,
+        verbose=verbose
     )
 
 
@@ -170,15 +171,14 @@ def load_plot_config(p: Dict[str, Any]) -> PlotConfig:
 
     pred_all = bool(p.get("pred_all", True))
     save_plots = bool(p.get("save_plots", True))
-
+    save_artifacts = bool(p.get("save_artifacts", True))
     sample_index = _parse_sample_index(p.get("sample_index", [0]))
 
-    predictions_dir_raw = p.get("predictions_dir", "predictions")
-    predictions_dir = Path(predictions_dir_raw)
+
 
     return PlotConfig(
         pred_all=pred_all,
         sample_index=sample_index,
         save_plots=save_plots,
-        predictions_dir=predictions_dir,
+        save_artifacts=save_artifacts,
     )

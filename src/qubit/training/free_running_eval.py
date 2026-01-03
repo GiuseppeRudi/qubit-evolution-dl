@@ -8,6 +8,8 @@ from typing import cast
 from ..inference.seq2seq_rnn import Seq2SeqLSTM2LayerAdapter
 from ..inference.base import  decode_autoregressive
 from ..enums.start_mode import StartMode
+from ..enums.verbose_mode import VerboseMode
+from ..model.training_config import TrainingConfig
 
 class FreeRunningEvalCallback(keras.callbacks.Callback):
     """
@@ -20,21 +22,19 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         X_eval: np.ndarray,
         Y_eval: np.ndarray,
         *,
-        batch_size: int,
-        start_mode: StartMode = StartMode.ZEROS,         
-        every_epochs: int = 1,
-        p_eval: int | None = None,        
-        log_prefix: str = "test",         
+        verbose: VerboseMode,
+        start_mode: StartMode,         
+        training_cfg : TrainingConfig       
     ):
         super().__init__()
         self.X_eval = X_eval
         self.Y_eval = Y_eval
-        self.batch_size = batch_size
+        self.batch_size = training_cfg.batch_size
         self.start_mode = start_mode
-        self.every_epochs = max(1, int(every_epochs))
-        self.p_eval = p_eval
-        self.log_prefix = log_prefix
-
+        self.every_epochs = training_cfg.fr_eval.every_epochs
+        self.p_eval = training_cfg.fr_eval.p_eval
+        self.log_prefix = training_cfg.fr_eval.split
+        self.verbose = verbose
         self.adapter = None
         self.loss_fn = None
 
@@ -43,7 +43,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
             raise RuntimeError("Callback not related to a model (self.model is None).")
 
         trained_model = cast(keras.Model, self.model)
-        self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model)
+        self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose= self.verbose)
 
         loss = self.model.loss
         self.loss_fn = keras.losses.get(loss) if isinstance(loss, str) else loss
@@ -59,9 +59,9 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         return float(tf.reduce_mean(v).numpy())
 
     def _slice_eval(self):
-        if self.p_eval is None:
-            return self.X_eval, self.Y_eval
-        n = int(self.X_eval.shape[0]*self.p_eval/100)
+        if self.p_eval is None or self.p_eval <= 0 or self.p_eval > 1:
+            raise ValueError("P_eval must be in (0,1].")
+        n = int(self.X_eval.shape[0] * self.p_eval)
         return self.X_eval[:n], self.Y_eval[:n]
 
     def on_epoch_end(self, epoch, logs=None):

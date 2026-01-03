@@ -1,7 +1,3 @@
-
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-
 import keras
 from src.qubit.core.data import load_or_prepare_dataset
 from src.qubit.core.utils import get_device, parse_args
@@ -31,7 +27,6 @@ def main():
 
     training_cfg = load_training_config(run_cfg["training"])
 
-    print(training_cfg)
     TrainerCls = get_trainer(training_cfg.approach)
 
     trainer = TrainerCls(model, model_cfg, training_cfg)
@@ -47,15 +42,10 @@ def main():
     trainer.report_sample(sample_x, sample_y, pred)
     
 
-    plot_tmp = load_plot_config(run_cfg["plot"])
-
-
-    # TODO  create an object and a functions 
-    plot_cfg = run_cfg.get("plot", {})
-    print(plot_tmp)
+    plot_cfg = load_plot_config(run_cfg["plot"])
 
   
-    save_outputs(splits, pred, model_cfg, feat_names, history, plot_cfg, model, model_cfg.save_model)  
+    save_outputs(splits, pred, model_cfg, feat_names, history, plot_cfg, model)  
 
 if __name__ == "__main__":
     main()
@@ -65,4 +55,6 @@ if __name__ == "__main__":
 # TODO
 # SISTEMARE STRATEIGWE 
 
-# TODO remove the inizializations in the config model CRISTINA SA 
+# TODO look the implementations to shared word document
+
+# TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
