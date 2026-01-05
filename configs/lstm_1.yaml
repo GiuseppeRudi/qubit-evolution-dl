@@ -22,10 +22,11 @@ data:
     test_ratio: 0.15
 
 model:
-  name: "lstm_baseline_v1"
+  name: "prova1"
   save_model: true
   type: "LSTM"
   variant: "SEQ2SEQ"
+  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "ONE_SEQ"
 
   params:
     latent_dim: 128
@@ -48,20 +49,20 @@ training:
   batch_size: 32
   phases:
     - name: teacher_forcing
-      epochs: 10
-
-    - name: masked_modeling
-      epochs: 10
-      mask_prob: 0.15
-      # mask_scope: element     # time | element | feature
-      # mask_mode: zero         # zero | constant | noise
-      # mask_value: 0.0         # solo se constant
-      # noise_sigma: 0.1        # solo se noise
-
-    - name: scheduled_sampling
       epochs: 5
-      tf_ratio_start: 1.0
-      tf_ratio_end: 0.2
+
+    # - name: masked_modeling
+    #   epochs: 10
+    #   mask_prob: 0.15
+    #   # mask_scope: element     # time | element | feature
+    #   # mask_mode: zero         # zero | constant | noise
+    #   # mask_value: 0.0         # solo se constant
+    #   # noise_sigma: 0.1        # solo se noise
+
+    # - name: scheduled_sampling
+    #   epochs: 5
+    #   tf_ratio_start: 1.0
+    #   tf_ratio_end: 0.2
 
   # Free-running evaluation 
   fr_eval:

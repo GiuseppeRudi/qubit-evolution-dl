@@ -7,8 +7,13 @@ from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling1D, Reshap
 from tensorflow.keras.models import Model
 from .struct import *
 
+from ..enums.model_type import ModelType
+from ..enums.model_variant import ModelVariant
+from ..enums.decoder_mode import DecoderMode
 
-@register_model("TRN", "ENCODERDENSE")
+
+# TODO: to visualize that is correct 
+@register_model(ModelType.TRN,ModelVariant.ENCODERDENSE,DecoderMode.FULL_SEQ)
 def build_transformer_model(
     x_train,
     y_train,

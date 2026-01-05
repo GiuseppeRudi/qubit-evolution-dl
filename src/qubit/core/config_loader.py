@@ -21,6 +21,7 @@ from ..enums.phase_name import PhaseName
 from ..enums.split_name import SplitName
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
+from ..enums.decoder_mode import DecoderMode
 from ..enums.verbose_mode import VerboseMode
 
 def get_project_root() -> Path:
@@ -51,6 +52,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     try:
         model_type = ModelType(m["type"])
         variant = ModelVariant(m["variant"])
+        decoder_mode = DecoderMode(m["decoder_mode"])
     except KeyError as e:
         raise ValueError(f"Missing required field: model.{e.args[0]}") from None
     except ValueError as e:
@@ -82,6 +84,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
         save_model = save_model,
         type=model_type,
         variant=variant,
+        decoder_mode=decoder_mode,
         compile=compile_cfg,
         inference=inference_cfg,
         params=params,

@@ -24,7 +24,7 @@ def main():
     model_cfg = load_model_config(run_cfg["model"])
     
     if args.model is None:
-        builder = get_builder(model_cfg.type, model_cfg.variant)
+        builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
         model = builder(splits.X_train, splits.Y_train, model_cfg)
     else: model = keras.models.load_model(args.model)
 
@@ -36,7 +36,7 @@ def main():
     history = None
     
     if args.training is True :
-        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type}/{model_cfg.variant}]  ---")
+        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}]  ---")
         history = trainer.fit(splits)
 
         print(f"Final loss: {history.history['loss'][-1]:.4f}")
@@ -56,7 +56,8 @@ if __name__ == "__main__":
 
 
 # TODO
-# SISTEMARE STRATEIGWE 
+# create a model seq2seq lstm one seq using a global rnn infernece model with a wrapper 
+# implement the diffent options for the masked modelling strategy 
 
 # TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
 

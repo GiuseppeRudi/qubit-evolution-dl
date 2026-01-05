@@ -6,6 +6,7 @@ from .plot import save_loss_plots_keras
 
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
+from ..enums.decoder_mode import DecoderMode
 
 from ..model.model_config import ModelConfig
 from ..model.plot_config import PlotConfig
@@ -15,11 +16,12 @@ def make_run_output_dir(model_cfg : ModelConfig) -> Path:
     root_dir = Path("predictions")
     model_type : ModelType = model_cfg.type
     variant : ModelVariant = model_cfg.variant
+    decoder_mode : DecoderMode = model_cfg.decoder_mode
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{model_cfg.name}__{ts}"
 
-    run_dir = root_dir / model_type / variant / run_name
+    run_dir = root_dir / model_type / variant / decoder_mode / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
