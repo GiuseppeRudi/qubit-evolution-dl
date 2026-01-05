@@ -9,7 +9,6 @@ from ..enums.verbose_mode import VerboseMode
 class TrainingConfig:
     epochs: int 
     batch_size: int
-    approach: str
     verbose : VerboseMode
     phases: List[PhaseConfig]
     fr_eval: FrEvalConfig 

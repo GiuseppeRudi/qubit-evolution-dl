@@ -85,5 +85,5 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         )
 
         fr_loss = self._scalar_loss(Y, pred_fr)
-        logs[f"{self.log_prefix}_fr_loss"] = fr_loss
+        logs[f"{self.log_prefix.value.lower()}_fr_loss"] = fr_loss
 

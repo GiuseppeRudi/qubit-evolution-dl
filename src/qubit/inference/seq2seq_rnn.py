@@ -112,7 +112,7 @@ class Seq2SeqLSTM2LayerAdapter(AutoregressiveAdapter):
         # TODO check if it's better to initialize h2,c2 with zeros or with h1,c1
 
         # h2,c2 initial zeros (because in training your dec_lstm_2 starts from zeros)
-        N = X.shape[0]
+        # N = X.shape[0]
         # h2 = np.zeros((N, self._latent_dim), dtype=np.float32)
         # c2 = np.zeros((N, self._latent_dim), dtype=np.float32)
         return LSTM2LayerState(h1=h1, c1=c1, h2=h1, c2=c1)

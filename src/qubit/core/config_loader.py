@@ -121,11 +121,11 @@ def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
 
 def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
     verbose = t.get("verbose" , 1)
-    approach = t.get("approach", "standard")
-    epochs = t.get("epochs", 10)
+
     batch_size = t.get("batch_size", 32)
     phases_raw = t.get("phases", []) or []
     phases = [parse_phase(p) for p in phases_raw]
+    epochs = sum(p.epochs for p in phases)
 
     fr_eval_raw = t.get("fr_eval", {}) or {}
     # split deve essere enum-safe
@@ -135,10 +135,9 @@ def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
 
     fr_eval = FrEvalConfig(**fr_eval_raw)
 
-    return TrainingConfig(
-        epochs=epochs,
-        approach= approach ,
+    return TrainingConfig(                  
         batch_size=batch_size,
+        epochs= epochs ,
         phases=phases,
         fr_eval=fr_eval,
         verbose=verbose

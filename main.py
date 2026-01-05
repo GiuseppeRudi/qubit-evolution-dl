@@ -8,6 +8,9 @@ from src.qubit.core.save import save_outputs
 import src.qubit.rnn.builders  
 import src.qubit.transformer.builders
 import src.qubit.training.standard_trainer
+import src.qubit.training.rnn_trainer
+import src.qubit.training.trn_trainer
+
 
 def main():
 
@@ -27,13 +30,13 @@ def main():
 
     training_cfg = load_training_config(run_cfg["training"])
 
-    TrainerCls = get_trainer(training_cfg.approach)
+    TrainerCls = get_trainer(model_cfg.type)
 
     trainer = TrainerCls(model, model_cfg, training_cfg)
     history = None
     
     if args.training is True :
-        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type}/{model_cfg.variant}] approach={training_cfg.approach} ---")
+        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type}/{model_cfg.variant}]  ---")
         history = trainer.fit(splits)
 
         print(f"Final loss: {history.history['loss'][-1]:.4f}")
@@ -55,6 +58,6 @@ if __name__ == "__main__":
 # TODO
 # SISTEMARE STRATEIGWE 
 
-# TODO look the implementations to shared word document
-
 # TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
+
+# TODO  create a different plot configurations because we changed the history object with more informations 

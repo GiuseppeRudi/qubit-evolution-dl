@@ -19,7 +19,7 @@ from ..strategies.teacher_forcing import make_decoder_inputs
 
 
 #TODO change the signature because we use in the standard trainer the teacher forcing approach
-@register_trainer("standard")
+
 class StandardTrainer:
     def __init__(self, model, model_cfg : ModelConfig, training_cfg: TrainingConfig):
         self.model = model

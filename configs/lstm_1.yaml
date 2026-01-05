@@ -44,18 +44,19 @@ model:
 
 
 training:
-  epochs: 3
   verbose : 1
   batch_size: 32
-  approach: "standard"   # standard | teacher_forcing | autoregressive (future)
   phases:
     - name: teacher_forcing
       epochs: 10
-      tf_ratio: 1.0
 
     - name: masked_modeling
       epochs: 10
       mask_prob: 0.15
+      # mask_scope: element     # time | element | feature
+      # mask_mode: zero         # zero | constant | noise
+      # mask_value: 0.0         # solo se constant
+      # noise_sigma: 0.1        # solo se noise
 
     - name: scheduled_sampling
       epochs: 5
