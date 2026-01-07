@@ -62,3 +62,8 @@ if __name__ == "__main__":
 # TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
 
 # TODO  create a different plot configurations because we changed the history object with more informations 
+
+
+# TODO : resolve the problem that occurs when we are using the step wise
+# because this model currently doesn't have the inference model 
+# for this reason decode_autoregressive and the adapter doesnt exits

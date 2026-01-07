@@ -26,7 +26,7 @@ model:
   save_model: true
   type: "LSTM"
   variant: "SEQ2SEQ"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "ONE_SEQ"
+  decoder_mode: "STEP_WISE"  # "FULL_SEQ"  ,  "STEP_WISE"
 
   params:
     latent_dim: 128
@@ -45,7 +45,7 @@ model:
 
 
 training:
-  verbose : 1
+  verbose : 2
   batch_size: 32
   phases:
     - name: teacher_forcing

@@ -93,16 +93,22 @@ class BaseTrainer(ABC):
 
                 print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
               
-                
-                train_inputs, train_targets = self._prepare_model_inputs(
-                    splits.X_train, splits.Y_train, 
-                    strategy, epoch, phase_epochs
-                )
-                
-                val_inputs, val_targets = self._prepare_model_inputs(
-                    splits.X_val, splits.Y_val,
-                    strategy, epoch, phase_epochs
-                )
+    
+                    # se è un modello step-wise
+                if hasattr(self.model, "set_context"):
+                    self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs)
+                    train_inputs, train_targets = splits.X_train, splits.Y_train
+                    val_inputs, val_targets = splits.X_val, splits.Y_val
+                else:
+                    train_inputs, train_targets = self._prepare_model_inputs(
+                        splits.X_train, splits.Y_train, 
+                        strategy, epoch, phase_epochs
+                    )
+                        
+                    val_inputs, val_targets = self._prepare_model_inputs(
+                        splits.X_val, splits.Y_val,
+                        strategy, epoch, phase_epochs
+                    )
                 
                 # training for 1 epoch because there are strategies that need results for each epoch
                 history = self.model.fit(
@@ -117,7 +123,8 @@ class BaseTrainer(ABC):
                 
                 # object useful to obtain a custom history for plotting
                 history_combined['loss'].extend(history.history['loss'])
-                history_combined['test_fr_loss'].extend(history.history['test_fr_loss'])
+                # TODO remove the comment when resolve the call back function
+                # history_combined['test_fr_loss'].extend(history.history['test_fr_loss'])
                 history_combined['val_loss'].extend(history.history['val_loss'])
                 history_combined['phase_names'].append(strategy.get_name())
                 
@@ -136,14 +143,14 @@ class BaseTrainer(ABC):
             X = splits.X_test if is_test else splits.X_val
             Y = splits.Y_test if is_test else splits.Y_val
             
-            callbacks.append(
-                FreeRunningEvalCallback(
-                    X, Y,
-                    start_mode=self.model_cfg.inference.start_mode,
-                    verbose=self.model_cfg.inference.verbose,
-                    training_cfg=self.training_cfg
-                )
-            )
+            # callbacks.append(
+            #     FreeRunningEvalCallback(
+            #         X, Y,
+            #         start_mode=self.model_cfg.inference.start_mode,
+            #         verbose=self.model_cfg.inference.verbose,
+            #         training_cfg=self.training_cfg
+            #     )
+            # )
         
         return callbacks
     
@@ -159,6 +166,10 @@ class BaseTrainer(ABC):
         """
         Inference in fre-running mode - uses the specific adapter
         """
+
+        # TODO : resolve the problem that occurs when we are using the step wise
+        # because this model currently doesn't have the inference model 
+        # for this reason decode_autoregressive and the adapter doesnt exits
 
         X = splits.X_test
         Y = splits.Y_test
