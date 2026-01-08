@@ -79,6 +79,6 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
         optimizer=model_cfg.compile.optimizer,
         loss=model_cfg.compile.loss,
         metrics=model_cfg.compile.metrics,
-        run_eagerly=True
+        run_eagerly=model_cfg.compile.run_eagerly
     )
     return model

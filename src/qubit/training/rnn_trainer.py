@@ -12,6 +12,10 @@ from .base_trainer import BaseTrainer
 from ..strategies.teacher_forcing import make_decoder_inputs
 from ..inference.seq2seq_rnn import Seq2SeqLSTM2LayerAdapter
 from ..enums.model_type import ModelType
+
+from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
+from ..inference.step_wise_rnn_adapter import StepWiseSeq2SeqAdapter
+
 # ============================================
 # RNN/LSTM TRAINER
 # ============================================
@@ -28,11 +32,10 @@ class RNNTrainer(BaseTrainer):
         return model_inputs, targets
     
     def _create_inference_adapter(self):
-      
-        return Seq2SeqLSTM2LayerAdapter(
-            self.model, 
-            verbose=self.model_cfg.inference.verbose
-        )
+        if isinstance(self.model, Seq2SeqLSTM2LayerStepWiseModel):
+            return StepWiseSeq2SeqAdapter(self.model, verbose=self.model_cfg.inference.verbose)
+        return Seq2SeqLSTM2LayerAdapter(self.model, verbose=self.model_cfg.inference.verbose)
+
     
     def _get_model_state_for_scheduled_sampling(self, X, prev_predictions, timestep):
         """

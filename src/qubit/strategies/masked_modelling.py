@@ -1,3 +1,4 @@
+from typing import cast
 from .base_strategy import TrainingStrategy
 from .decoder_utils import make_decoder_inputs
 import numpy as np
@@ -38,8 +39,24 @@ class MaskedModelingStrategy(TrainingStrategy):
 
     # TODO change the function becuase we want to use a apply mask functions
     def next_dec_input(self, *, y_true_t, y_pred_t, epoch, total_epochs):
-        # mask per-sample per-timestep (N,1,1) -> broadcast su D
-        N = tf.gather(tf.shape(y_true_t), 0)  # invece di tf.shape(y_true_t)[0]
-        mask = tf.random.uniform((N, 1, 1), 0, 1.0) < self.mask_prob
-        return tf.where(mask, tf.cast(self.mask_prob, y_true_t.dtype) * tf.ones_like(y_true_t), y_true_t)
+        # y_true_t.shape = (batch_size , timesteps, feature_dim) where timesteps = 1
+
+        batch_size = tf.shape(y_true_t)[0] 
+        feature_dim = tf.shape(y_true_t)[2]
+
+        shape = cast(tf.Tensor, tf.stack([batch_size, 1, feature_dim]))
+        
+        # TODO currently we apply the same mask for all feature dim  in the feature we modify a different mask for each feature dim 
+        # mask is a tensor of boolean with shape (batch_size, 1 ,1 ), min_max_value [0, 1)  
+        mask = tf.random.uniform(shape, 0, 1.0) < self.mask_prob
+
+        # (B,1,1) = same mask for all feature dim 
+        # (B,1,feature_dim) = different mask for each feature 
+        # (B,timesteps,1) = different mask for each timestep
+        # (B,timesteps,feature_dim) = different mask for each (timestep, feature)
+        # automatic broadcast when we use the same mask for different feature dim in the tf.where function
+
+        # tf.where(condition,x,y) if condition=True take x instead of y
+        # TODO currently  use 0 like but in the future we can possibily to choose from yaml file
+        return tf.where(mask, tf.zeros_like(y_true_t), y_true_t)
 

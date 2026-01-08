@@ -63,7 +63,4 @@ if __name__ == "__main__":
 
 # TODO  create a different plot configurations because we changed the history object with more informations 
 
-
-# TODO : resolve the problem that occurs when we are using the step wise
-# because this model currently doesn't have the inference model 
-# for this reason decode_autoregressive and the adapter doesnt exits
+# TODO better organizations for the file and package 

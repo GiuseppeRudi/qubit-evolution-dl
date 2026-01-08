@@ -41,8 +41,11 @@ def save_outputs(
 
     run_dir = make_run_output_dir(model_cfg=model_cfg)
 
-    if save_model and model is not None:
-        model.save(run_dir/"model.keras")
+    # if save_model and model is not None:
+        # TODO with custom model we dont use directly model.save
+        # for this reasons we save the weights and later modify the code to recreate the model from the weights 
+        # model.save_weights(run_dir / "weights.h5")  # o .weights.h5
+        # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
         save_loss_plots_keras(run_dir,history)

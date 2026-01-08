@@ -1,0 +1,11 @@
+// {
+//   "include": ["src", "main.py"],
+//   "exclude": ["**/artifacts/**", "**/__pycache__/**", "**/.venv/**"],
+//   "typeCheckingMode": "basic",
+
+//   "strict": ["src/qubit/core/**"],
+
+//   "reportMissingImports": "warning",
+//   "reportGeneralTypeIssues": "warning",
+//   "reportOptionalMemberAccess": "none"
+// }

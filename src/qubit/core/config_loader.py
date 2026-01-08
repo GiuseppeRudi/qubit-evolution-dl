@@ -22,7 +22,6 @@ from ..enums.split_name import SplitName
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
 from ..enums.decoder_mode import DecoderMode
-from ..enums.verbose_mode import VerboseMode
 
 def get_project_root() -> Path:
     return Path(__file__).resolve().parents[3]  # core -> qubit -> src -> qubit-evolution-dl
@@ -63,7 +62,6 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     params_dict = m.get("params", {}) or {}
     compile_cfg = CompileConfig(**(m.get("compile", {}) or {}))
     inference_cfg = InferenceConfig(**(m.get("inference", {}) or {}))
-
 
     if model_type == ModelType.LSTM:
         if variant in ModelVariant:

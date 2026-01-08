@@ -5,15 +5,15 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10
-    used_qubits: 2
+    used_qubits: 8
     time_steps: 1001
     n_traj: 400
-    traj_fraction: 0.1
+    traj_fraction: 0.4
 
   windowing:
     input_seq_len: 200
     output_seq_len: 100
-    stride: 20
+    stride: 40
     mode: seq2seq      
 
   split:
@@ -35,7 +35,7 @@ model:
     optimizer: "adam"
     loss: "mse"
     metrics: ["mae"]
-
+    run_eagerly: true
 
   inference:
     mode : "free_running"   # "teacher_forcing" | "free_running"
@@ -45,24 +45,26 @@ model:
 
 
 training:
-  verbose : 2
-  batch_size: 32
+  verbose : 1
+  batch_size: 128
   phases:
     - name: teacher_forcing
       epochs: 5
 
-    # - name: masked_modeling
-    #   epochs: 10
-    #   mask_prob: 0.15
-    #   # mask_scope: element     # time | element | feature
-    #   # mask_mode: zero         # zero | constant | noise
-    #   # mask_value: 0.0         # solo se constant
-    #   # noise_sigma: 0.1        # solo se noise
+    - name: masked_modeling
+      epochs: 10
+      mask_prob: 0.25
+      # mask_scope: element     # time | element | feature
+      # mask_mode: zero         # zero | constant | noise
+      # mask_value: 0.0         # solo se constant
+      # noise_sigma: 0.1        # solo se noise
 
-    # - name: scheduled_sampling
-    #   epochs: 5
-    #   tf_ratio_start: 1.0
-    #   tf_ratio_end: 0.2
+    - name: scheduled_sampling
+      epochs: 10
+      tf_ratio_start: 1.0
+      tf_ratio_end: 0.2
+      # mode : lineare, esponenziale, inverse-sigmoid.
+      # per_feature : true , false  
 
   # Free-running evaluation 
   fr_eval:

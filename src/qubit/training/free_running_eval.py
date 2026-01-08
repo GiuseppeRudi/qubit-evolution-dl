@@ -11,6 +11,9 @@ from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
 from ..model.training_config import TrainingConfig
 
+from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
+from ..inference.step_wise_rnn_adapter import StepWiseSeq2SeqAdapter
+
 class FreeRunningEvalCallback(keras.callbacks.Callback):
     """
     Calculate the free-running loss (autoregressive) based on the every_epoch variable,
@@ -43,7 +46,11 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
             raise RuntimeError("Callback not related to a model (self.model is None).")
 
         trained_model = cast(keras.Model, self.model)
-        self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose= self.verbose)
+        
+        if isinstance(self.model, Seq2SeqLSTM2LayerStepWiseModel):
+            self.adapter = StepWiseSeq2SeqAdapter(trained_model, verbose=self.verbose)
+        else: self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose=self.verbose)
+        # self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose= self.verbose)
 
         loss = self.model.loss
         self.loss_fn = keras.losses.get(loss) if isinstance(loss, str) else loss
@@ -56,7 +63,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         y_pred_t = tf.convert_to_tensor(y_pred)
         if self.loss_fn is not None:
             v = self.loss_fn(y_true_t, y_pred_t)     
-        return float(tf.reduce_mean(v).numpy())
+        return float(tf.reduce_mean(cast(tf.Tensor,v)).numpy()) 
 
     def _slice_eval(self):
         if self.p_eval is None or self.p_eval <= 0 or self.p_eval > 1:

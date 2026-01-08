@@ -7,3 +7,4 @@ class CompileConfig:
     optimizer: str 
     loss: str
     metrics: list[str]
+    run_eagerly: bool

@@ -9,7 +9,8 @@ from .inference_config import InferenceConfig
 
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant       
-from ..enums.decoder_mode import DecoderMode                
+from ..enums.decoder_mode import DecoderMode      
+from ..enums.compile_mode import CompileMode          
 
 @dataclass(frozen=True)
 class ModelConfig:
@@ -17,7 +18,7 @@ class ModelConfig:
     save_model: bool
     type: ModelType             
     variant: ModelVariant
-    decoder_mode: DecoderMode        
+    decoder_mode: DecoderMode
     compile: CompileConfig 
     inference: InferenceConfig 
     params: Union[RNNConfig, TransformerConfig] 

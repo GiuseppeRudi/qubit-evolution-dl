@@ -94,7 +94,7 @@ class BaseTrainer(ABC):
                 print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
               
     
-                    # se è un modello step-wise
+                # se è un modello step-wise
                 if hasattr(self.model, "set_context"):
                     self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs)
                     train_inputs, train_targets = splits.X_train, splits.Y_train
@@ -124,7 +124,7 @@ class BaseTrainer(ABC):
                 # object useful to obtain a custom history for plotting
                 history_combined['loss'].extend(history.history['loss'])
                 # TODO remove the comment when resolve the call back function
-                # history_combined['test_fr_loss'].extend(history.history['test_fr_loss'])
+                history_combined['test_fr_loss'].extend(history.history['test_fr_loss'])
                 history_combined['val_loss'].extend(history.history['val_loss'])
                 history_combined['phase_names'].append(strategy.get_name())
                 
@@ -143,14 +143,14 @@ class BaseTrainer(ABC):
             X = splits.X_test if is_test else splits.X_val
             Y = splits.Y_test if is_test else splits.Y_val
             
-            # callbacks.append(
-            #     FreeRunningEvalCallback(
-            #         X, Y,
-            #         start_mode=self.model_cfg.inference.start_mode,
-            #         verbose=self.model_cfg.inference.verbose,
-            #         training_cfg=self.training_cfg
-            #     )
-            # )
+            callbacks.append(
+                FreeRunningEvalCallback(
+                    X, Y,
+                    start_mode=self.model_cfg.inference.start_mode,
+                    verbose=self.model_cfg.inference.verbose,
+                    training_cfg=self.training_cfg
+                )
+            )
         
         return callbacks
     

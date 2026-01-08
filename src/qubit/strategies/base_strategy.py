@@ -18,7 +18,7 @@ class TrainingStrategy(ABC):
     @abstractmethod
     def next_dec_input(self,*,y_true_t: tf.Tensor,   # (N,1,D)
         y_pred_t: tf.Tensor,   # (N,1,D)
-        epoch: int,
-        total_epochs: int) -> tf.Tensor:
+        epoch:  tf.Tensor ,
+        total_epochs: tf.Tensor) -> tf.Tensor:
         """Return decoder input for next timestep (N,1,D)."""
         raise NotImplementedError
