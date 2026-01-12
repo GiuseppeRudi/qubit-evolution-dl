@@ -89,24 +89,25 @@ class BaseTrainer(ABC):
             phase_epochs = phase.cfg.epochs
             horizon = self.training_cfg.curriculum[phase_idx] if self.training_cfg.curriculum[phase_idx] != -1 else splits.Y_train.shape[1]
             
-
-            lr = self.phases[phase_idx].cfg.learning_rate
-            clip_norm = self.phases[phase_idx].cfg.clip_norm
+       
+            lr_local = self.phases[phase_idx].cfg.learning_rate
+            clip_norm_local = self.phases[phase_idx].cfg.clip_norm
 
             
-            if lr == -1:
-                keras.backend.set_value(self.model.optimizer.learning_rate, lr_global)
-            else:
-                keras.backend.set_value(self.model.optimizer.learning_rate, lr_global)
+            lr_to_use = lr_global if lr_local == -1 else lr_local
+            clip_norm_to_use = clip_norm_global if clip_norm_local == -1  else clip_norm_local
 
-            self.model.current_clip_norm = clip_norm_global if clip_norm == -1  else clip_norm
+            self.model.optimizer.learning_rate.assign(lr_to_use)
+            self.model.current_clip_norm = clip_norm_to_use
 
 
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {strategy.get_name()}")
             for key, value in phase.cfg.__dict__.items():
-                if (key != "epochs" and key != "name"): print(f"   {key.replace("_"," ").title()}: {value if not isinstance(value,str) else str(value)}")
+                if (key != "epochs" and key != "name" and key != "learning_rate" and key != "clip_norm"): print(f"   {key.replace("_"," ").title()}: {value if not isinstance(value,str) else str(value)}")
             print(f"   Epochs: {phase_epochs}")
+            print(f"   Learning Rate: {lr_to_use}")
+            print(f"   Clipping Norm: {clip_norm_to_use}")
             print(f"   Horizon (train loss): {horizon}")
             print(f"   Output timesteps (val_loss and fr_loss): {splits.Y_train.shape[1]}")
             print(f"{'='*70}\n")

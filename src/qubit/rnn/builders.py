@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, LSTM, Dense, RepeatVector, TimeDistributed
 from ..registry import register_model
-from typing import cast
+from typing import Optional, cast
 from ..model.rnn_config import RNNConfig
 
 from .Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
@@ -56,7 +56,12 @@ def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig):
     
     model = Model([encoder_inputs, decoder_input], decoder_outputs)
 
-    model.compile(optimizer=model_cfg.compile.optimizer, loss=model_cfg.compile.loss, metrics = model_cfg.compile.metrics)
+    optimizer = build_optimizer(
+    model_cfg.compile.optimizer,
+    model_cfg.compile.learning_rate,
+    model_cfg.compile.clip_norm)
+
+    model.compile(optimizer=optimizer, loss=model_cfg.compile.loss, metrics = model_cfg.compile.metrics)
 
     return model
 
@@ -72,10 +77,30 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
         start_mode=model_cfg.inference.start_mode,
     )
 
+    optimizer = build_optimizer(
+    model_cfg.compile.optimizer,
+    model_cfg.compile.learning_rate)
+
+
     model.compile(
-        optimizer=model_cfg.compile.optimizer,
+        optimizer=optimizer,
         loss=model_cfg.compile.loss,
         metrics=model_cfg.compile.metrics,
         run_eagerly=model_cfg.compile.run_eagerly
     )
     return model
+
+
+def build_optimizer(name: str, lr: float, clip_norm: Optional[float] = None):
+    name = name.lower()
+
+    kwargs = {"learning_rate": lr}
+    if clip_norm is not None and clip_norm > 0:
+        kwargs["global_clipnorm"] = clip_norm  
+
+    if name == "adam":
+        return tf.keras.optimizers.Adam(**kwargs)
+    elif name == "adamw":
+        return tf.keras.optimizers.AdamW(**kwargs)
+    else:
+        raise ValueError(f"Unknown optimizer: {name}")

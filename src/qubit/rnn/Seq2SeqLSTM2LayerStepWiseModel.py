@@ -160,7 +160,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
             raise RuntimeError("There are no gradients")
 
         grads, vars_ = zip(*grads_and_vars)
-        grads, _ = tf.clip_by_global_norm(grads, 1.0)
+        grads, _ = tf.clip_by_global_norm(grads, self.current_clip_norm)
         self.optimizer.apply_gradients(zip(grads, vars_))
 
         self.compute_metrics(x=X, y=Y_true, y_pred=Y_pred, sample_weight=None)

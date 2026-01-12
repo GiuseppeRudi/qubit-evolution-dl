@@ -1,13 +1,15 @@
 from pathlib import Path
+from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from ..model.phase_config import PhaseConfig
 
 phase_colors = {
-    "TeacherForcingPhase":"#FFDDDD",
-    "MaskedModelingPhase": "#DDFFDD",
-    "ScheduledSamplingPhase": "#DDDDFF",
-    "FullAutoregressivePhase": "#FFFFDD"
+    "TeacherForcingPhase": "red",
+    "MaskedModelingPhase": "green",
+    "ScheduledSamplingPhase": "blue",
+    "FullAutoregressivePhase": "yellow"
 }
 
 phase_labels = {
@@ -20,7 +22,7 @@ phase_labels = {
 def save_loss_plots_keras(
     run_dir: str | Path,
     history,
-    phases,
+    phases: List[PhaseConfig],
     fr_key: str,   
     train_key: str = "loss",
     val_key: str = "val_loss",
@@ -58,7 +60,7 @@ def save_loss_plots_keras(
     for ph in phases:
         start = epoch_start
         end = epoch_start + ph.epochs
-        phase_intervals.append((start, end, type(ph).__name__))
+        phase_intervals.append((start, end, ph.__class__.__name__))
         epoch_start = end
 
     # --- 1) Train plot ---
@@ -67,7 +69,17 @@ def save_loss_plots_keras(
         x = np.arange(1, len(y) + 1)
 
         plt.figure()
+        for start, end, ph_type in phase_intervals:
+            plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
+        # linee verticali per inizio fase
+        for _, end, _ in phase_intervals:
+            plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
+
+        # legenda per fasi
+        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
+                        for _, _, ph_type in phase_intervals]
+        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches)
         plt.xlabel("Epoch")
         plt.ylabel(train_key)
         plt.title(f"Training {train_key}")
@@ -83,7 +95,17 @@ def save_loss_plots_keras(
         x = np.arange(1, len(y) + 1)
 
         plt.figure()
+        for start, end, ph_type in phase_intervals:
+            plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
+        # linee verticali per inizio fase
+        for _, end, _ in phase_intervals:
+            plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
+
+        # legenda per fasi
+        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
+                        for _, _, ph_type in phase_intervals]
+        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches)
         plt.xlabel("Epoch")
         plt.ylabel(val_key)
         plt.title(f"Validation {val_key}")
@@ -100,7 +122,17 @@ def save_loss_plots_keras(
         y = [v for v in fr if v is not None]
 
         plt.figure()
+        for start, end, ph_type in phase_intervals:
+            plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
+        # linee verticali per inizio fase
+        for _, end, _ in phase_intervals:
+            plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
+
+        # legenda per fasi
+        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
+                        for _, _, ph_type in phase_intervals]
+        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches)
         plt.xlabel("Epoch")
         plt.ylabel(fr_key)
         plt.title(f"Free-running {fr_key}")
@@ -121,7 +153,7 @@ def save_loss_plots_keras(
 
         # sfondi per fase
         for start, end, ph_type in phase_intervals:
-            plt.axvspan(start + 0.5, end + 0.5, color=phase_colors[ph_type], alpha=0.2)
+            plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
 
         # plot train/val/fr
         if train is not None and len(train) > 0:
@@ -140,11 +172,11 @@ def save_loss_plots_keras(
             plt.plot(x, y, label=f"free-running ({fr_key})")
 
         # linee verticali per inizio fase
-        for start, _, _ in phase_intervals:
-            plt.axvline(start + 0.5, color='k', linestyle='--', linewidth=0.8)
+        for _, end, _ in phase_intervals:
+            plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
         # legenda per fasi
-        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.2, label=phase_labels[ph_type])
+        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
                         for _, _, ph_type in phase_intervals]
         plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches)
 
