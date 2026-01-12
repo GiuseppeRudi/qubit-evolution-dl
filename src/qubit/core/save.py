@@ -11,6 +11,16 @@ from ..enums.decoder_mode import DecoderMode
 from ..model.model_config import ModelConfig
 from ..model.plot_config import PlotConfig
 
+import sys
+from ..core.utils import Tee
+
+def save_log(run_dir : Path):
+
+    log_path = run_dir / "train.log"
+    log_file = open(log_path, "w", buffering=1, encoding="utf-8")
+
+    sys.stdout = Tee(sys.__stdout__, log_file)
+    sys.stderr = Tee(sys.__stderr__, log_file)
 
 def make_run_output_dir(model_cfg : ModelConfig) -> Path:
     root_dir = Path("predictions")
@@ -31,6 +41,8 @@ def save_outputs(
     model_cfg : ModelConfig,
     feat_names,
     history,
+    run_dir,
+    fr_key: str,
     plot_cfg: PlotConfig,
     model = None,
 ) -> Path:
@@ -39,7 +51,7 @@ def save_outputs(
     save_plots = plot_cfg.save_plots
     save_artifacts  = plot_cfg.save_artifacts
 
-    run_dir = make_run_output_dir(model_cfg=model_cfg)
+    
 
     # if save_model and model is not None:
         # TODO with custom model we dont use directly model.save
@@ -48,7 +60,7 @@ def save_outputs(
         # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
-        save_loss_plots_keras(run_dir,history)
+        save_loss_plots_keras(run_dir,history,fr_key)
 
     if save_artifacts:
         np.savez_compressed(

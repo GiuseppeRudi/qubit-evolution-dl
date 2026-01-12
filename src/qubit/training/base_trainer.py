@@ -9,8 +9,11 @@ from ..model.custom_history import CustomHistory
 
 from .free_running_eval import FreeRunningEvalCallback
 from ..strategies.strategy_factory import create_strategy
+from ..strategies.decoder_utils import make_decoder_inputs
 from ..enums.split_name import SplitName
-from ..inference.base import decode_autoregressive
+from ..enums.inference_mode import InferenceMode
+
+from ..inference.base import decode
 
 class BaseTrainer(ABC):
 
@@ -66,7 +69,7 @@ class BaseTrainer(ABC):
 
         history_combined = {
             'loss': [], 
-            'test_fr_loss': [], 
+            self.training_cfg.fr_eval.split + '_fr_loss': [], 
             'val_loss': [],
             'phase_names': [],  
             'phase_boundaries': [] 
@@ -80,10 +83,15 @@ class BaseTrainer(ABC):
 
             strategy = phase.strategy
             phase_epochs = phase.cfg.epochs
+            horizon = self.training_cfg.curriculum[phase_idx] if self.training_cfg.curriculum[phase_idx] != -1 else splits.Y_train.shape[1]
             
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {strategy.get_name()}")
+            for key, value in phase.cfg.__dict__.items():
+                if (key != "epochs" and key != "name"): print(f"   {key.replace("_"," ").title()}: {value if not isinstance(value,str) else str(value)}")
             print(f"   Epochs: {phase_epochs}")
+            print(f"   Horizon (train loss): {horizon}")
+            print(f"   Output timesteps (val_loss and fr_loss): {splits.Y_train.shape[1]}")
             print(f"{'='*70}\n")
             
             history_combined['phase_boundaries'].append(current_epoch)
@@ -96,20 +104,15 @@ class BaseTrainer(ABC):
     
                 # se è un modello step-wise
                 if hasattr(self.model, "set_context"):
-                    self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs)
-                    train_inputs, train_targets = splits.X_train, splits.Y_train
+                    self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs,horizon=horizon)
+                    train_inputs, train_targets = splits.X_train, splits.Y_train[:, :horizon, :]
+                    # train_step for val set is performed by all final_ouput not only for horizon
                     val_inputs, val_targets = splits.X_val, splits.Y_val
                 else:
-                    train_inputs, train_targets = self._prepare_model_inputs(
-                        splits.X_train, splits.Y_train, 
-                        strategy, epoch, phase_epochs
-                    )
-                        
-                    val_inputs, val_targets = self._prepare_model_inputs(
-                        splits.X_val, splits.Y_val,
-                        strategy, epoch, phase_epochs
-                    )
-                
+                    
+                    train_inputs, train_targets = strategy.prepare_inputs(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
+                    val_inputs, val_targets = strategy.prepare_inputs(splits.X_val, splits.Y_val,epoch, phase_epochs,splits.Y_val.shape[1])
+
                 # training for 1 epoch because there are strategies that need results for each epoch
                 history = self.model.fit(
                     train_inputs,
@@ -123,8 +126,12 @@ class BaseTrainer(ABC):
                 
                 # object useful to obtain a custom history for plotting
                 history_combined['loss'].extend(history.history['loss'])
-                # TODO remove the comment when resolve the call back function
-                history_combined['test_fr_loss'].extend(history.history['test_fr_loss'])
+                
+                fr_loss = self.training_cfg.fr_eval.split.value + '_fr_loss'
+                if (fr_loss in history.history):
+                    history_combined[fr_loss].extend(history.history[fr_loss])
+                else : history_combined[fr_loss].append(None)  
+                
                 history_combined['val_loss'].extend(history.history['val_loss'])
                 history_combined['phase_names'].append(strategy.get_name())
                 
@@ -148,6 +155,7 @@ class BaseTrainer(ABC):
                     X, Y,
                     start_mode=self.model_cfg.inference.start_mode,
                     verbose=self.model_cfg.inference.verbose,
+                    inference_mode=self.model_cfg.inference.mode,
                     training_cfg=self.training_cfg
                 )
             )
@@ -170,9 +178,12 @@ class BaseTrainer(ABC):
         # TODO : resolve the problem that occurs when we are using the step wise
         # because this model currently doesn't have the inference model 
         # for this reason decode_autoregressive and the adapter doesnt exits
+        print("Predicting all test samples in " + str(self.model_cfg.inference.mode) + " mode...")
 
         X = splits.X_test
         Y = splits.Y_test
+
+        
         
         # this function is implemented in the concrete classes 
         adapter = self._create_inference_adapter()
@@ -181,13 +192,20 @@ class BaseTrainer(ABC):
         if adapter is None :
             raise TypeError("Adapter is None ")
 
-        pred = decode_autoregressive(
-            adapter,
-            X,
-            out_steps=Y.shape[1],
-            start_mode=self.model_cfg.inference.start_mode,
-            batch_size=self.training_cfg.batch_size,
-        )
+        if self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
+            pred = decode(adapter, X,
+                        out_steps=Y.shape[1],
+                        start_mode=self.model_cfg.inference.start_mode,
+                        batch_size=self.training_cfg.batch_size,
+                        mode=InferenceMode.TEACHER_FORCING,
+                        y_true=Y)
+        else:
+            pred = decode(adapter, X,
+                        out_steps=Y.shape[1],
+                        start_mode=self.model_cfg.inference.start_mode,
+                        batch_size=self.training_cfg.batch_size,
+                        mode=InferenceMode.FREE_RUNNING)
+
         return X, Y, pred
     
     def report_sample(self, sample_x, sample_y, pred):

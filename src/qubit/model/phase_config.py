@@ -24,8 +24,14 @@ class ScheduledSamplingPhase:
     tf_ratio_start: float 
     tf_ratio_end: float 
 
+@dataclass(frozen=True)
+class FullAutoregressivePhase:
+    name: Literal[PhaseName.FULL_AUTOREGRESSIVE] 
+    epochs: int 
+    gradient_through_time: bool
 
-PhaseConfig = Union[TeacherForcingPhase, MaskedModelingPhase, ScheduledSamplingPhase]
+
+PhaseConfig = Union[TeacherForcingPhase, MaskedModelingPhase, ScheduledSamplingPhase, FullAutoregressivePhase]
 
 
 @dataclass

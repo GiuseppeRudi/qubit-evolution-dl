@@ -39,8 +39,9 @@ class StepWiseSeq2SeqAdapter(AutoregressiveAdapter):
         )
 
     def init_decoder_input(self, X: np.ndarray, *, start_mode: StartMode) -> np.ndarray:
-        # usa la stessa logica del model
-        self.model.start_mode = start_mode  # oppure passa start_mode come arg se preferisci
+        print("StepWiseSeq2SeqAdapter.init_decoder_input called with start_mode:", start_mode)
+       
+        self.model.start_mode = start_mode 
         Xtf = tf.convert_to_tensor(X, dtype=tf.float32)
         dec0 = self.model._init_dec0(Xtf)  # (N,1,D)
         return dec0.numpy().astype(np.float32, copy=False)

@@ -21,7 +21,8 @@ from ..inference.step_wise_rnn_adapter import StepWiseSeq2SeqAdapter
 # ============================================
 @register_trainer(ModelType.LSTM)
 class RNNTrainer(BaseTrainer):
- 
+    
+    # TODO possibility to remove this class and use only the base trainer 
     def _prepare_model_inputs(self, X, Y, strategy, epoch, total_epochs):
      
         # the corrispondent strategy prepare the input based on the current epoch in some cases

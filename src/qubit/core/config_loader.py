@@ -116,13 +116,16 @@ def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
         return MaskedModelingPhase(**d)
     if name == PhaseName.SCHEDULED_SAMPLING:
         return ScheduledSamplingPhase(**d)
+    if name == PhaseName.FULL_AUTOREGRESSIVE:
+        return FullAutoregressivePhase(**d)
 
     raise ValueError(f"Unsupported phase name: {name}")
 
 
 def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
-    verbose = t.get("verbose" , 1)
 
+    verbose = t.get("verbose" , 1)
+    curriculum = t.get("curriculum",[] )
     batch_size = t.get("batch_size", 32)
     phases_raw = t.get("phases", []) or []
     phases = [parse_phase(p) for p in phases_raw]
@@ -141,9 +144,9 @@ def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
         epochs= epochs ,
         phases=phases,
         fr_eval=fr_eval,
-        verbose=verbose
+        verbose=verbose,
+        curriculum = curriculum
     )
-
 
 
 def _parse_sample_index(v: Any) -> List[int]:

@@ -66,13 +66,10 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
     latent_dim = cast(RNNConfig, model_cfg.params).latent_dim
     feature_dim = int(x_train.shape[2])
 
-    # start_mode lo puoi prendere da model_cfg.inference.start_mode se vuoi
-    start_mode = getattr(model_cfg.inference, "start_mode", "zeros")
-
     model = Seq2SeqLSTM2LayerStepWiseModel(
         feature_dim=feature_dim,
         latent_dim=latent_dim,
-        start_mode=start_mode,
+        start_mode=model_cfg.inference.start_mode,
     )
 
     model.compile(

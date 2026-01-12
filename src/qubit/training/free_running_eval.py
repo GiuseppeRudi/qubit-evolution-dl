@@ -6,9 +6,10 @@ from typing import cast
 
 
 from ..inference.seq2seq_rnn import Seq2SeqLSTM2LayerAdapter
-from ..inference.base import  decode_autoregressive
+from ..inference.base import  decode
 from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
+from ..enums.inference_mode import InferenceMode
 from ..model.training_config import TrainingConfig
 
 from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
@@ -26,7 +27,8 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         Y_eval: np.ndarray,
         *,
         verbose: VerboseMode,
-        start_mode: StartMode,         
+        start_mode: StartMode,   
+        inference_mode : InferenceMode,   
         training_cfg : TrainingConfig       
     ):
         super().__init__()
@@ -40,8 +42,11 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         self.verbose = verbose
         self.adapter = None
         self.loss_fn = None
+        self.global_epoch = 0
+        self.inference_mode = inference_mode
 
     def on_train_begin(self, logs=None):
+        print("FreeRunningEvalCallback: on_train_begin")
         if self.model is None:
             raise RuntimeError("Callback not related to a model (self.model is None).")
 
@@ -72,9 +77,11 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         return self.X_eval[:n], self.Y_eval[:n]
 
     def on_epoch_end(self, epoch, logs=None):
+        print("\nFreeRunningEvalCallback: on_epoch_end")
         
         # epoch è 0-based
-        if (epoch + 1) % self.every_epochs != 0:
+        self.global_epoch += 1
+        if self.global_epoch % self.every_epochs != 0:
             return
 
         logs = logs or {}
@@ -83,14 +90,44 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         if self.adapter is None:
             raise RuntimeError("Adapter not initialized.")
         
-        pred_fr = decode_autoregressive(
+        pred_fr = decode(
             self.adapter,
             X,
             out_steps=Y.shape[1],
             start_mode=cast(StartMode, self.start_mode),
             batch_size=self.batch_size,
+            mode=self.inference_mode,
+            y_true= Y
         )
 
-        fr_loss = self._scalar_loss(Y, pred_fr)
+        Xtf = tf.convert_to_tensor(X)
+        Ytf = tf.convert_to_tensor(Y)
+        Ptf = tf.convert_to_tensor(pred_fr)
+
+        model = cast(keras.Model,self.model)
+
+        fr_loss = model.compute_loss(x=Xtf, y=Ytf, y_pred=Ptf, training=False)
+        
         logs[f"{self.log_prefix.value.lower()}_fr_loss"] = fr_loss
 
+        print("trained sum:", self.sum_trainable_tf(model))
+
+        adapter_model = None
+        if (hasattr(self.adapter, "model") ) and isinstance(self.adapter,StepWiseSeq2SeqAdapter ):
+            adapter_model = cast(keras.Model, self.adapter.model)
+
+        if adapter_model is None:
+            print("adapter has no .model; can't compare weights")
+            return
+
+        print("adapter sum:", self.sum_trainable_tf(adapter_model))
+
+        print("same object:", adapter_model is model)
+
+        print("same first var object:",
+            adapter_model.trainable_variables[0] is model.trainable_variables[0])
+
+
+    def sum_trainable_tf(self,m: keras.Model) -> float:
+        # evita get_weights() (più pesante) e somma direttamente i tensori
+        return float(tf.add_n([tf.reduce_sum(v) for v in m.trainable_variables]).numpy())

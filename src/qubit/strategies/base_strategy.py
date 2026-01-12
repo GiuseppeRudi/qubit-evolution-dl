@@ -7,7 +7,7 @@ class TrainingStrategy(ABC):
 
     #TODO change the name of this function
     @abstractmethod
-    def prepare_inputs(self, X, Y, epoch, total_epochs) ->tuple[list[np.ndarray], np.ndarray]:
+    def prepare_inputs(self, X, Y, epoch, total_epochs,horizon) ->tuple[list[np.ndarray], np.ndarray]:
         """Prepare the input for the current batch"""
         pass
     

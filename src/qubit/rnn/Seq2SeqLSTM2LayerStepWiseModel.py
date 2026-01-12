@@ -7,6 +7,7 @@ import keras
 from keras import layers
 
 from ..strategies.base_strategy import TrainingStrategy
+from ..enums.start_mode import StartMode
 
 
 class LSTM2LayerTFState(NamedTuple):
@@ -17,11 +18,11 @@ class LSTM2LayerTFState(NamedTuple):
 
 
 class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
-    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: str = "zeros"):
+    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode):
         super().__init__()
-        self.feature_dim = int(feature_dim)
-        self.latent_dim = int(latent_dim)
-        self.start_mode = str(start_mode)
+        self.feature_dim = feature_dim
+        self.latent_dim = latent_dim
+        self.start_mode = start_mode
 
         # Encoder
         self.enc_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, name="enc_lstm_1")
@@ -39,11 +40,13 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         # Epoch context as TF vars (evita retracing in graph)
         self.ctx_epoch = tf.Variable(tf.constant(0, dtype=tf.int32), trainable=False)
         self.ctx_total_epochs = tf.Variable(tf.constant(1, dtype=tf.int32), trainable=False)
+        self.ctx_horizon = tf.Variable(tf.constant(0,tf.int32), trainable=False)
 
-    def set_context(self, *, strategy: TrainingStrategy, epoch: int, total_epochs: int) -> None:
+    def set_context(self, *, strategy: TrainingStrategy, epoch: int, total_epochs: int, horizon :int) -> None:
         self._strategy = strategy
         self.ctx_epoch.assign(int(epoch))
         self.ctx_total_epochs.assign(int(total_epochs))
+        self.ctx_horizon.assign(int(horizon))
 
     def _encode(self, X: tf.Tensor) -> LSTM2LayerTFState:
         x = self.enc_lstm_1(X)
@@ -51,7 +54,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         return LSTM2LayerTFState(h1=h, c1=c, h2=h, c2=c)
 
     def _init_dec0(self, X: tf.Tensor) -> tf.Tensor:
-        if self.start_mode == "last_x":
+        if self.start_mode == StartMode.LAST_X:
             T = tf.shape(X)[1]
             last = tf.gather(X, T - 1, axis=1)   # (N, D)
             return tf.expand_dims(last, axis=1)  # (N, 1, D)
@@ -76,36 +79,45 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         if self._strategy is None:
             raise RuntimeError("StepWise model: strategy context not set. Call model.set_context(...) before fit().")
 
-        T_out = tf.shape(Y)[1]
 
-        # forza shape attesa (molto utile per beccare mismatch subito)
-        Y = tf.ensure_shape(Y, [None, None, self.feature_dim])
+        T_eff = self.ctx_horizon
 
         with tf.GradientTape() as tape:
+
+            # return the internal states from encoder 
             state = self._encode(X)
+
+            # 
             dec_t = self._init_dec0(X)
 
-            # ogni elemento: (N, D)
+            # array with T_out elements and each element have shape(batch_size, feature_dim)
+            # batch_size is None because is dinamic 
             ta = tf.TensorArray(
                 dtype=Y.dtype,
-                size=T_out,
+                size=T_eff,
                 element_shape=tf.TensorShape([None, self.feature_dim]),
             )
+            
+            # ta = shape (batch_size , T_out , feature_dim)
+            # print(ta.element_shape) = shape (batch_size, feature_dim) ,  ta.size() = T_out
+
             t0 = tf.constant(0, tf.int32)
 
-            strategy = self._strategy  # narrowing per Pylance
+            strategy = self._strategy  
+
             if strategy is None:
                 raise RuntimeError("strategy not set")
 
             def cond(t, dec_t, state, ta):
-                return t < T_out
+                return t < T_eff
 
             def body(t, dec_t, state, ta):
                 y_t, state = self._decode_step(dec_t, state)    # (N,1,D)
-                y_t_nd = tf.squeeze(y_t, axis=1)                # (N,D)  <--- QUI
-                ta = ta.write(t, y_t_nd)
+                y_t_nd = tf.squeeze(y_t, axis=1)                # (N,D) 
 
-                # y_true_t: (N,1,D)
+                ta = ta.write(t, y_t_nd)
+                
+                # Y.shape(batch_size, timesteps, feature_dim)
                 y_true_nd = tf.gather(Y, t, axis=1)             # (N,D)
                 y_true_t = tf.expand_dims(y_true_nd, axis=1)    # (N,1,D)
 
@@ -117,31 +129,45 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
                 )
                 return t + 1, dec_t, state, ta
 
+            # the parameter given in input change in the loop 
+            # the constant parameter are taken by the father function
             _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
 
+            # tf.print(ta.stack())
             # stack: (T_out, N, D) -> transpose: (N, T_out, D)
             Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
-            Y_pred = tf.ensure_shape(Y_pred, [None, None, self.feature_dim])
 
-            # Debug assert (lascia finché non sei sicuro)
-            tf.debugging.assert_equal(tf.shape(Y), tf.shape(Y_pred), message="Y vs Y_pred shape mismatch")
+            # loss = self.compiled_loss(Y, Y_pred, regularization_losses=self.losses)
+            loss = cast(tf.Tensor, self.compute_loss(x=X, y=Y, y_pred=Y_pred, training=True))
 
-            loss = self.compiled_loss(Y, Y_pred, regularization_losses=self.losses)
-
+            # TODO check if this is needed
+            if self.losses:
+                loss = loss + tf.add_n(self.losses)
+                
+        # calculate the derivate of the loss from all trainable_variables (weights ect..)
         grads_raw = tape.gradient(loss, self.trainable_variables)
+
         if grads_raw is None:
-            raise RuntimeError("tape.gradient ha restituito None (loss non dipende dalle variabili?)")
+            raise RuntimeError("tape.gradient return None")
 
         grads = cast(Sequence[Optional[tf.Tensor]], grads_raw)
-        vars_ = list(self.trainable_variables)
-        grads_and_vars = [(g, v) for g, v in zip(grads, vars_) if g is not None]
-        if not grads_and_vars:
-            raise RuntimeError("Nessun gradiente valido: controlla la loss e il grafo del modello.")
 
-        self.optimizer.apply_gradients(grads_and_vars)
-        self.compiled_metrics.update_state(Y, Y_pred)
+        vars_ = list(self.trainable_variables)
+
+        # apply_gradients don't accept a list of None so we filter it
+        grads_and_vars = [(g, v) for g, v in zip(grads, vars_) if g is not None]
+       
+        if not grads_and_vars:
+            raise RuntimeError("There are no gradients")
+
+        grads, vars_ = zip(*grads_and_vars)
+        grads, _ = tf.clip_by_global_norm(grads, 1.0)
+        self.optimizer.apply_gradients(zip(grads, vars_))
+
+        self.compute_metrics(x=X, y=Y, y_pred=Y_pred, sample_weight=None)
 
         out = {m.name: m.result() for m in self.metrics}
+
         out["loss"] = loss
         return out
 
@@ -159,7 +185,11 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         state = self._encode(X)
         dec_t = self._init_dec0(X)
 
-        ta = tf.TensorArray(dtype=Y.dtype, size=T_out)
+        ta = tf.TensorArray(
+            dtype=Y.dtype, size=T_out,  
+            element_shape=tf.TensorShape([None, self.feature_dim]),
+        )
+        
         t0 = tf.constant(0, dtype=tf.int32)
 
         def cond(t, dec_t, state, ta):
@@ -167,35 +197,23 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
 
         def body(t, dec_t, state, ta):
             y_t, state = self._decode_step(dec_t, state)
-            ta = ta.write(t, y_t)
+            y_t_nd = tf.squeeze(y_t, axis=1)
+            ta = ta.write(t, y_t_nd)
 
             y_true = tf.gather(Y, t, axis=1)
             y_true_t = tf.expand_dims(y_true, axis=1)
 
-            dec_t = cast(TrainingStrategy,self._strategy).next_dec_input(
-                y_true_t=y_true_t,
-                y_pred_t=y_t,
-                epoch=self.ctx_epoch,
-                total_epochs=self.ctx_total_epochs,
-            )
-            return t + 1, dec_t, state, ta
+           
+            return t + 1, y_true_t, state, ta
 
 
 
         _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
 
-        # preds = tf.transpose(ta.stack(), [1, 0, 2])
-        preds = tf.transpose(ta.stack(), [1, 0, 2, 3])
-        print(  "DEBUG preds shape before squeeze:", preds.shape)
-        preds = tf.squeeze(preds, axis=2)
+        preds = tf.transpose(ta.stack(), [1, 0, 2])
 
-        # preds  = tf.ensure_shape(preds, [None, None, self.feature_dim])
-
-        # # Debug assert (lascia finché non sei sicuro)
-        # tf.debugging.assert_equal(tf.shape(Y), tf.shape(preds), message="Y vs Y_pred shape mismatch")
-
-        loss = self.compiled_loss(Y, preds, regularization_losses=self.losses)
-        self.compiled_metrics.update_state(Y, preds)
+        loss = self.compute_loss(x=X, y=Y, y_pred=preds, training=False)
+        self.compute_metrics(x=X, y=Y, y_pred=preds, sample_weight=None)
 
         out = {m.name: m.result() for m in self.metrics}
         out["loss"] = loss

@@ -1,11 +1,11 @@
 import numpy as np
 
 
-def make_decoder_inputs(Y: np.ndarray) -> np.ndarray:
+def make_decoder_inputs(Y: np.ndarray, horizon : int ) -> np.ndarray:
     # dec_in shape = (N, output_seq_len, feature_dim)
 
     # initialize array with all zeros
-    dec_in = np.zeros_like(Y, dtype=Y.dtype)
+    dec_in = np.zeros_like(Y[: , :horizon , :], dtype=Y.dtype)
 
     # shift Y by one time step => so start the time step 0 with zeros 
     dec_in[:, 0, :] = 0.0

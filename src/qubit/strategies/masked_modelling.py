@@ -8,10 +8,10 @@ class MaskedModelingStrategy(TrainingStrategy):
     def __init__(self, mask_prob: float = 0.15):
         self.mask_prob = mask_prob
     
-    def prepare_inputs(self, X, Y, epoch, total_epochs):
+    def prepare_inputs(self, X, Y, epoch, total_epochs, horizon):
         
         # decoder input with teacher forcing = ground truth 
-        dec_in = make_decoder_inputs(Y)
+        dec_in = make_decoder_inputs(Y, horizon)
 
         # denoising = to dirty the input 
         dec_in_masked = self._apply_masking(dec_in)

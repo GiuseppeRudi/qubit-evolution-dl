@@ -34,6 +34,7 @@ def build_inference_models(
 
     # trained_model.input[0].shape : (None, T_in, D)
     # encoder input: (T_in, D)
+    print("Building inference model...")
     enc_input_shape = trained_model.inputs[0].shape[1:]
 
 
@@ -121,7 +122,7 @@ class Seq2SeqLSTM2LayerAdapter(AutoregressiveAdapter):
         # X = ensure_3d(X).astype(np.float32, copy=False)
 
         N, _, D = X.shape
-        if start_mode == "last_x":
+        if start_mode == StartMode.LAST_X:
             return X[:, -1:, :]  # (N,1,D)
         # default zeros
         return np.zeros((N, 1, D), dtype=np.float32)

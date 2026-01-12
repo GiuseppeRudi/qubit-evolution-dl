@@ -10,17 +10,17 @@ import matplotlib.pyplot as plt
 def save_loss_plots_keras(
     run_dir: str | Path,
     history,
+    fr_key: str,   
     train_key: str = "loss",
     val_key: str = "val_loss",
-    fr_key: str = "test_fr_loss",   
     prefix: str = "loss",
 ) -> tuple[Path | None, Path | None, Path | None, Path | None]:
     """
     Save 4 plot:
-      - {prefix}_train.png  : train_key (es. loss)
-      - {prefix}_val.png    : val_key (es. val_loss)
-      - {prefix}_fr.png     : fr_key (es. test_fr_loss)
-      - {prefix}_all.png    : combined (train + val + fr)
+      - {prefix}_train.jpg  : train_key (es. loss)
+      - {prefix}_val.jpg    : val_key (es. val_loss)
+      - {prefix}_fr.jpg     : fr_key (es. test_fr_loss)
+      - {prefix}_all.jpg    : combined (train + val + fr)
 
     Returns: (train_path, val_path, fr_path, all_path)
     """
@@ -42,6 +42,8 @@ def save_loss_plots_keras(
     fr_path: Path | None = None
     all_path: Path | None = None
 
+    print(fr)
+
     # --- 1) Train plot ---
     if train is not None and len(train) > 0:
         y = np.asarray(train, dtype=float)
@@ -54,8 +56,8 @@ def save_loss_plots_keras(
         plt.title(f"Training {train_key}")
         plt.grid(True)
 
-        train_path = run_dir / f"{prefix}_train.png"
-        plt.savefig(train_path, dpi=150, bbox_inches="tight")
+        train_path = run_dir / f"{prefix}_train.jpg"
+        plt.savefig(train_path, dpi=300, bbox_inches="tight")
         plt.close()
 
     # --- 2) Val plot ---
@@ -70,14 +72,15 @@ def save_loss_plots_keras(
         plt.title(f"Validation {val_key}")
         plt.grid(True)
 
-        val_path = run_dir / f"{prefix}_val.png"
-        plt.savefig(val_path, dpi=150, bbox_inches="tight")
+        val_path = run_dir / f"{prefix}_val.jpg"
+        plt.savefig(val_path, dpi=300, bbox_inches="tight")
         plt.close()
 
     # --- 3) Free-running plot ---
-    if fr is not None and len(fr) > 0:
-        y = np.asarray(fr, dtype=float)
-        x = np.arange(1, len(y) + 1)
+    if fr is not None and any(v is not None for v in fr):
+
+        x = [epoch + 1 for epoch, v in enumerate(fr) if v is not None]
+        y = [v for v in fr if v is not None]
 
         plt.figure()
         plt.plot(x, y)
@@ -86,8 +89,8 @@ def save_loss_plots_keras(
         plt.title(f"Free-running {fr_key}")
         plt.grid(True)
 
-        fr_path = run_dir / f"{prefix}_fr.png"
-        plt.savefig(fr_path, dpi=150, bbox_inches="tight")
+        fr_path = run_dir / f"{prefix}_fr.jpg"
+        plt.savefig(fr_path, dpi=300, bbox_inches="tight")
         plt.close()
 
     # --- 4) Combined plot  ---
@@ -109,9 +112,9 @@ def save_loss_plots_keras(
             x = np.arange(1, len(y) + 1)
             plt.plot(x, y, label=f"val ({val_key})")
 
-        if fr is not None and len(fr) > 0:
-            y = np.asarray(fr, dtype=float)
-            x = np.arange(1, len(y) + 1)
+        if fr is not None and any(v is not None for v in fr):
+            x = [epoch + 1 for epoch, v in enumerate(fr) if v is not None]
+            y = [v for v in fr if v is not None]
             plt.plot(x, y, label=f"free-running ({fr_key})")
 
         plt.xlabel("Epoch")
@@ -120,8 +123,8 @@ def save_loss_plots_keras(
         plt.grid(True)
         plt.legend()
 
-        all_path = run_dir / f"{prefix}_all.png"
-        plt.savefig(all_path, dpi=150, bbox_inches="tight")
+        all_path = run_dir / f"{prefix}_all.jpg"
+        plt.savefig(all_path, dpi=300, bbox_inches="tight")
         plt.close()
 
     return train_path, val_path, fr_path, all_path

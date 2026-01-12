@@ -51,3 +51,29 @@ def get_device():
     return "/GPU:0"
 
 
+import re
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+class Tee:
+    def __init__(self, console_stream, file_stream):
+        self.console = console_stream
+        self.file = file_stream
+
+    def write(self, s: str):
+        # 1) console: lascia tutto com’è
+        self.console.write(s)
+        self.console.flush()
+
+        # 2) file: ripulisci ANSI + ignora gli update di progress bar (carriage return senza newline)
+        s2 = _ANSI_RE.sub("", s).replace("\b", "")
+        if "\r" in s2 and "\n" not in s2:
+            return  # skip “refresh” della progressbar
+        s2 = s2.replace("\r", "")
+        self.file.write(s2)
+        self.file.flush()
+
+    def flush(self):
+        self.console.flush()
+        self.file.flush()
+
