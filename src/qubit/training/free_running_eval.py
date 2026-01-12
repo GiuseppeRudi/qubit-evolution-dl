@@ -46,7 +46,6 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         self.inference_mode = inference_mode
 
     def on_train_begin(self, logs=None):
-        print("FreeRunningEvalCallback: on_train_begin")
         if self.model is None:
             raise RuntimeError("Callback not related to a model (self.model is None).")
 
@@ -77,8 +76,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         return self.X_eval[:n], self.Y_eval[:n]
 
     def on_epoch_end(self, epoch, logs=None):
-        print("\nFreeRunningEvalCallback: on_epoch_end")
-        
+    
         # epoch è 0-based
         self.global_epoch += 1
         if self.global_epoch % self.every_epochs != 0:
@@ -110,22 +108,22 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         
         logs[f"{self.log_prefix.value.lower()}_fr_loss"] = fr_loss
 
-        print("trained sum:", self.sum_trainable_tf(model))
+        # print("trained sum:", self.sum_trainable_tf(model))
 
-        adapter_model = None
-        if (hasattr(self.adapter, "model") ) and isinstance(self.adapter,StepWiseSeq2SeqAdapter ):
-            adapter_model = cast(keras.Model, self.adapter.model)
+        # adapter_model = None
+        # if (hasattr(self.adapter, "model") ) and isinstance(self.adapter,StepWiseSeq2SeqAdapter ):
+        #     adapter_model = cast(keras.Model, self.adapter.model)
 
-        if adapter_model is None:
-            print("adapter has no .model; can't compare weights")
-            return
+        # if adapter_model is None:
+        #     print("adapter has no .model; can't compare weights")
+        #     return
 
-        print("adapter sum:", self.sum_trainable_tf(adapter_model))
+        # print("adapter sum:", self.sum_trainable_tf(adapter_model))
 
-        print("same object:", adapter_model is model)
+        # print("same object:", adapter_model is model)
 
-        print("same first var object:",
-            adapter_model.trainable_variables[0] is model.trainable_variables[0])
+        # print("same first var object:",
+        #     adapter_model.trainable_variables[0] is model.trainable_variables[0])
 
 
     def sum_trainable_tf(self,m: keras.Model) -> float:

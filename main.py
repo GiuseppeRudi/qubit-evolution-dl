@@ -3,7 +3,7 @@ from src.qubit.core.data import load_or_prepare_dataset
 from src.qubit.core.utils import get_device, parse_args
 from src.qubit.core.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config
 from src.qubit.registry import get_builder,get_trainer
-from src.qubit.core.save import save_outputs, make_run_output_dir
+from src.qubit.core.save import save_outputs, make_run_output_dir,save_log
 
 
 import src.qubit.rnn.builders  
@@ -24,7 +24,7 @@ def main():
     model_cfg = load_model_config(run_cfg["model"])
 
     run_dir = make_run_output_dir(model_cfg)
-
+    save_log(run_dir)
     
     if args.model is None:
         builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
@@ -51,19 +51,30 @@ def main():
     plot_cfg = load_plot_config(run_cfg["plot"])
 
   
-    save_outputs(splits, pred, model_cfg, feat_names, history, run_dir, training_cfg.fr_eval.split + "_fr_loss", plot_cfg, model)  
+    save_outputs(splits, pred, model_cfg, feat_names, history, run_dir, training_cfg.fr_eval.split + "_fr_loss", plot_cfg, training_cfg.phases, model)  
 
 if __name__ == "__main__":
     main()
 
 
 
-# TODO
-# create a model seq2seq lstm one seq using a global rnn infernece model with a wrapper 
-# implement the diffent options for the masked modelling strategy 
+
 
 # TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
 
 # TODO  create a different plot configurations because we changed the history object with more informations 
 
-# TODO better organizations for the file and package 
+# TODO implement different learning rate and cli_norm for each strategy 
+
+# TODO scheduled sampling con noise injection 
+
+
+# - name: scheduled_sampling_with_noise
+#   epochs: 20
+#   tf_ratio_start: 1.0
+#   tf_ratio_end: 0.0
+#   noise_injection:
+#     enabled: true
+#     noise_type: "adaptive"  # Cresce con la distanza dall'inizio
+#     sigma_start: 0.0
+#     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5

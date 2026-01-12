@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import cast
 import numpy as np
+import keras
+
 
 from ..model.dataset_splits import DatasetSplits
 from ..model.model_config import ModelConfig
@@ -76,7 +79,8 @@ class BaseTrainer(ABC):
         }
 
         current_epoch = 0
- 
+        lr_global = self.model_cfg.compile.learning_rate
+        clip_norm_global = self.model_cfg.compile.clip_norm
         
         # Esegui ogni fase
         for phase_idx, phase in enumerate(self.phases):
@@ -85,6 +89,19 @@ class BaseTrainer(ABC):
             phase_epochs = phase.cfg.epochs
             horizon = self.training_cfg.curriculum[phase_idx] if self.training_cfg.curriculum[phase_idx] != -1 else splits.Y_train.shape[1]
             
+
+            lr = self.phases[phase_idx].cfg.learning_rate
+            clip_norm = self.phases[phase_idx].cfg.clip_norm
+
+            
+            if lr == -1:
+                keras.backend.set_value(self.model.optimizer.learning_rate, lr_global)
+            else:
+                keras.backend.set_value(self.model.optimizer.learning_rate, lr_global)
+
+            self.model.current_clip_norm = clip_norm_global if clip_norm == -1  else clip_norm
+
+
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {strategy.get_name()}")
             for key, value in phase.cfg.__dict__.items():
@@ -100,8 +117,7 @@ class BaseTrainer(ABC):
             for epoch in range(phase_epochs):
 
                 print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
-              
-    
+
                 # se è un modello step-wise
                 if hasattr(self.model, "set_context"):
                     self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs,horizon=horizon)
@@ -113,6 +129,7 @@ class BaseTrainer(ABC):
                     train_inputs, train_targets = strategy.prepare_inputs(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
                     val_inputs, val_targets = strategy.prepare_inputs(splits.X_val, splits.Y_val,epoch, phase_epochs,splits.Y_val.shape[1])
 
+                
                 # training for 1 epoch because there are strategies that need results for each epoch
                 history = self.model.fit(
                     train_inputs,

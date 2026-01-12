@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import datetime
+from typing import List
 import numpy as np
 import json
 from .plot import save_loss_plots_keras
@@ -10,6 +11,8 @@ from ..enums.decoder_mode import DecoderMode
 
 from ..model.model_config import ModelConfig
 from ..model.plot_config import PlotConfig
+from ..model.training_config import TrainingConfig
+from ..model.phase_config import PhaseConfig
 
 import sys
 from ..core.utils import Tee
@@ -44,6 +47,7 @@ def save_outputs(
     run_dir,
     fr_key: str,
     plot_cfg: PlotConfig,
+    phases : List[PhaseConfig],
     model = None,
 ) -> Path:
     sample_index = plot_cfg.sample_index
@@ -60,7 +64,7 @@ def save_outputs(
         # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
-        save_loss_plots_keras(run_dir,history,fr_key)
+        save_loss_plots_keras(run_dir,history,phases,fr_key)
 
     if save_artifacts:
         np.savez_compressed(

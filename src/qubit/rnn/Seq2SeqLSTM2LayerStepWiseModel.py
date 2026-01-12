@@ -137,12 +137,11 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
             # stack: (T_out, N, D) -> transpose: (N, T_out, D)
             Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
 
-            # loss = self.compiled_loss(Y, Y_pred, regularization_losses=self.losses)
-            loss = cast(tf.Tensor, self.compute_loss(x=X, y=Y, y_pred=Y_pred, training=True))
+            # Y_true: (N, T_eff, D)
+            Y_true = tf.slice(Y, [0, 0, 0], [-1, T_eff, -1])
 
-            # TODO check if this is needed
-            if self.losses:
-                loss = loss + tf.add_n(self.losses)
+            # loss = self.compiled_loss(Y, Y_pred, regularization_losses=self.losses)
+            loss = cast(tf.Tensor, self.compute_loss(x=X, y=Y_true, y_pred=Y_pred, training=True))
                 
         # calculate the derivate of the loss from all trainable_variables (weights ect..)
         grads_raw = tape.gradient(loss, self.trainable_variables)
@@ -164,7 +163,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         grads, _ = tf.clip_by_global_norm(grads, 1.0)
         self.optimizer.apply_gradients(zip(grads, vars_))
 
-        self.compute_metrics(x=X, y=Y, y_pred=Y_pred, sample_weight=None)
+        self.compute_metrics(x=X, y=Y_true, y_pred=Y_pred, sample_weight=None)
 
         out = {m.name: m.result() for m in self.metrics}
 

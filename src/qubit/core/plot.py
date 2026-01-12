@@ -1,15 +1,26 @@
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
-from pathlib import Path
-import numpy as np
-import matplotlib.pyplot as plt
+phase_colors = {
+    "TeacherForcingPhase":"#FFDDDD",
+    "MaskedModelingPhase": "#DDFFDD",
+    "ScheduledSamplingPhase": "#DDDDFF",
+    "FullAutoregressivePhase": "#FFFFDD"
+}
 
+phase_labels = {
+    "TeacherForcingPhase": "Teacher Forcing",
+    "MaskedModelingPhase": "Masked Modeling",
+    "ScheduledSamplingPhase": "Scheduled Sampling",
+    "FullAutoregressivePhase": "Full Autoregressive"
+}
 
 def save_loss_plots_keras(
     run_dir: str | Path,
     history,
+    phases,
     fr_key: str,   
     train_key: str = "loss",
     val_key: str = "val_loss",
@@ -42,7 +53,13 @@ def save_loss_plots_keras(
     fr_path: Path | None = None
     all_path: Path | None = None
 
-    print(fr)
+    epoch_start = 0
+    phase_intervals = []
+    for ph in phases:
+        start = epoch_start
+        end = epoch_start + ph.epochs
+        phase_intervals.append((start, end, type(ph).__name__))
+        epoch_start = end
 
     # --- 1) Train plot ---
     if train is not None and len(train) > 0:
@@ -97,11 +114,16 @@ def save_loss_plots_keras(
     has_any = (
         (train is not None and len(train) > 0) or
         (val is not None and len(val) > 0) or
-        (fr is not None and len(fr) > 0)
+        (fr is not None and any(v is not None for v in fr))
     )
     if has_any:
-        plt.figure()
+        plt.figure(figsize=(8,5))
 
+        # sfondi per fase
+        for start, end, ph_type in phase_intervals:
+            plt.axvspan(start + 0.5, end + 0.5, color=phase_colors[ph_type], alpha=0.2)
+
+        # plot train/val/fr
         if train is not None and len(train) > 0:
             y = np.asarray(train, dtype=float)
             x = np.arange(1, len(y) + 1)
@@ -117,11 +139,19 @@ def save_loss_plots_keras(
             y = [v for v in fr if v is not None]
             plt.plot(x, y, label=f"free-running ({fr_key})")
 
+        # linee verticali per inizio fase
+        for start, _, _ in phase_intervals:
+            plt.axvline(start + 0.5, color='k', linestyle='--', linewidth=0.8)
+
+        # legenda per fasi
+        legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.2, label=phase_labels[ph_type])
+                        for _, _, ph_type in phase_intervals]
+        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches)
+
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.title("Loss curves (TF + Free-running)")
         plt.grid(True)
-        plt.legend()
 
         all_path = run_dir / f"{prefix}_all.jpg"
         plt.savefig(all_path, dpi=300, bbox_inches="tight")

@@ -8,3 +8,5 @@ class CompileConfig:
     loss: str
     metrics: list[str]
     run_eagerly: bool
+    learning_rate : float
+    clip_norm : float 

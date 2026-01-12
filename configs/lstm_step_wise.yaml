@@ -12,7 +12,7 @@ data:
 
   windowing:
     input_seq_len: 200
-    output_seq_len: 100
+    output_seq_len: 10
     stride: 20
     mode: seq2seq      
 
@@ -36,6 +36,8 @@ model:
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
+    learning_rate: 0.001
+    clip_norm: 1.0
 
   inference:
     mode : "free_running"   # "teacher_forcing" | "free_running"
@@ -47,13 +49,15 @@ model:
 training:
   verbose : 1
   batch_size: 64
-  curriculum: [5,5,5,5,5,5] # [5,10,25,30,-1,50]   # number of elements = number of strategies if we dont use a specific temporal horizon  insert -1 
+  curriculum: [-1,-1,-1,-1,-1,-1] # [5,10,25,30,-1,50]   # number of elements = number of strategies if we dont use a specific temporal horizon  insert -1 
   # remember the number of epoch for each temporal horizon is decided by the specific strategy
   phases:
 
     - name: full_autoregressive
       epochs: 5
       gradient_through_time: false
+      learning_rate: 0.0005   # override
+      clip_norm: 0.5          # override
 
     - name: teacher_forcing
       epochs: 5
