@@ -44,8 +44,6 @@ model:
     start_mode: "last_x"    # "zeros" | "last_x"
     verbose : 0  # 0,1,2
 
-
-
 training:
   verbose : 1
   batch_size: 64
@@ -53,14 +51,15 @@ training:
   # remember the number of epoch for each temporal horizon is decided by the specific strategy
   phases:
 
+    - name: teacher_forcing
+      epochs: 5
+
     - name: full_autoregressive
       epochs: 5
       gradient_through_time: false
-      learning_rate: 0.0005   # override
+      learning_rate: 5e-4   # override
       clip_norm: 0.5          # override
 
-    - name: teacher_forcing
-      epochs: 5
 
     # - name: masked_modeling
     #   epochs: 5
@@ -91,7 +90,6 @@ training:
     split: val    # test | val 
     p_eval: 0.8    # value beetwen  > 0 e 1 for percentual 
     every_epochs: 2 # frequency of evaluation (in epochs)
-  
   
 plot:
   pred_all : true # TODO this is not usefull

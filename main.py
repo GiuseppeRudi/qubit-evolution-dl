@@ -26,10 +26,8 @@ def main():
     run_dir = make_run_output_dir(model_cfg)
     save_log(run_dir)
     
-    if args.model is None:
-        builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
-        model = builder(splits.X_train, splits.Y_train, model_cfg)
-    else: model = keras.models.load_model(args.model)
+    builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
+    model = builder(splits.X_train, splits.Y_train, model_cfg, args.model)
 
     training_cfg = load_training_config(run_cfg["training"])
 

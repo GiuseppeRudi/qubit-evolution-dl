@@ -97,7 +97,7 @@ class BaseTrainer(ABC):
             lr_to_use = lr_global if lr_local == -1 else lr_local
             clip_norm_to_use = clip_norm_global if clip_norm_local == -1  else clip_norm_local
 
-            self.model.optimizer.learning_rate.assign(lr_to_use)
+            self.model.optimizer.learning_rate.assign(float(lr_to_use))
             self.model.current_clip_norm = clip_norm_to_use
 
 

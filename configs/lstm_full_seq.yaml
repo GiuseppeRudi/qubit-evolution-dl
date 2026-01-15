@@ -12,7 +12,7 @@ data:
 
   windowing:
     input_seq_len: 200
-    output_seq_len: 100
+    output_seq_len: 10
     stride: 20
     mode: seq2seq      
 
@@ -36,17 +36,18 @@ model:
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
+    learning_rate: 0.001
+    clip_norm: 1.0
 
   inference:
     mode : "free_running"   # "teacher_forcing" | "free_running"
     start_mode: "last_x"    # "zeros" | "last_x"
     verbose : 0  # 0,1,2
 
-
-
 training:
   verbose : 1
   batch_size: 64
+  curriculum: [-1,-1]
   phases:
     - name: teacher_forcing
       epochs: 5
@@ -59,16 +60,7 @@ training:
       # mask_value: 0.0         # solo se constant
       # noise_sigma: 0.1        # solo se noise
 
-    - name: scheduled_sampling
-      epochs: 10
-      tf_ratio_start: 1.0
-      tf_ratio_end: 0.2
-      # mode : lineare, esponenziale, inverse-sigmoid.
-      # per_feature : true , false  
-    
-    - name: full_autoregressive
-      epochs: 10
-      gradient_through_time: true
+# SCHEDULED SAMPLING and FULL AUTOREGRESSIVE in fullseq cannot be done
 
   # Free-running evaluation 
   fr_eval:

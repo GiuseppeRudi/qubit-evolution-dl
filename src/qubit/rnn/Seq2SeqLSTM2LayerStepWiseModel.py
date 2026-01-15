@@ -42,6 +42,25 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         self.ctx_total_epochs = tf.Variable(tf.constant(1, dtype=tf.int32), trainable=False)
         self.ctx_horizon = tf.Variable(tf.constant(0,tf.int32), trainable=False)
 
+    def build(self, input_shape):
+        # input_shape: (batch, Tin, D)
+        feature_dim = input_shape[-1]
+        if feature_dim is None:
+            feature_dim = self.feature_dim
+
+        # Encoder build
+        self.enc_lstm_1.build((None, None, feature_dim))          # (N,Tin,D) -> (N,Tin,latent)
+        self.enc_lstm_2.build((None, None, self.latent_dim))      # (N,Tin,latent)
+
+        # Decoder build (step-wise input: (N,1,D))
+        self.dec_lstm_1.build((None, 1, feature_dim))             # (N,1,D) -> (N,1,latent)
+        self.dec_lstm_2.build((None, 1, self.latent_dim))         # (N,1,latent)
+
+        # Dense build (last dim = latent)
+        self.out_dense.build((None, 1, self.latent_dim))
+
+        super().build(input_shape)
+
     def set_context(self, *, strategy: TrainingStrategy, epoch: int, total_epochs: int, horizon :int) -> None:
         self._strategy = strategy
         self.ctx_epoch.assign(int(epoch))

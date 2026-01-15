@@ -1,3 +1,4 @@
+from pathlib import Path
 from ..model.model_config import ModelConfig
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -13,7 +14,7 @@ from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
 
 @register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.FULL_SEQ)
-def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig):
+def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig, model_path: Optional[str] = None) -> Model:
 
     latent_dim = cast(RNNConfig,model_cfg.params).latent_dim
 
@@ -57,17 +58,21 @@ def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig):
     model = Model([encoder_inputs, decoder_input], decoder_outputs)
 
     optimizer = build_optimizer(
-    model_cfg.compile.optimizer,
-    model_cfg.compile.learning_rate,
-    model_cfg.compile.clip_norm)
+        model_cfg.compile.optimizer,
+        model_cfg.compile.learning_rate,
+        model_cfg.compile.clip_norm
+    )
 
     model.compile(optimizer=optimizer, loss=model_cfg.compile.loss, metrics = model_cfg.compile.metrics)
+
+    if model_path is not None:
+        model.load_weights(Path(model_path) / "model.weights.h5")
 
     return model
 
 
 @register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.STEP_WISE)
-def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
+def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig, model_path: Optional[str] = None) -> Seq2SeqLSTM2LayerStepWiseModel:
     latent_dim = cast(RNNConfig, model_cfg.params).latent_dim
     feature_dim = int(x_train.shape[2])
 
@@ -77,10 +82,12 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
         start_mode=model_cfg.inference.start_mode,
     )
 
-    optimizer = build_optimizer(
-    model_cfg.compile.optimizer,
-    model_cfg.compile.learning_rate)
+    model.build((None, None, feature_dim))
 
+    optimizer = build_optimizer(
+        model_cfg.compile.optimizer,
+        model_cfg.compile.learning_rate
+    )
 
     model.compile(
         optimizer=optimizer,
@@ -88,6 +95,10 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig):
         metrics=model_cfg.compile.metrics,
         run_eagerly=model_cfg.compile.run_eagerly
     )
+
+    if model_path is not None:
+        model.load_weights(Path(model_path) / "model.weights.h5")
+
     return model
 
 
