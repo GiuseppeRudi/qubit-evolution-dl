@@ -52,19 +52,39 @@ training:
     - name: masked_modeling
       epochs: 5
       mask_prob: 0.25
-      # mask_scope: element     # time | element | feature
-      # mask_mode: zero         # zero | constant | noise
+      mask_scope: element     # time | element | feature
+      mask_mode: zero         # zero | constant | noise
       # mask_value: 0.0         # solo se constant
       # noise_sigma: 0.1        # solo se noise
 
 # SCHEDULED SAMPLING and FULL AUTOREGRESSIVE in fullseq cannot be done
 
-  # Free-running evaluation 
+  # free-running evaluation
   fr_eval:
-    enabled: true  # enable/disable free-running eval callback
-    split: val    # test | val 
-    p_eval: 0.8    # value beetwen  > 0 e 1 for percentual 
-    every_epochs: 5 # frequency of evaluation (in epochs)
+    enabled: true
+    split: val   # val || test 
+    
+    # p_eval => percentuage of the (val or test) split
+    # out_steps can be 
+    # out_steps => phase  where phase take horizon prediction determinated by a used strategy
+    # out_steps => global where the horizon prediction are taken by output_seq_len
+    # out_steps => [10,25,60,100] a list of horizon values insert by the programmer 
+    probes:
+      - name: fr_phase 
+        out_steps: phase  
+        every_epochs: 2
+        p_eval: 0.8    
+
+      - name: fr_target
+        out_steps: global
+        p_eval: 0.3
+        every_epochs: end_of_phase
+
+      - name: fr_curve
+        out_steps: [10, 25, 50, 75] 
+        p_eval: 0.2
+        every_epochs: end_of_phase
+  
   
   
 plot:

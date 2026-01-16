@@ -80,6 +80,29 @@ if __name__ == "__main__":
 
 
 
+# TODO RESOLVE THIS BUG WHEN TRY TO PERFORM FULLSEQ EXECUTION 
+
+# 163/163 ━━━━━━━━━━━━━━━━━━━━ 0s 36ms/step - loss: 0.0068 - mae: 0.0645Traceback (most recent call last):
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 56, in <module>
+#     main()
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 42, in main
+#     history = trainer.fit(splits)
+#               ^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/base_trainer.py", line 146, in fit
+#     history = self.model.fit(
+#               ^^^^^^^^^^^^^^^
+#   File "/home/giu20/miniconda3/envs/qubit/lib/python3.12/site-packages/keras/src/utils/traceback_utils.py", line 122, in error_handler
+#     raise e.with_traceback(filtered_tb) from None
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/free_running_eval.py", line 164, in on_epoch_end
+#     fr_loss = self._scalar_loss(y_k, p_k)  # float
+#               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/free_running_eval.py", line 80, in _scalar_loss
+#     v = self.loss_fn(y_true_t, y_pred_t)     
+#         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# tensorflow.python.framework.errors_impl.InvalidArgumentError: {{function_node __wrapped__Sub_device_/job:localhost/replica:0/task:0/device:GPU:0}} required broadcastable shapes [Op:Sub] name: 
+# (qubit) giu20@RudiPC:~/projects/qubit-evolution-dl$ 
+
+
 # TODO IMPORTANTE 
 # 2) Problema strutturale con il curriculum: self._strategy è un oggetto Python dentro un train_step che Keras mette in graph
 
