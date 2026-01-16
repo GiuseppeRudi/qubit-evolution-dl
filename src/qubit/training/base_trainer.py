@@ -107,7 +107,8 @@ class BaseTrainer(ABC):
             lr_to_use = lr_global if lr_local is None else lr_local
             clip_norm_to_use = clip_norm_global if clip_norm_local is None else clip_norm_local
 
-            self.model.optimizer.learning_rate.assign(lr_to_use)
+            self.model.optimizer.learning_rate.assign(float(lr_to_use))
+            self.model.current_clip_norm = clip_norm_to_use
 
             # clip_norm is used only for a custom model (not for full_seq model)
             self.model.current_clip_norm = clip_norm_to_use

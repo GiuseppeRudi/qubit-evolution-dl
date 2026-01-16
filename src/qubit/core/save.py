@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 from typing import List
+from xml.parsers.expat import model
 import numpy as np
 import json
 from .plot import save_loss_plots_keras
@@ -56,12 +57,12 @@ def save_outputs(
     save_plots = plot_cfg.save_plots
     save_artifacts  = plot_cfg.save_artifacts
 
-    
-
-    # if save_model and model is not None:
+    if save_model and model is not None:
+        print("model built:", model.built)
+        print("num weights:", len(model.weights))
         # TODO with custom model we dont use directly model.save
         # for this reasons we save the weights and later modify the code to recreate the model from the weights 
-        # model.save_weights(run_dir / "weights.h5")  # o .weights.h5
+        model.save_weights(run_dir / "model.weights.h5")
         # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
