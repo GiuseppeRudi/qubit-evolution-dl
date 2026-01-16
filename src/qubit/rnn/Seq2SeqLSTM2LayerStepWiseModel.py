@@ -25,7 +25,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         self.start_mode = start_mode
 
         # Encoder
-        self.enc_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, name="enc_lstm_1")
+        self.enc_lstm_1 = layers.LSTM(latent_dim, return_state=True,return_sequences=True, name="enc_lstm_1")
         self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True, name="enc_lstm_2")
 
         # Decoder (step-by-step, input (N,1,D))
@@ -49,9 +49,9 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
         self.ctx_horizon.assign(int(horizon))
 
     def _encode(self, X: tf.Tensor) -> LSTM2LayerTFState:
-        x = self.enc_lstm_1(X)
-        _, h, c = self.enc_lstm_2(x)
-        return LSTM2LayerTFState(h1=h, c1=c, h2=h, c2=c)
+        x_seq, h1, c1 = self.enc_lstm_1(X)   
+        _, h2, c2 = self.enc_lstm_2(x_seq)
+        return LSTM2LayerTFState(h1=h1, c1=c1, h2=h2, c2=c2)
 
     def _init_dec0(self, X: tf.Tensor) -> tf.Tensor:
         if self.start_mode == StartMode.LAST_X:
@@ -80,8 +80,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
             raise RuntimeError("StepWise model: strategy context not set. Call model.set_context(...) before fit().")
 
 
-        T_eff = self.ctx_horizon
-
+        T_eff = tf.cast(self.ctx_horizon.read_value(), tf.int32)
         with tf.GradientTape() as tape:
 
             # return the internal states from encoder 
@@ -94,7 +93,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
             # batch_size is None because is dinamic 
             ta = tf.TensorArray(
                 dtype=Y.dtype,
-                size=T_eff,
+                size=T_eff ,
                 element_shape=tf.TensorShape([None, self.feature_dim]),
             )
             
@@ -120,6 +119,7 @@ class Seq2SeqLSTM2LayerStepWiseModel(keras.Model):
                 # Y.shape(batch_size, timesteps, feature_dim)
                 y_true_nd = tf.gather(Y, t, axis=1)             # (N,D)
                 y_true_t = tf.expand_dims(y_true_nd, axis=1)    # (N,1,D)
+
 
                 dec_t = strategy.next_dec_input(
                     y_true_t=y_true_t,

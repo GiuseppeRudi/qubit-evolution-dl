@@ -24,6 +24,7 @@ def main():
     model_cfg = load_model_config(run_cfg["model"])
 
     run_dir = make_run_output_dir(model_cfg)
+    print(f"Run outputs will be saved in: {run_dir}\n")
     save_log(run_dir)
     
     if args.model is None:
@@ -51,7 +52,7 @@ def main():
     plot_cfg = load_plot_config(run_cfg["plot"])
 
   
-    save_outputs(splits, pred, model_cfg, feat_names, history, run_dir, training_cfg.fr_eval.split + "_fr_loss", plot_cfg, training_cfg.phases, model)  
+    save_outputs(splits, pred, model_cfg, feat_names, history, run_dir, training_cfg.fr_eval.split + "_fr_", plot_cfg, training_cfg, splits.Y_train.shape[1], model)  
 
 if __name__ == "__main__":
     main()
@@ -78,3 +79,17 @@ if __name__ == "__main__":
 #     noise_type: "adaptive"  # Cresce con la distanza dall'inizio
 #     sigma_start: 0.0
 #     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5
+
+
+
+# TODO IMPORTANTE 
+# 2) Problema strutturale con il curriculum: self._strategy è un oggetto Python dentro un train_step che Keras mette in graph
+
+# Keras (con run_eagerly=False) wrappa train_step in tf.function. Dentro una tf.function:
+
+# gli oggetti Python catturati (come self._strategy) diventano “costanti” del trace
+
+# quando tu fai set_context(... strategy=...) e cambi strategia per fase/epoch, la graph potrebbe NON “vedere” il cambio oppure forzare retracing in modo brutto (memory/instabilità/errori strani)
+
+# Tu hai già fatto bene a mettere ctx_epoch/ctx_total_epochs/ctx_horizon come tf.Variable per evitare retracing… ma la strategia resta Python, quindi il problema rimane.
+

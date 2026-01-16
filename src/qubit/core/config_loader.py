@@ -10,7 +10,7 @@ from ..model.transformer_config import TransformerConfig
 from ..model.compile_config import CompileConfig
 from ..model.inference_config import InferenceConfig
 from ..model.training_config import TrainingConfig
-from ..model.fr_eval_config import FrEvalConfig
+from ..model.fr_eval_config import *
 from ..model.plot_config import PlotConfig
 from ..model.phase_config import *
 
@@ -88,8 +88,6 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
         params=params,
     )
 
-
-
 def load_run_config(path: str) -> dict:
 
     # dictionary from yaml file 
@@ -100,9 +98,6 @@ def load_run_config(path: str) -> dict:
         if k not in cfg:
             raise ValueError(f"Missing '{k}' in run config")
     return cfg
-
-
-
 
 def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
     if "name" not in d:
@@ -122,32 +117,79 @@ def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
     raise ValueError(f"Unsupported phase name: {name}")
 
 
-def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
+def validate_masked_modeling_phase(p: MaskedModelingPhase) -> None:
+    if p.mask_mode == MaskMode.CONSTANT:
+        if p.mask_value is None:
+            raise ValueError("MaskedModelingPhase: mask_mode=CONSTANT need mask_value.")
 
-    verbose = t.get("verbose" , 1)
-    curriculum = t.get("curriculum",[] )
+    elif p.mask_mode == MaskMode.NOISE:
+        if p.noise_sigma is None:
+            raise ValueError("MaskedModelingPhase: mask_mode=NOISE need noise_sigma.")
+        
+    elif p.mask_mode == MaskMode.ZERO:
+        pass
+
+    else:
+        raise ValueError(f"MaskedModelingPhase: mask_mode non supportato: {p.mask_mode}")
+
+
+def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
+    verbose = t.get("verbose", 1)
+    curriculum = t.get("curriculum", [])
     batch_size = t.get("batch_size", 32)
     phases_raw = t.get("phases", []) or []
     phases = [parse_phase(p) for p in phases_raw]
     epochs = sum(p.epochs for p in phases)
 
+    for p in phases:
+        if isinstance(p, MaskedModelingPhase):
+            validate_masked_modeling_phase(p)    
+
     fr_eval_raw = t.get("fr_eval", {}) or {}
-    # split deve essere enum-safe
-    if "split" in fr_eval_raw:
-        fr_eval_raw = dict(fr_eval_raw)
-        fr_eval_raw["split"] = SplitName(fr_eval_raw["split"])
 
-    fr_eval = FrEvalConfig(**fr_eval_raw)
+    # split enum-safe
+    split = SplitName(fr_eval_raw.get("split", "val")) 
+    enabled = bool(fr_eval_raw.get("enabled", False))
 
-    return TrainingConfig(                  
+    # parse probes 
+    probes_raw = fr_eval_raw.get("probes")
+    if probes_raw is  None:
+        raise ValueError("fr_eval config must define probes field.")
+    
+    probes = tuple(_parse_fr_eval_probe(cast(Dict[str, Any], p)) for p in probes_raw)
+
+
+    if enabled and len(probes) == 0:
+        raise ValueError("if fr_eval.enabled=true requires at least one probe")
+
+    fr_eval = FrEvalConfig(
+        enabled=enabled,
+        split=split,
+        probes=cast(tuple[FrEvalProbeConfig],probes),
+    )
+
+    return TrainingConfig(
         batch_size=batch_size,
-        epochs= epochs ,
+        epochs=epochs,
         phases=phases,
         fr_eval=fr_eval,
         verbose=verbose,
-        curriculum = curriculum
+        curriculum=curriculum,
     )
 
+
+def _parse_fr_eval_probe(p: Dict[str, Any]) -> FrEvalProbeConfig:
+    out_steps = p.get("out_steps")
+
+    if out_steps is None:
+        raise ValueError(f"FrEvalProbeConfig '{p.get('name')}' must define 'out_steps' ")
+
+    return FrEvalProbeConfig(
+        name=cast(str, p["name"]),
+        every_epochs=cast(EveryEpochs, p.get("every_epochs")),
+        out_steps=cast(OutStepsSpec, out_steps),
+        p_eval=cast(float, p.get("p_eval")),
+    )
 
 def _parse_sample_index(v: Any) -> List[int]:
     if v is None:

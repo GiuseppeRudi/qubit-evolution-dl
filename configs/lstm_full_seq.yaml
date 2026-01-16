@@ -1,6 +1,3 @@
-run:
-  name: "Lstm_prova"
-
 data:
   dataset:
     csv_path: data/trajectories.csv

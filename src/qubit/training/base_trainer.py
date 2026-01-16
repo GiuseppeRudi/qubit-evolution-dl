@@ -10,6 +10,8 @@ from ..model.training_config import TrainingConfig
 from ..model.phase_config import Phase
 from ..model.custom_history import CustomHistory
 
+from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
+
 from .free_running_eval import FreeRunningEvalCallback
 from ..strategies.strategy_factory import create_strategy
 from ..strategies.decoder_utils import make_decoder_inputs
@@ -68,38 +70,47 @@ class BaseTrainer(ABC):
     def fit(self, splits: DatasetSplits):
 
         callbacks = self._prepare_callbacks(splits)
+
+        curriculum_no_dupe = list(dict.fromkeys(
+            splits.Y_train.shape[1] if h == -1 else int(h)
+            for h in self.training_cfg.curriculum
+        ))
         
+        fr_target = self.training_cfg.fr_eval.split.value + '_fr_target_loss_' + str(splits.Y_train.shape[1])
+        fr_curve = self.training_cfg.fr_eval.split.value + '_fr_curve_loss_'
+        fr_phase = self.training_cfg.fr_eval.split.value + '_fr_phase_loss_'
+        out_steps_curve = next(p.out_steps for p in self.training_cfg.fr_eval.probes if p.name == "fr_curve")
 
         history_combined = {
-            'loss': [], 
-            self.training_cfg.fr_eval.split + '_fr_loss': [], 
+            'loss': [],
+            **{fr_curve + str(h): [] for h in out_steps_curve},
+            **{fr_phase + str(h): [] for h in curriculum_no_dupe},
+            fr_target: [],
             'val_loss': [],
-            'phase_names': [],  
-            'phase_boundaries': [] 
+            'phase_names': []
         }
 
         current_epoch = 0
         lr_global = self.model_cfg.compile.learning_rate
         clip_norm_global = self.model_cfg.compile.clip_norm
         
-        # Esegui ogni fase
+        # for each phases (strategy)
         for phase_idx, phase in enumerate(self.phases):
 
             strategy = phase.strategy
             phase_epochs = phase.cfg.epochs
             horizon = self.training_cfg.curriculum[phase_idx] if self.training_cfg.curriculum[phase_idx] != -1 else splits.Y_train.shape[1]
             
-       
             lr_local = self.phases[phase_idx].cfg.learning_rate
             clip_norm_local = self.phases[phase_idx].cfg.clip_norm
-
             
-            lr_to_use = lr_global if lr_local == -1 else lr_local
-            clip_norm_to_use = clip_norm_global if clip_norm_local == -1  else clip_norm_local
+            lr_to_use = lr_global if lr_local is None else lr_local
+            clip_norm_to_use = clip_norm_global if clip_norm_local is None else clip_norm_local
 
             self.model.optimizer.learning_rate.assign(lr_to_use)
-            self.model.current_clip_norm = clip_norm_to_use
 
+            # clip_norm is used only for a custom model (not for full_seq model)
+            self.model.current_clip_norm = clip_norm_to_use
 
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {strategy.get_name()}")
@@ -111,24 +122,23 @@ class BaseTrainer(ABC):
             print(f"   Horizon (train loss): {horizon}")
             print(f"   Output timesteps (val_loss and fr_loss): {splits.Y_train.shape[1]}")
             print(f"{'='*70}\n")
-            
-            history_combined['phase_boundaries'].append(current_epoch)
-            
-            # Custom training loop per questa fase
+
+
+            callbacks[0].phase_horizon = horizon
+
+            # for each epoch of each phase 
             for epoch in range(phase_epochs):
+                callbacks[0].end_of_phase = (epoch == phase_epochs-1)
 
                 print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
-
-                # se è un modello step-wise
-                if hasattr(self.model, "set_context"):
+       
+                if  isinstance(self.model,Seq2SeqLSTM2LayerStepWiseModel):
                     self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs,horizon=horizon)
                     train_inputs, train_targets = splits.X_train, splits.Y_train[:, :horizon, :]
-                    # train_step for val set is performed by all final_ouput not only for horizon
-                    val_inputs, val_targets = splits.X_val, splits.Y_val
+                    val_inputs, val_targets = splits.X_val, splits.Y_val[:, :horizon, :]
                 else:
-                    
                     train_inputs, train_targets = strategy.prepare_inputs(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
-                    val_inputs, val_targets = strategy.prepare_inputs(splits.X_val, splits.Y_val,epoch, phase_epochs,splits.Y_val.shape[1])
+                    val_inputs, val_targets = strategy.prepare_inputs(splits.X_val, splits.Y_val,epoch, phase_epochs, horizon)
 
                 
                 # training for 1 epoch because there are strategies that need results for each epoch
@@ -144,16 +154,29 @@ class BaseTrainer(ABC):
                 
                 # object useful to obtain a custom history for plotting
                 history_combined['loss'].extend(history.history['loss'])
-                
-                fr_loss = self.training_cfg.fr_eval.split.value + '_fr_loss'
-                if (fr_loss in history.history):
-                    history_combined[fr_loss].extend(history.history[fr_loss])
-                else : history_combined[fr_loss].append(None)  
-                
+
+                if (fr_target in history.history):
+                    history_combined[fr_target].extend(history.history[fr_target])
+                else : history_combined[fr_target].append(None)
+
+                for h in out_steps_curve:
+                    curve = fr_curve + str(h)
+                    if (curve in history.history):
+                        history_combined[curve].extend(history.history[curve])
+                    else: history_combined[curve].append(None)
+
+                phase = fr_phase + str(horizon)
+
+                if (phase in history.history):
+                    history_combined[phase].extend(history.history[phase])
+                else : history_combined[phase].append(None)  
+            
                 history_combined['val_loss'].extend(history.history['val_loss'])
                 history_combined['phase_names'].append(strategy.get_name())
                 
                 current_epoch += 1
+            
+            callbacks[0].phase_epoch = 0
         
         # this functions is important to return a history like keras 
         # we used this because we fit the model for 1 epoch and we dont have history.epoch = total epoch  

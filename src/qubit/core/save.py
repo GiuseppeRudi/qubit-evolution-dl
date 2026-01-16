@@ -47,7 +47,8 @@ def save_outputs(
     run_dir,
     fr_key: str,
     plot_cfg: PlotConfig,
-    phases : List[PhaseConfig],
+    training_cfg : TrainingConfig,
+    output_seq_len: int,
     model = None,
 ) -> Path:
     sample_index = plot_cfg.sample_index
@@ -64,7 +65,7 @@ def save_outputs(
         # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
-        save_loss_plots_keras(run_dir,history,phases,fr_key)
+        save_loss_plots_keras(run_dir,history,training_cfg,fr_key,output_seq_len)
 
     if save_artifacts:
         np.savez_compressed(

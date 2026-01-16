@@ -9,6 +9,7 @@ class ScheduledSamplingStrategy(TrainingStrategy):
         self.tf_ratio_start = tf_ratio_start
         self.tf_ratio_end = tf_ratio_end
     
+    # not possible because for full_seq model wih full encoder it's not possible to apply the SS 
     def prepare_inputs(self, X, Y, epoch, total_epochs,horizon):
         pass
     
@@ -25,7 +26,9 @@ class ScheduledSamplingStrategy(TrainingStrategy):
         end = tf.cast(self.tf_ratio_end, tf.float32)
         return start + (end - start) * alpha
 
+
     def next_dec_input(self, *, y_true_t, y_pred_t, epoch, total_epochs):
+
         ratio = self._tf_ratio(epoch, total_epochs)  # scalar
         batch_size = tf.shape(y_true_t)[0]  
         feature_dim = tf.shape(y_true_t)[2]  

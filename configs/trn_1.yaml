@@ -1,6 +1,3 @@
-run:
-  name: "exp_trn_encoderdense_v1"
-
 data:
   dataset:
     csv_path: data/trajectories.csv
