@@ -11,7 +11,6 @@ data:
     input_seq_len: 200
     output_seq_len: 10
     stride: 20
-    mode: seq2seq      
 
   split:
     seed: 42
@@ -44,18 +43,20 @@ model:
 training:
   verbose : 1
   batch_size: 64
-  curriculum: [-1,-1]
+  curriculum: [-1,5]
   phases:
     - name: teacher_forcing
       epochs: 5
 
     - name: masked_modeling
       epochs: 5
-      mask_prob: 0.25
-      mask_scope: element     # time | element | feature
-      mask_mode: zero         # zero | constant | noise
-      # mask_value: 0.0         # solo se constant
-      # noise_sigma: 0.1        # solo se noise
+      mask_prob: 0.20
+      learning_rate: 0.0005
+      clip_norm: 0.7
+      mask_scope: time        # time | element | feature
+      mask_mode: constant         # zero | constant | noise
+      mask_value: 0.2         # solo se constant
+      noise_sigma: 0.1        # solo se noise
 
 # SCHEDULED SAMPLING and FULL AUTOREGRESSIVE in fullseq cannot be done
 
@@ -81,14 +82,13 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [10, 25, 50, 75] 
+        out_steps: [2,4,6] 
         p_eval: 0.2
         every_epochs: end_of_phase
   
   
   
 plot:
-  pred_all : true # TODO this is not usefull
   sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
   save_plots: true
   save_artifacts : true

@@ -63,14 +63,6 @@ def load_run_artifacts(run_dir: str | Path):
     splits = SimpleNamespace(X_test=X_test, Y_test=Y_test)
     return splits, pred, meta
 
-# def _pick_pred(pred, sample_index: int):
-#     pred = np.asarray(pred)
-#     if pred.ndim == 3:
-#         return pred[sample_index]
-#     if pred.ndim == 2:
-#         return pred
-#     raise ValueError(f"Unsupported prediction shape: {pred.shape}")
-
 def generate_plot_for_feature(
     feature_names,
     splits,
@@ -136,8 +128,6 @@ def generate_plot_for_feature(
     plt.close()
 
     return str(plot_path)
-
-# TODO make predictions for all test set and reuse a pick pred 
 
 def generate_all_plots(
     splits,
@@ -207,7 +197,7 @@ def main():
         out_dir = Path(args.out_dir)
     else:
         if args.run_b is None:
-            out_dir = Path(args.run_a) / "plots"
+            out_dir = Path(args.run_a) / "prediction_plots"
         else:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             out_dir = Path("predictions") / "compare" / f"compare__{ts}"

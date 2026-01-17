@@ -5,8 +5,6 @@ from typing import Protocol
 from ..enums.start_mode import StartMode
 import numpy as np
 
-# TODO remember to update the start mode with add the last x and this is the reason why the plots start wrong 
-
 class AutoregressiveAdapter(Protocol):
     """Adapter protocol for autoregressive inference."""
 

@@ -60,10 +60,7 @@ def save_outputs(
     if save_model and model is not None:
         print("model built:", model.built)
         print("num weights:", len(model.weights))
-        # TODO with custom model we dont use directly model.save
-        # for this reasons we save the weights and later modify the code to recreate the model from the weights 
         model.save_weights(run_dir / "model.weights.h5")
-        # model.save(run_dir/"model.keras")
 
     if history is not None and save_plots:
         save_loss_plots_keras(run_dir,history,training_cfg,fr_key,output_seq_len)

@@ -10,6 +10,7 @@ import pandas as pd
 
 
 
+from ..model.data_config import DataConfig
 
 def compute_feature_dim(n: int) -> int:
    # number of features: n magnetisations (10) + (n * (n - 1)) // 2 correlations (45)
@@ -24,17 +25,17 @@ def load_raw_dataframe(csv_path: Path | str) -> pd.DataFrame:
 
 
 
-def build_trajectories(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarray, list[str]]:
+def build_trajectories(df: pd.DataFrame, data_cfg : DataConfig) -> Tuple[np.ndarray, list[str]]:
 
     # number of rows => n_points * n_traj => 400.400
     # number of cols => 1 + feature_dim => 1 + (10 (magnetisations) + 45 (correlations) ) = 56 (for n=10)
 
-    total_qubits = int(cfg["dataset"]["total_qubits"]) # number of qubits
-    used_qubits = int(cfg["dataset"]["used_qubits"]) # number of qubits to use
-    time_steps = int(cfg["dataset"]["time_steps"]) # number of time steps per trajectory
-    n_traj = int(cfg["dataset"]["n_traj"]) # number of trajectories
+    total_qubits = data_cfg.dataset.total_qubits # number of qubits
+    used_qubits = data_cfg.dataset.used_qubits  # number of qubits to use
+    time_steps = data_cfg.dataset.time_steps # number of time steps per trajectory
+    n_traj = data_cfg.dataset.n_traj # number of trajectories
 
-    traj_fraction = float(cfg["dataset"]["traj_fraction"]) # fraction of trajectories to use
+    traj_fraction = data_cfg.dataset.traj_fraction # fraction of trajectories to use
 
 
     feature_dim = compute_feature_dim(used_qubits)
@@ -81,9 +82,6 @@ def build_trajectories(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarra
     print(feat_names)
     # split into input (X) and output (Y) sequences
 
-    # TODO : we could implement a sliding window approach to have more data => now we take only the first input_len + output_len time steps => trash the rest
-    #X = data_3d[:, :input_len, :]
-    #Y = data_3d[:, input_len: input_len + output_len, :]
     return data_3d, feat_names
 
 
@@ -107,20 +105,21 @@ def build_trajectories(df: pd.DataFrame, cfg: Dict[str, Any]) -> Tuple[np.ndarra
 #     splits = split_by_trajectory(X, Y, val_ratio=val_ratio, test_ratio=test_ratio)
 #     return splits, feat_names
 
-def load_or_prepare_dataset(m: Dict[str, Any]) -> Tuple[DatasetSplits, list[str]]:
-    df = load_raw_dataframe(m["dataset"]["csv_path"])
+def prepare_dataset(data_cfg : DataConfig ) -> Tuple[DatasetSplits, list[str]]:
 
-    traj_3d, feat_names = build_trajectories(df, m)
+    df = load_raw_dataframe(data_cfg.dataset.csv_path)
 
-    seed = int(m["split"]["seed"])
+    traj_3d, feat_names = build_trajectories(df, data_cfg)
+
+    seed = data_cfg.split.seed
     set_seed(seed, deterministic=True)
 
-    input_len  = int(m["windowing"]["input_seq_len"])
-    output_len = int(m["windowing"]["output_seq_len"])
-    stride     = int(m["windowing"].get("stride", 1))
+    input_len  =  data_cfg.windowing.input_seq_len
+    output_len =  data_cfg.windowing.output_seq_len
+    stride     =  data_cfg.windowing.stride
 
-    val_ratio  = float(m["split"]["val_ratio"])
-    test_ratio = float(m["split"]["test_ratio"])
+    val_ratio  = data_cfg.split.val_ratio
+    test_ratio = data_cfg.split.test_ratio
 
     splits = split_by_trajectory_then_window(
         traj_3d,

@@ -1,10 +1,10 @@
 import keras
-from src.qubit.core.data import load_or_prepare_dataset
+from src.qubit.core.data import prepare_dataset
 from src.qubit.core.utils import get_device, parse_args
-from src.qubit.core.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config
+from src.qubit.core.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config
 from src.qubit.registry import get_builder,get_trainer
 from src.qubit.core.save import save_outputs, make_run_output_dir,save_log
-
+from src.qubit.core.error import check_correctness
 
 import src.qubit.rnn.builders  
 import src.qubit.transformer.builders
@@ -19,18 +19,19 @@ def main():
     args = parse_args()
     run_cfg = load_run_config(args.run_cfg)
  
-    splits, feat_names = load_or_prepare_dataset(run_cfg["data"])
-
+    data_cfg = load_data_config(run_cfg["data"])
     model_cfg = load_model_config(run_cfg["model"])
+    training_cfg = load_training_config(run_cfg["training"])
+
+    check_correctness(model_cfg,training_cfg,data_cfg)
+
+    splits, feat_names = prepare_dataset(data_cfg)
 
     run_dir = make_run_output_dir(model_cfg)
-    print(f"Run outputs will be saved in: {run_dir}\n")
     save_log(run_dir)
     
     builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
     model = builder(splits.X_train, splits.Y_train, model_cfg, args.model)
-
-    training_cfg = load_training_config(run_cfg["training"])
 
     TrainerCls = get_trainer(model_cfg.type)
 
@@ -56,18 +57,7 @@ if __name__ == "__main__":
     main()
 
 
-
-
-
-# TODO create functions in error.py that will check if in the config loader insert the correct parameters otherwise catch the error
-
-# TODO  create a different plot configurations because we changed the history object with more informations 
-
-# TODO implement different learning rate and cli_norm for each strategy 
-
 # TODO scheduled sampling con noise injection 
-
-
 # - name: scheduled_sampling_with_noise
 #   epochs: 20
 #   tf_ratio_start: 1.0
@@ -79,38 +69,10 @@ if __name__ == "__main__":
 #     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5
 
 
-
-# TODO RESOLVE THIS BUG WHEN TRY TO PERFORM FULLSEQ EXECUTION 
-
-# 163/163 ━━━━━━━━━━━━━━━━━━━━ 0s 36ms/step - loss: 0.0068 - mae: 0.0645Traceback (most recent call last):
-#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 56, in <module>
-#     main()
-#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 42, in main
-#     history = trainer.fit(splits)
-#               ^^^^^^^^^^^^^^^^^^^
-#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/base_trainer.py", line 146, in fit
-#     history = self.model.fit(
-#               ^^^^^^^^^^^^^^^
-#   File "/home/giu20/miniconda3/envs/qubit/lib/python3.12/site-packages/keras/src/utils/traceback_utils.py", line 122, in error_handler
-#     raise e.with_traceback(filtered_tb) from None
-#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/free_running_eval.py", line 164, in on_epoch_end
-#     fr_loss = self._scalar_loss(y_k, p_k)  # float
-#               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/free_running_eval.py", line 80, in _scalar_loss
-#     v = self.loss_fn(y_true_t, y_pred_t)     
-#         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# tensorflow.python.framework.errors_impl.InvalidArgumentError: {{function_node __wrapped__Sub_device_/job:localhost/replica:0/task:0/device:GPU:0}} required broadcastable shapes [Op:Sub] name: 
-# (qubit) giu20@RudiPC:~/projects/qubit-evolution-dl$ 
-
-
 # TODO IMPORTANTE 
 # 2) Problema strutturale con il curriculum: self._strategy è un oggetto Python dentro un train_step che Keras mette in graph
-
 # Keras (con run_eagerly=False) wrappa train_step in tf.function. Dentro una tf.function:
-
 # gli oggetti Python catturati (come self._strategy) diventano “costanti” del trace
-
 # quando tu fai set_context(... strategy=...) e cambi strategia per fase/epoch, la graph potrebbe NON “vedere” il cambio oppure forzare retracing in modo brutto (memory/instabilità/errori strani)
-
 # Tu hai già fatto bene a mettere ctx_epoch/ctx_total_epochs/ctx_horizon come tf.Variable per evitare retracing… ma la strategia resta Python, quindi il problema rimane.
 

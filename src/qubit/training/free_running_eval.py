@@ -6,16 +6,17 @@ from typing import cast
 
 from ..model.fr_eval_config import FrEvalProbeConfig, OutStepsSpec
 
-from ..inference.seq2seq_rnn import Seq2SeqLSTM2LayerAdapter
+from ..inference.full_seq_lstm_adapter import FullSeqLstmAdapter
 from ..inference.base import  decode
 from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
 from ..enums.inference_mode import InferenceMode
 from ..model.training_config import TrainingConfig
 
-from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
-from ..inference.step_wise_rnn_adapter import StepWiseSeq2SeqAdapter
-
+from ..rnn.step_wise_lstm_model import StepWiseLstmModel
+from ..inference.step_wise_lstm_adapter import StepWiseLstmAdapter
+from ..transformer.step_wise_model import StepWiseTrnModel
+from ..inference.step_wise_trn_adapter import StepWiseTrnAdapter
 class FreeRunningEvalCallback(keras.callbacks.Callback):
     """
     Calculate the free-running loss (autoregressive) based on the every_epoch variable,
@@ -62,9 +63,11 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
         trained_model = cast(keras.Model, self.model)
         
-        if isinstance(self.model, Seq2SeqLSTM2LayerStepWiseModel):
-            self.adapter = StepWiseSeq2SeqAdapter(trained_model, verbose=self.verbose)
-        else: self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose=self.verbose)
+        if isinstance(self.model, StepWiseLstmModel):
+            self.adapter = StepWiseLstmAdapter(trained_model, verbose=self.verbose)
+        elif isinstance(self.model, StepWiseTrnModel):
+            self.adapter = StepWiseTrnAdapter(trained_model, verbose=self.verbose)
+        else: self.adapter = FullSeqLstmAdapter(trained_model, verbose=self.verbose)
         # self.adapter = Seq2SeqLSTM2LayerAdapter(trained_model, verbose= self.verbose)
 
         loss = self.model.loss
@@ -76,6 +79,8 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
     def _scalar_loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         y_true_t = tf.convert_to_tensor(y_true)
         y_pred_t = tf.convert_to_tensor(y_pred)
+        print(f"\n{y_true_t.shape}")
+        print(y_pred_t.shape)
         if self.loss_fn is not None:
             v = self.loss_fn(y_true_t, y_pred_t)     
         return float(tf.reduce_mean(cast(tf.Tensor,v)).numpy()) 

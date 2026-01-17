@@ -1,59 +1,56 @@
-from typing import cast
+from pathlib import Path
+from typing import Optional, cast
 
+
+from .step_wise_model import StepWiseTrnModel
 from ..model.transformer_config import TransformerConfig
 from ..model.model_config import ModelConfig
 from ..registry import register_model
-from tensorflow.keras.layers import Input, Dense, GlobalAveragePooling1D, Reshape
-from tensorflow.keras.models import Model
+
 from .struct import *
 
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
 from ..enums.decoder_mode import DecoderMode
 
+from ..core.core import build_optimizer
 
-# TODO: to visualize that is correct 
-@register_model(ModelType.TRN,ModelVariant.ENCODERDENSE,DecoderMode.FULL_SEQ)
-def build_transformer_model(
+@register_model(ModelType.TRN, ModelVariant.SEQ2SEQ, DecoderMode.STEP_WISE)
+def build_transformer_step_wise_model(
     x_train,
     y_train,
-    model_cfg: ModelConfig
-):
-    params = cast(TransformerConfig,model_cfg.params)
+    model_cfg: ModelConfig,
+    model_path: Optional[str] = None,
+) -> StepWiseTrnModel:
+    tcfg = cast(TransformerConfig, model_cfg.params)
+    feature_dim = int(x_train.shape[2])
 
-    embed_dim=params.embed_dim
-    num_heads=params.num_heads
-    ff_dim=params.ff_dim
+    model = StepWiseTrnModel(
+        feature_dim=feature_dim,
+        d_model=tcfg.d_model,
+        n_heads=tcfg.num_heads,
+        ff_dim=tcfg.ff_dim,
+        num_layers=tcfg.num_layers,
+        dropout=tcfg.dropout,
+        max_len=tcfg.max_len,
+        start_mode=model_cfg.inference.start_mode,
+    )
 
-    # x_train: (N, in_len, feat)
-    # y_train: (N, out_len, feat)
-    if x_train.ndim != 3 or y_train.ndim != 3:
-        raise ValueError(f"Expected 3D tensors. Got x:{x_train.shape}, y:{y_train.shape}")
+    model.build((None, None, feature_dim))
 
-    input_seq_len, x_feat = x_train.shape[1], x_train.shape[2]
-    output_seq_len, y_feat = y_train.shape[1], y_train.shape[2]
+    optimizer = build_optimizer(
+        model_cfg.compile.optimizer,
+        model_cfg.compile.learning_rate,
+    )
 
-    if x_feat != y_feat:
-        raise ValueError(f"Feature dim mismatch: x has {x_feat}, y has {y_feat}")
+    model.compile(
+        optimizer=optimizer,
+        loss=model_cfg.compile.loss,
+        metrics=model_cfg.compile.metrics,
+        run_eagerly=model_cfg.compile.run_eagerly,
+    )
 
-    input_shape = (input_seq_len, x_feat)
-    feature_dim = x_feat
+    if model_path is not None:
+        model.load_weights(Path(model_path) / "model.weights.h5")
 
-    inputs = Input(shape=input_shape)
-
-    x = Dense(embed_dim, activation="relu")(inputs)
-
-    x = PositionalEmbedding(input_seq_len, input_seq_len, embed_dim)(x)
-
-    transformer_block = TransformerBlock(embed_dim, num_heads, ff_dim)
-    x = transformer_block(x, training=False)
-
-    x = GlobalAveragePooling1D()(x)
-
-    x = Dense(output_seq_len * feature_dim, activation="linear")(x)
-
-    outputs = Reshape((output_seq_len, feature_dim))(x)
-
-    model = Model(inputs=inputs, outputs=outputs, name=model_cfg.name)
-    model.compile(optimizer=model_cfg.compile.optimizer, loss=model_cfg.compile.loss)
     return model

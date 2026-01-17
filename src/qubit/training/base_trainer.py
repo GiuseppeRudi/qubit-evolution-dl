@@ -10,7 +10,7 @@ from ..model.training_config import TrainingConfig
 from ..model.phase_config import Phase
 from ..model.custom_history import CustomHistory
 
-from ..rnn.Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
+from ..rnn.step_wise_lstm_model import StepWiseLstmModel
 
 from .free_running_eval import FreeRunningEvalCallback
 from ..strategies.strategy_factory import create_strategy
@@ -19,6 +19,8 @@ from ..enums.split_name import SplitName
 from ..enums.inference_mode import InferenceMode
 
 from ..inference.base import decode
+
+from ..transformer.step_wise_model import StepWiseTrnModel
 
 class BaseTrainer(ABC):
 
@@ -41,21 +43,6 @@ class BaseTrainer(ABC):
             phases.append(Phase(phase,strategy))
         return phases
     
-
-    @abstractmethod
-    def _prepare_model_inputs(self, X, Y, strategy, epoch, total_epochs) -> tuple:
-        """
-        Args:
-            X: Input encoder
-            Y: Target sequences
-            strategy: current training strategy
-            epoch: Current epoch in the current strategy 
-            total_epochs: total epoch in the current strategy
-            
-        Returns:
-            (model_inputs, targets) dove model_inputs è quello che viene passato a model.fit()
-        """
-        pass
     
     @abstractmethod
     def _create_inference_adapter(self):
@@ -124,6 +111,7 @@ class BaseTrainer(ABC):
             print(f"   Output timesteps (val_loss and fr_loss): {splits.Y_train.shape[1]}")
             print(f"{'='*70}\n")
 
+            
 
             callbacks[0].phase_horizon = horizon
 
@@ -132,16 +120,16 @@ class BaseTrainer(ABC):
                 callbacks[0].end_of_phase = (epoch == phase_epochs-1)
 
                 print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
-       
-                if  isinstance(self.model,Seq2SeqLSTM2LayerStepWiseModel):
+
+                if isinstance(self.model,StepWiseLstmModel) or isinstance(self.model,StepWiseTrnModel):
                     self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs,horizon=horizon)
                     train_inputs, train_targets = splits.X_train, splits.Y_train[:, :horizon, :]
                     val_inputs, val_targets = splits.X_val, splits.Y_val[:, :horizon, :]
                 else:
-                    train_inputs, train_targets = strategy.prepare_inputs(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
-                    val_inputs, val_targets = strategy.prepare_inputs(splits.X_val, splits.Y_val,epoch, phase_epochs, horizon)
-
-                
+                    train_inputs, train_targets = strategy.prepare_inputs_full_seq(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
+                    val_inputs, val_targets = strategy.prepare_inputs_full_seq(splits.X_val, splits.Y_val,epoch, phase_epochs, horizon)
+       
+                # TODO possibility to increase the performance moving the logical switching about strategy inside the custom model 
                 # training for 1 epoch because there are strategies that need results for each epoch
                 history = self.model.fit(
                     train_inputs,
@@ -217,9 +205,6 @@ class BaseTrainer(ABC):
         Inference in fre-running mode - uses the specific adapter
         """
 
-        # TODO : resolve the problem that occurs when we are using the step wise
-        # because this model currently doesn't have the inference model 
-        # for this reason decode_autoregressive and the adapter doesnt exits
         print("Predicting all test samples in " + str(self.model_cfg.inference.mode) + " mode...")
 
         X = splits.X_test

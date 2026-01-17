@@ -7,11 +7,13 @@ from ..registry import register_model
 from typing import Optional, cast
 from ..model.rnn_config import RNNConfig
 
-from .Seq2SeqLSTM2LayerStepWiseModel import Seq2SeqLSTM2LayerStepWiseModel
+from .step_wise_lstm_model import StepWiseLstmModel
 
 from ..enums.decoder_mode import DecoderMode
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
+
+from ..core.core import build_optimizer
 
 @register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.FULL_SEQ)
 def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig, model_path: Optional[str] = None) -> Model:
@@ -39,19 +41,21 @@ def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig, model_
     # return_state = False (default) => don't return the hidden states 
     # return_state = True => return the hidden state and cell state => state_h(batch, latent_dim), state_c(batch, latent_dim)
 
-    enc_seq = LSTM(latent_dim, return_sequences=True, name = "enc_lstm_1")(encoder_inputs)
-    _, h, c = LSTM(latent_dim, return_state=True , name = "enc_lstm_2")(enc_seq)
+    enc_seq, h1, c1 = LSTM(latent_dim, return_sequences=True, return_state = True, name = "enc_lstm_1")(encoder_inputs)
+    _, h2, c2 = LSTM(latent_dim, return_state=True , name = "enc_lstm_2")(enc_seq)
 
-    enc_states = [h, c]
     # --- Decoder  (2 stacked LSTM) ---
 
     # the encoder need the 3d array so that we use this line to repeat the context vector h for each output time step
     # h(batch, latent_dim) => decoder_input(batch, output_seq_len, latent_dim)
     # decoder_input = RepeatVector(output_seq_len)(h)
-    dec_seq_1, d_h_1 , d_c_1 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_1")(decoder_input , initial_state = enc_states)
+    dec_seq_1, d_h_1, d_c_1 = LSTM(latent_dim, return_sequences=True, return_state=True, name="dec_lstm_1")(
+        decoder_input, initial_state=[h1, c1]
+    )
 
-    # RNN encoder-decoder seq2seq => final states of encoder as initial states of decoder => inizial_state=[h, c]
-    dec_seq_2, d_h_2, d_c_2 = LSTM(latent_dim, return_sequences=True, return_state=True, name = "dec_lstm_2")(dec_seq_1, initial_state = enc_states)
+    dec_seq_2, d_h_2, d_c_2 = LSTM(latent_dim, return_sequences=True, return_state=True, name="dec_lstm_2")(
+        dec_seq_1, initial_state=[h2, c2]
+    )
 
     decoder_outputs = Dense(feature_dim, name ="out_dense")(dec_seq_2) 
     
@@ -72,11 +76,11 @@ def build_lstm_full_seq_model(x_train , y_train , model_cfg: ModelConfig, model_
 
 
 @register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.STEP_WISE)
-def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig, model_path: Optional[str] = None) -> Seq2SeqLSTM2LayerStepWiseModel:
+def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig, model_path: Optional[str] = None) -> StepWiseLstmModel:
     latent_dim = cast(RNNConfig, model_cfg.params).latent_dim
     feature_dim = int(x_train.shape[2])
 
-    model = Seq2SeqLSTM2LayerStepWiseModel(
+    model = StepWiseLstmModel(
         feature_dim=feature_dim,
         latent_dim=latent_dim,
         start_mode=model_cfg.inference.start_mode,
@@ -102,16 +106,3 @@ def build_lstm_step_wise_model(x_train, y_train, model_cfg: ModelConfig, model_p
     return model
 
 
-def build_optimizer(name: str, lr: float, clip_norm: Optional[float] = None):
-    name = name.lower()
-
-    kwargs = {"learning_rate": lr}
-    if clip_norm is not None and clip_norm > 0:
-        kwargs["global_clipnorm"] = clip_norm  
-
-    if name == "adam":
-        return tf.keras.optimizers.Adam(**kwargs)
-    elif name == "adamw":
-        return tf.keras.optimizers.AdamW(**kwargs)
-    else:
-        raise ValueError(f"Unknown optimizer: {name}")

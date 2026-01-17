@@ -1,7 +1,7 @@
 from ..model.phase_config import *
 from .base_strategy import TrainingStrategy
 from .teacher_forcing import TeacherForcingStrategy
-from .masked_modelling import MaskedModelingStrategy
+from .masked_modelling import MaskedModellingStrategy
 from .scheduled_sampling import ScheduledSamplingStrategy
 from .full_autoregressive_strategy import FullAutoregressiveStrategy
 
@@ -17,7 +17,7 @@ def create_strategy(phase_config: PhaseConfig) -> TrainingStrategy:
         )
     
     elif isinstance(phase_config, MaskedModelingPhase):
-        return MaskedModelingStrategy(phase_config.mask_prob, 
+        return MaskedModellingStrategy(phase_config.mask_prob, 
                                       phase_config.mask_mode, 
                                       phase_config.mask_scope,
                                       phase_config.mask_value if phase_config.mask_value is not None else 0,

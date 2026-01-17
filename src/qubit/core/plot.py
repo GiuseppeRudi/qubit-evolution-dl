@@ -31,7 +31,7 @@ def save_loss_plots_keras(
     prefix: str = "loss",
 ) -> tuple[Path | None, Path | None, Path | None, Path | None]:
 
-    run_dir = Path(run_dir)
+    run_dir = Path(str(run_dir) + "/loss_plots")
     run_dir.mkdir(parents=True, exist_ok=True)
 
     if not hasattr(history, "history") or not isinstance(history.history, dict):

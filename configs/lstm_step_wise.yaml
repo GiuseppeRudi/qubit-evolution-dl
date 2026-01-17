@@ -10,8 +10,7 @@ data:
   windowing:
     input_seq_len: 400
     output_seq_len: 75
-    stride: 30
-    mode: seq2seq      
+    stride: 30  
 
   split:
     seed: 42
@@ -119,7 +118,6 @@ training:
         every_epochs: end_of_phase
   
 plot:
-  pred_all : true # TODO this is not usefull
   sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
   save_plots: true
   save_artifacts : true

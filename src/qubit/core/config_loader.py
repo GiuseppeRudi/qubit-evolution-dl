@@ -12,8 +12,8 @@ from ..model.inference_config import InferenceConfig
 from ..model.training_config import TrainingConfig
 from ..model.fr_eval_config import *
 from ..model.plot_config import PlotConfig
+from ..model.data_config import DataConfig
 from ..model.phase_config import *
-
 
 from .error import *
 
@@ -177,7 +177,10 @@ def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
         curriculum=curriculum,
     )
 
+def load_data_config(d: Dict[str, Any]) -> DataConfig:
+    return DataConfig.from_dict(d) 
 
+    
 def _parse_fr_eval_probe(p: Dict[str, Any]) -> FrEvalProbeConfig:
     out_steps = p.get("out_steps")
 
@@ -214,15 +217,11 @@ def _parse_sample_index(v: Any) -> List[int]:
 
 def load_plot_config(p: Dict[str, Any]) -> PlotConfig:
 
-    pred_all = bool(p.get("pred_all", True))
     save_plots = bool(p.get("save_plots", True))
     save_artifacts = bool(p.get("save_artifacts", True))
     sample_index = _parse_sample_index(p.get("sample_index", [0]))
 
-
-
     return PlotConfig(
-        pred_all=pred_all,
         sample_index=sample_index,
         save_plots=save_plots,
         save_artifacts=save_artifacts,
