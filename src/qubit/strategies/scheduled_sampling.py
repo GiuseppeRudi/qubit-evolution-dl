@@ -1,47 +1,64 @@
-from typing import cast
-from .base_strategy import TrainingStrategy
-from .decoder_utils import make_decoder_inputs
-import numpy as np
 import tensorflow as tf
 
-class ScheduledSamplingStrategy(TrainingStrategy):
-    def __init__(self, tf_ratio_start: float, tf_ratio_end: float):
-        self.tf_ratio_start = tf_ratio_start
-        self.tf_ratio_end = tf_ratio_end
-    
-    # not possible because for full_seq model wih full encoder it's not possible to apply the SS 
-    def prepare_inputs_full_seq(self, X, Y, epoch, total_epochs,horizon):
-        pass
-    
-    def get_name(self) -> str:
-        return f"ScheduledSampling({self.tf_ratio_start} to {self.tf_ratio_end})"
-    
-    def _tf_ratio(self, epoch: int | tf.Tensor, total_epochs: int | tf.Tensor) -> tf.Tensor:
-        # TODO currently is a linear decay but in future introduce different type of decay
-
-        # we put total_epoch -1 because epoch is 0-based
-        den = tf.maximum(tf.cast(total_epochs, tf.int32) - 1, 1)
-        alpha = tf.math.divide(tf.cast(epoch, tf.float32), tf.cast(den, tf.float32))
-        start = tf.cast(self.tf_ratio_start, tf.float32)
-        end = tf.cast(self.tf_ratio_end, tf.float32)
-        return start + (end - start) * alpha
+@tf.function
+def linear_ratio(epoch, total_epochs, start, end) -> tf.Tensor:
+    # epoch 0-based
+    den = tf.maximum(tf.cast(total_epochs, tf.int32) - 1, 1)
+    alpha = tf.cast(epoch, tf.float32) / tf.cast(den, tf.float32)
+    start = tf.cast(start, tf.float32)
+    end = tf.cast(end, tf.float32)
+    return start + (end - start) * alpha
 
 
-    def prepare_inputs_step_wise(self, *, y_true_t, y_pred_t, epoch, total_epochs):
+@tf.function
+def scheduled_sampling_next(
+    y_true_t: tf.Tensor,
+    y_pred_t: tf.Tensor,
+    ratio: tf.Tensor,
+    *,
+    scope_id: tf.Tensor,          # 0 -> broadcast (B,1,1), 1 -> per-feature (B,1,F)
+    stop_grad_pred: bool = True,
+) -> tf.Tensor:
+    if stop_grad_pred:
+        y_pred_t = tf.stop_gradient(y_pred_t)
 
-        ratio = self._tf_ratio(epoch, total_epochs)  # scalar
-        batch_size = tf.shape(y_true_t)[0]  
-        feature_dim = tf.shape(y_true_t)[2]  
+    b = tf.shape(y_true_t)[0]
+    f = tf.shape(y_true_t)[2]
 
-        # class SS use the broadcast for the feature 
-        # instead we also use feature_dim for different behaviour for each feature_dim
-        # shape = cast(tf.Tensor, tf.stack([batch_size, 1, feature_dim]))
-        # TODO permit to choose this behaviour from the yaml file
+    scope_id = tf.cast(scope_id, tf.int32)
+    scope_id = tf.reshape(scope_id, [])   # forza scalare
 
-        shape = cast(tf.Tensor, tf.stack([batch_size, 1, 1]))
-        
-        use_teacher = tf.random.uniform(shape, 0, 1.0) < ratio
+    shape = tf.switch_case(
+        scope_id,
+        branch_fns={
+            0: lambda: tf.stack([b, 1, 1]),  # stessa scelta per tutte le feature
+            1: lambda: tf.stack([b, 1, f]),  # scelta diversa per ogni feature
+        },
+        default=lambda: tf.stack([b, 1, 1]),
+    )
 
-        # IMPORTANT: stop_gradient sul feedback per evitare grafi enormi/instabilità
-        y_pred_in = tf.stop_gradient(y_pred_t)
-        return tf.where(use_teacher, y_true_t, y_pred_in)
+    use_teacher = tf.random.uniform(shape, 0.0, 1.0) < ratio
+    return tf.where(use_teacher, y_true_t, y_pred_t)
+
+
+@tf.function
+def scheduled_sampling_strategy(
+    y_true_t: tf.Tensor,
+    y_pred_t: tf.Tensor,
+    *,
+    epoch: tf.Tensor,
+    total_epochs: tf.Tensor,
+    tf_ratio_start: tf.Tensor,
+    tf_ratio_end: tf.Tensor,
+    scope_id: tf.Tensor,
+    stop_grad_pred: bool = True,
+) -> tf.Tensor:
+    tf.print("\nRUNTIME scheduled_sampling_strategy")
+    ratio = linear_ratio(epoch, total_epochs, tf_ratio_start, tf_ratio_end)
+    return scheduled_sampling_next(
+        y_true_t,
+        y_pred_t,
+        ratio,
+        scope_id=scope_id,
+        stop_grad_pred=stop_grad_pred,
+    )

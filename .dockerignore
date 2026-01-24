@@ -36,10 +36,8 @@ temp/
 
 # Dati grandi (se non vuoi copiarli nell'immagine)
 data/
-datasets/
-checkpoints/
-models/
-outputs/
+predictions/
+
 
 # Altro
 .DS_Store

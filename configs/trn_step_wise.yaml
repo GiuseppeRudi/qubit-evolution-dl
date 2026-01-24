@@ -8,9 +8,9 @@ data:
     traj_fraction: 0.1
 
   windowing:
-    input_seq_len: 400
-    output_seq_len: 75
-    stride: 30  
+    input_seq_len: 200
+    output_seq_len: 10
+    stride: 50   
 
   split:
     seed: 42
@@ -18,14 +18,19 @@ data:
     test_ratio: 0.15
 
 model:
-  name: "prova1"
+  name: "prova"
   save_model: true
-  type: "LSTM"
+  type: "TRN"
   variant: "SEQ2SEQ"
   decoder_mode: "STEP_WISE"  # "FULL_SEQ"  ,  "STEP_WISE"
 
   params:
-    latent_dim: 128
+    d_model: 64
+    num_heads: 4
+    ff_dim: 512
+    num_layers: 2
+    dropout: 0.1
+    max_len: 512
 
   compile:
     optimizer: "adam"
@@ -42,13 +47,13 @@ model:
 
 training:
   verbose : 1
-  batch_size: 64
-  curriculum: [15,20,34,40,50, -1] # [5,10,25,30,-1,50]   # number of elements = number of strategies if we dont use a specific temporal horizon  insert -1 
+  batch_size: 8
+  curriculum: [-1,5] # [5,10,25,30,-1,50]   # number of elements = number of strategies if we dont use a specific temporal horizon  insert -1 
   # remember the number of epoch for each temporal horizon is decided by the specific strategy
   phases:
 
-    # - name: teacher_forcing
-    #   epochs: 5
+    - name: teacher_forcing
+      epochs: 5
 
     - name: full_autoregressive
       epochs: 5
@@ -56,40 +61,40 @@ training:
       learning_rate: 0.0005
       clip_norm: 0.5
 
-    - name: teacher_forcing
-      epochs: 10 
+    # - name: teacher_forcing
+    #   epochs: 10 
 
-    - name: masked_modeling
-      epochs: 8
-      mask_prob: 0.20
-      learning_rate: 0.0005
-      clip_norm: 0.7
-      mask_scope: element     # time | feature | element
-      mask_mode: noise         # zero | constant | noise
-      #mask_value: 0.0         # solo se constant
-      noise_sigma: 0.2       # solo se noise
+    # - name: masked_modeling
+    #   epochs: 8
+    #   mask_prob: 0.20
+    #   learning_rate: 0.0005
+    #   clip_norm: 0.7
+    #   mask_scope: element     # time | element | feature
+    #   mask_mode: noise         # zero | constant | noise
+    #   #mask_value: 0.0         # solo se constant
+    #   noise_sigma: 0.2       # solo se noise
 
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: true
-      learning_rate: 0.0003
-      clip_norm: 0.5
+    # - name: full_autoregressive
+    #   epochs: 5
+    #   gradient_through_time: true
+    #   learning_rate: 0.0003
+    #   clip_norm: 0.5
 
 
-    - name: scheduled_sampling
-      epochs: 8
-      tf_ratio_start: 1.0
-      tf_ratio_end: 0.5
-      learning_rate: 0.0003
-      clip_norm: 0.5
-      # mode : lineare, esponenziale, inverse-sigmoid.
-      per_feature: false # true , false    
+    # - name: scheduled_sampling
+    #   epochs: 8
+    #   tf_ratio_start: 1.0
+    #   tf_ratio_end: 0.5
+    #   learning_rate: 0.0003
+    #   clip_norm: 0.5
+    #   # mode : lineare, esponenziale, inverse-sigmoid.
+    #   # per_feature : true , false  
       
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: true
-      learning_rate: 0.0001
-      clip_norm: 0.3
+    # - name: full_autoregressive
+    #   epochs: 5
+    #   gradient_through_time: true
+    #   learning_rate: 0.0001
+    #   clip_norm: 0.3
 
   # free-running evaluation
   fr_eval:
@@ -113,7 +118,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [10, 25, 50, 75] 
+        out_steps: [2, 6, 8, 10] 
         p_eval: 0.2
         every_epochs: end_of_phase
   

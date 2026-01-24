@@ -1,18 +1,31 @@
-import numpy as np 
-
-from .decoder_utils import make_decoder_inputs
-from .base_strategy import TrainingStrategy
-
-class TeacherForcingStrategy(TrainingStrategy):
+import tensorflow as tf
 
 
-    def prepare_inputs_full_seq(self, X, Y, epoch, total_epochs, horizon):
-        dec_in = make_decoder_inputs(Y,horizon)
-        Y_h = Y[:, :horizon, :]  
-        return [X, dec_in], Y_h
+@tf.function
+def teacher_forcing_full_seq(
+    Y: tf.Tensor,
+    dec0: tf.Tensor,
+):
+    tf.print("\nRUNTIME teacher_forcing_full_seq")
+    # Y if prediction mode => ALL => Y.shape = (B, t = t_out == output_seq_len, F)
+    # Y if prediction mode => HORIZON => Y.shape = (B, t = t_hor, F)
+
+    # dec0.shape(batch_size , 1 , feature_dim)
     
-    def get_name(self) -> str:
-        return f"TeacherForcing"
+    # we lose Y[-1] not used because at time t we use Y[t-1] as input
+    Y_truncated = Y[:, :-1, :]  # (batch_size , t - 1 , feature_dim)
+
+    # dec_in.shape[1] = dec0.shape[1] + Y_truncated.shape[1]  => t
+    dec_in = tf.concat([dec0, Y_truncated], 1) # (batch_size, t, feature_dim)
     
-    def prepare_inputs_step_wise(self, *, y_true_t, y_pred_t, epoch, total_epochs):
-            return y_true_t
+    return dec_in
+
+
+@tf.function
+def teacher_forcing_step_wise(
+    *,
+    y_true_t: tf.Tensor, # (B,1,F)
+    y_pred_t: tf.Tensor, # (B,1,F) (unused)
+) -> tf.Tensor:
+    tf.print("\nRUNTIME teacher_forcing_step_wise")
+    return y_true_t

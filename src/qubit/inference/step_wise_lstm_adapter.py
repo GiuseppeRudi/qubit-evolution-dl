@@ -5,7 +5,7 @@ import tensorflow as tf
 from ..enums.start_mode import StartMode
 
 from .base import AutoregressiveAdapter
-from ..rnn.step_wise_lstm_model import LSTM2LayerTFState
+from ..models.rnn.step_wise_lstm_model import LSTM2LayerTFState
 
 from ..enums.verbose_mode import VerboseMode
 

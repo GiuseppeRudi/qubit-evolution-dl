@@ -1,175 +1,147 @@
-from typing import cast
-from .base_strategy import TrainingStrategy
-from .decoder_utils import make_decoder_inputs
-import numpy as np
-import tensorflow as tf 
+import tensorflow as tf
 
 
-from ..enums.mask_mode import MaskMode
-from ..enums.mask_scope import MaskScope
-
-class MaskedModellingStrategy(TrainingStrategy):
-    def __init__(self, mask_prob: float, mask_mode : MaskMode , mask_scope : MaskScope , mask_value : float  , noise_sigma : float):
-        self.mask_prob = mask_prob
-        self.mask_mode = mask_mode
-        self.mask_scope = mask_scope
-        self.mask_value = mask_value
-        self.noise_sigma = noise_sigma
+# TODO possibility to change the step_wise to choose if we want to apply the mask also the dec0 
+# in full seq this change is easier 
 
 
-    def prepare_inputs_full_seq(self, X, Y, epoch, total_epochs, horizon):
-        # X: (B,Tin,F), Y: (B,Tout,F)  <-- devono essere tf.Tensor se vuoi graph mode
-
-        X = tf.convert_to_tensor(X)   # accetta NumPy direttamente
-        Y = tf.convert_to_tensor(Y)
-
-        h = tf.cast(horizon, tf.int32)
-        Y_h = Y[:, :h, :]  # (B,h,F)
-
-        # decoder input: shift right (t=0 zeri, poi y_{t-1})
-        z0 = tf.zeros_like(Y_h[:, :1, :])                 # (B,1,F)
-        dec_in = tf.concat([z0, Y_h[:, :-1, :]], axis=1)  # (B,h,F)
-
-        dec_in_masked = self.apply_mask_tf(dec_in, training=True)
-        return [X, dec_in_masked], Y_h
-        
-    # def prepare_inputs_full_seq(self, X, Y, epoch, total_epochs, horizon):
-        
-    #     # decoder input with teacher forcing = ground truth 
-    #     dec_in = make_decoder_inputs(Y, horizon)
-
-    #     # denoising = to dirty the input 
-    #     dec_in_masked = self._apply_masking_np(dec_in)
-
-    #     Y_h = Y[:, :horizon, :]   
-    #     return [X, dec_in_masked], Y_h
+@tf.function
+def make_mask(
+    dec_in: tf.Tensor, # (batch_size , t, feature_dim)
+    mask_prob: tf.Tensor, # scalar value beetwen (0,1)
+    mask_scope_id: tf.Tensor,  # id of mask scope 
+) -> tf.Tensor:
     
-    def _make_mask_tf(self, x: tf.Tensor) -> tf.Tensor:
-        # x: (B,T,F)
-        B = tf.shape(x)[0]
-        T = tf.shape(x)[1]
-        F = tf.shape(x)[2]
+    B = tf.shape(dec_in)[0]
+    T = tf.shape(dec_in)[1]
+    F = tf.shape(dec_in)[2]
 
-        if self.mask_scope == MaskScope.TIME:
-            shape = tf.stack([B, T, 1])     # broadcast su F
-        elif self.mask_scope == MaskScope.FEATURE:
-            shape = tf.stack([B, 1, F])     # broadcast su T
-        else:  # ELEMENT
-            shape = tf.stack([B, T, F])
+    # Mask Scope => time (0) , feature (1) , element (2)
 
-        return tf.random.uniform(shape, 0.0, 1.0) < self.mask_prob
+    shape = tf.switch_case(
+        mask_scope_id,
+        branch_fns={
+            0: lambda: tf.stack([B, T, 1]),  # TIME: variable mask for all the timesteps and the same for each feature
+            1: lambda: tf.stack([B, 1, F]),  # FEATURE: variable mask for all the features and the same for each timestep
+            2: lambda: tf.stack([B, T, F]),  # ELEMENT: variable mask for all
+        }, # the dimensions with 1, after are broadcasted into a specific dimension of dec_in
+        default = lambda: tf.stack([B, T, F]),
+    )
 
+    # create a float array with uniform random values in [0,1)
+    u = tf.random.uniform(shape, 0.0, 1.0) 
 
-    def apply_mask_tf(self, x: tf.Tensor, *, training: bool) -> tf.Tensor:
-        # se vuoi che in inference non mascheri
-        if not training:
-            return x
+    # create the bool mask array where each element is True with probability approx mask_prob
 
-        m = self._make_mask_tf(x)  # broadcastable su x
-
-        if self.mask_mode == MaskMode.ZERO:
-            return tf.where(m, tf.zeros_like(x), x)
-
-        if self.mask_mode == MaskMode.CONSTANT:
-            repl = tf.cast(self.mask_value, x.dtype)
-            return tf.where(m, tf.ones_like(x) * repl, x)
-
-        if self.mask_mode == MaskMode.NOISE:
-            noise = tf.random.normal(tf.shape(x), mean=0.0, stddev=self.noise_sigma, dtype=x.dtype)
-            return tf.where(m, noise, x)
-            # alternativa “corruption” spesso migliore:
-            # return tf.where(m, x + noise, x)
-
-        raise ValueError(f"Unsupported mask_mode: {self.mask_mode}")
-
-
-    # def _apply_masking_np(self, dec_in: np.ndarray) -> np.ndarray:
-    #     # dec_in: (N,T,F)
-    #     N, T, F = dec_in.shape
-
-    #     print(f"dec_in.shape = {dec_in.shape} (_apply_masking_np)")
-
-    #     # build mask depending on scope
-    #     if self.mask_scope == MaskScope.TIME:
-    #         # mask per timestep (N,T,1) broadcast su F
-    #         m = (np.random.rand(N, T, 1) < self.mask_prob)
-    #     elif self.mask_scope == MaskScope.FEATURE:
-    #         # mask per feature (N,1,F) broadcast su T
-    #         m = (np.random.rand(N, 1, F) < self.mask_prob)
-    #     else:  # ELEMENT
-    #         m = (np.random.rand(N, T,F) < self.mask_prob)
-
-    #     masked = dec_in.copy()
-    #     m_full = np.broadcast_to(m, dec_in.shape)  # (N,T,F)
-
-    #     # choose replacement based on mode
-    #     if self.mask_mode == MaskMode.ZERO:
-    #         masked = dec_in.copy()
-    #         masked[m_full] = 0.0
-
-
-    #     elif self.mask_mode == MaskMode.CONSTANT:
-    #         masked[m_full] = self.mask_value
-
-
-    #     # TODO implement noise injections and thing about if it is correct to implement here or in SS strategy
-    #     elif self.mask_mode == MaskMode.NOISE:
-    #         noise = np.random.normal(loc=0.0, scale=self.noise_sigma, size=dec_in.shape).astype(dec_in.dtype)
-    #         #! change the real noise injections 
-    #         #! alternative: dec_in + noise (corruption, not mash)
-    #         masked[m_full] = noise[m]
-
-    #     else:
-    #         raise ValueError(f"Unsupported mask_mode: {self.mask_mode}")
-        
-    #     print(f"masked.shape = {masked.shape} (_apply_masking_np)")
-
-    #     return masked
-
+    # u[i] < mask_prob => m[i] = True else false
+    m = u < mask_prob
+    return m
     
+
+@tf.function
+def apply_mask(
+    dec_in: tf.Tensor,             
+    m: tf.Tensor,              # broadcastable to x
+    mask_mode_id: tf.Tensor,   # scalar int
+    mask_value: tf.Tensor,     # scalar float
+    noise_sigma: tf.Tensor,    # scalar float
+    noise_replace : tf.Tensor  # bool 
+) -> tf.Tensor:
+
+    # dec_in.shape(batch_size, timesteps, feature_dim) if use FULL_SEQ
+    # dec_in.shape(batch_size, 1, feature_dim)         if use STEP_WISE
+
+    # m.shape(batch_size, timesteps, 1) => if use TIME mode
+    # m.shape(batch_size, 1 , feature_dim) => if use FEAUTURE mode
+    # m.shape(batch_size, timesteps, feature_dim) => if use ELEMENT mode
     
-    # def _make_mask_tf(self, x: tf.Tensor) -> tf.Tensor:
-    #     # x shape: (B,T,F)
-    #     B = tf.shape(x)[0]
-    #     T = tf.shape(x)[1]
-    #     F = tf.shape(x)[2]
+    # ? we apply the mask also in timestep = 0 so in dec0
 
-    #     if self.mask_scope == MaskScope.TIME:
-    #         shape = tf.stack([B, T, 1])
-    #     elif self.mask_scope == MaskScope.FEATURE:
-    #         shape = tf.stack([B, 1, F])
-    #     else:  # ELEMENT
-    #         shape = tf.stack([B, T, F])
+    def mode_zero():
+        # for each element where  m[i] == True so dec_in[i] =  0
+        # for each element where  m[i] == False so dec_in[i] =  dec_in[i] (original value)
 
-    #     m = tf.random.uniform(shape, 0.0, 1.0) < self.mask_prob
-    #     # broadcast automatico quando m ha 1 in una dimensione
-    #     return m
+        return tf.where(m, tf.zeros_like(dec_in), dec_in)
+
+    def mode_constant():
+        # for each element where  m[i] == True so dec_in[i] =  mask_value
+        # for each element where  m[i] == False so dec_in[i] =  dec_in[i] (original value)
+
+        return tf.where(m, tf.ones_like(dec_in) * mask_value, dec_in)
+    
+    def mode_noise():
+        noise = tf.random.normal(tf.shape(dec_in), 0.0, noise_sigma, dtype=dec_in.dtype)
+
+        def replace():
+            # for each element where  m[i] == True so dec_in[i] =  noise
+            # for each element where  m[i] == False so dec_in[i] =  dec_in[i] (original value)
+
+            return tf.where(m, noise, dec_in)
+
+        def additive():
+            # for each element where  m[i] == True so dec_in[i] =  dec_in[i] + noise
+            # for each element where  m[i] == False so dec_in[i] =  dec_in[i] (original value)
+
+            return tf.where(m, dec_in + noise, dec_in)
+
+        return tf.cond(noise_replace, replace, additive)
+
+    return tf.switch_case(
+        mask_mode_id,
+        branch_fns={
+            0: mode_zero,
+            1: mode_constant,
+            2: mode_noise,
+        },
+        default=lambda: dec_in,
+    )
 
 
-    # def _apply_masking_tf(self, y: tf.Tensor, *, mask: tf.Tensor) -> tf.Tensor:
-    #     # y shape (B,T,F) ; mask bool broadcastable to y
-    #     if self.mask_mode == MaskMode.ZERO:
-    #         repl = tf.zeros_like(y)
-    #         return tf.where(mask, repl, y)
+@tf.function
+def masked_modeling_full_seq(
+    Y: tf.Tensor,
+    dec0: tf.Tensor,
+    mask_prob: tf.Tensor,
+    mask_mode_id: tf.Tensor,
+    mask_scope_id: tf.Tensor,
+    mask_value: tf.Tensor,
+    noise_sigma: tf.Tensor,
+    noise_replace : tf.Tensor
+):
+    
+    # ! REMEMBER the masking modeling use always the groun truth for the input 
+    tf.print("\nRUNTIME masked_modeling_full_seq")
+    # Y if prediction mode => ALL => Y.shape = (B, t = t_out == output_seq_len, F)
+    # Y if prediction mode => HORIZON => Y.shape = (B, t = t_hor, F)
 
-    #     if self.mask_mode == MaskMode.CONSTANT:
-    #         repl = tf.ones_like(y) * tf.cast(self.mask_value, y.dtype)
-    #         return tf.where(mask, repl, y)
+    # dec0.shape(batch_size , 1 , feature_dim)
+    
+    # we lose Y[-1] not used because at time t we use Y[t-1] as input
+    Y_truncated = Y[:, :-1, :]  # (batch_size , t - 1 , feature_dim)
 
-    #     if self.mask_mode == MaskMode.NOISE:
-    #         noise = tf.random.normal(tf.shape(y), mean=0.0, stddev=self.noise_sigma, dtype=y.dtype)
-    #         # sostituisci con rumore
-    #         return tf.where(mask, noise, y)
-    #         # alternativa (spesso migliore): corrompi invece di sostituire
-    #         # return tf.where(mask, y + noise, y)
+    # dec_in.shape[1] = dec0.shape[1] + Y_truncated.shape[1]  => t
+    dec_in = tf.concat([dec0, Y_truncated], 1) # (batch_size, t, feature_dim)
 
-    #     raise ValueError(f"Unsupported mask_mode: {self.mask_mode}")
+    m = make_mask(dec_in, mask_prob, mask_scope_id)
+    return apply_mask(dec_in, m, mask_mode_id, mask_value, noise_sigma,noise_replace)
 
-    def get_name(self) -> str:
-            return f"MaskedModeling(p={self.mask_prob})"
-        
-    def prepare_inputs_step_wise(self, *, y_true_t, y_pred_t, epoch, total_epochs):
-        # y_true_t: (B,1,F)
-        return self.apply_mask_tf(y_true_t, training=True)
 
+
+
+@tf.function
+def masked_modeling_step_wise(
+    y_true_t: tf.Tensor,       # (batch_size , 1 , feature_dim)
+    mask_prob: tf.Tensor,
+    mask_mode_id: tf.Tensor,
+    mask_scope_id: tf.Tensor,
+    mask_value: tf.Tensor,
+    noise_sigma: tf.Tensor,
+    noise_replace : tf.Tensor,
+) -> tf.Tensor:
+    tf.print("\nRUNTIME masked_modeling_step_wise")
+
+    # ! REMEMBER the masking modeling use always the groun truth for the input 
+
+    m = make_mask(y_true_t, mask_prob, mask_scope_id)
+    return apply_mask(y_true_t, m, mask_mode_id, mask_value, noise_sigma, noise_replace)
 

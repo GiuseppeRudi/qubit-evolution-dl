@@ -1,9 +1,9 @@
-from ..registry import register_trainer
+from ..utils.registry import register_trainer
 from .base_trainer import BaseTrainer
 from ..inference.full_seq_lstm_adapter import FullSeqLstmAdapter
 from ..enums.model_type import ModelType
 
-from ..rnn.step_wise_lstm_model import StepWiseLstmModel
+from ..models.rnn.step_wise_lstm_model import StepWiseLstmModel
 from ..inference.step_wise_lstm_adapter import StepWiseLstmAdapter
 
 @register_trainer(ModelType.LSTM)

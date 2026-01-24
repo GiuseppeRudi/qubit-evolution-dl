@@ -10,29 +10,38 @@ from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
 from ..enums.decoder_mode import DecoderMode
 
-from ..model.model_config import ModelConfig
-from ..model.plot_config import PlotConfig
-from ..model.training_config import TrainingConfig
-from ..model.phase_config import PhaseConfig
+from ..dataclasses.model_config import ModelConfig
+from ..dataclasses.plot_config import PlotConfig
+from ..dataclasses.training_config import TrainingConfig
 
+from ..utils.config_values import LOG_PATH, PREDICTION_PATH
 import sys
-from ..core.utils import Tee
+from ..utils.utils import Logger
 
 def save_log(run_dir : Path):
 
-    log_path = run_dir / "train.log"
+    log_path = run_dir / LOG_PATH
+    
+    # buffering = 1 because we want to write line by line  
     log_file = open(log_path, "w", buffering=1, encoding="utf-8")
 
-    sys.stdout = Tee(sys.__stdout__, log_file)
-    sys.stderr = Tee(sys.__stderr__, log_file)
+    # standard output => write the print to both console and log file 
+    sys.stdout = Logger(sys.__stdout__, log_file)
+
+    # standard error => write the errors to both console and log file 
+    # sys.stderr = Logger(sys.__stderr__, log_file)
 
 def make_run_output_dir(model_cfg : ModelConfig) -> Path:
-    root_dir = Path("predictions")
+
+    root_dir = Path(PREDICTION_PATH)
     model_type : ModelType = model_cfg.type
     variant : ModelVariant = model_cfg.variant
     decoder_mode : DecoderMode = model_cfg.decoder_mode
 
+    # take the datatime at the moment of creation
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # take the name of the model and append the timestamp
     run_name = f"{model_cfg.name}__{ts}"
 
     run_dir = root_dir / model_type / variant / decoder_mode / run_name

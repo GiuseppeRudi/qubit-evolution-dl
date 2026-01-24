@@ -4,8 +4,8 @@ from itertools import chain
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from ..model.phase_config import PhaseConfig
-from ..model.training_config import TrainingConfig
+from ..dataclasses.training_config import PhaseConfig
+from ..dataclasses.training_config import TrainingConfig
 
 phase_colors = {
     "TeacherForcingPhase": "red",
@@ -125,10 +125,10 @@ def save_loss_plots_keras(
         plt.close()
 
     # --- 3) Free-running plot ---
-    if fr_phase is not None and any(v is not None for v in fr_phase):
+    if fr_phase is not None and any(not np.isnan(v) for v in fr_phase):
 
-        x = [epoch + 1 for epoch, v in enumerate(fr_phase) if v is not None]
-        y = [v for v in fr_phase if v is not None]
+        x = [epoch + 1 for epoch, v in enumerate(fr_phase) if not np.isnan(v)]
+        y = [v for v in fr_phase if not np.isnan(v)]
 
         plt.figure()
         for start, end, ph_type in phase_intervals:
@@ -149,10 +149,10 @@ def save_loss_plots_keras(
         plt.savefig(fr_path, dpi=300, bbox_inches="tight")
         plt.close()
     
-    if fr_target is not None and any(v is not None for v in fr_target):
+    if fr_target is not None and any(not np.isnan(v) for v in fr_target):
 
-        x = [epoch + 1 for epoch, v in enumerate(fr_target) if v is not None]
-        y = [v for v in fr_target if v is not None]
+        x = [epoch + 1 for epoch, v in enumerate(fr_target) if not np.isnan(v)]
+        y = [v for v in fr_target if not np.isnan(v)]
 
         plt.figure()
         for start, end, ph_type in phase_intervals:
@@ -180,9 +180,9 @@ def save_loss_plots_keras(
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
 
         for k,c in fr_curve:
-            if c is not None and any(v is not None for v in c):
-                x = [epoch + 1 for epoch, v in enumerate(c) if v is not None]
-                y = [v for v in c if v is not None]
+            if c is not None and any(not np.isnan(v) for v in c):
+                x = [epoch + 1 for epoch, v in enumerate(c) if not np.isnan(v)]
+                y = [v for v in c if not np.isnan(v)]
                 plt.plot(x, y, label=f"{k} horizons")
 
         # linee verticali per inizio fase
@@ -208,7 +208,7 @@ def save_loss_plots_keras(
     has_any = (
         (train is not None and len(train) > 0) or
         (val is not None and len(val) > 0) or
-        (fr_phase is not None and any(v is not None for v in fr_phase))
+        (fr_phase is not None and any(not np.isnan(v) for v in fr_phase))
     )
     if has_any:
         plt.figure(figsize=(8,5))
@@ -228,9 +228,9 @@ def save_loss_plots_keras(
             x = np.arange(1, len(y) + 1)
             plt.plot(x, y, label=f"{val_key + prefix}")
 
-        if fr_phase is not None and any(v is not None for v in fr_phase):
-            x = [epoch + 1 for epoch, v in enumerate(fr_phase) if v is not None]
-            y = [v for v in fr_phase if v is not None]
+        if fr_phase is not None and any(not np.isnan(v) for v in fr_phase):
+            x = [epoch + 1 for epoch, v in enumerate(fr_phase) if not np.isnan(v)]
+            y = [v for v in fr_phase if not np.isnan(v)]
             plt.plot(x, y, label=f"{phase}")
 
         # linee verticali per inizio fase

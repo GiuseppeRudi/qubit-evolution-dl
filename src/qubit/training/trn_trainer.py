@@ -1,4 +1,4 @@
-from ..registry import register_trainer
+from ..utils.registry import register_trainer
 import numpy as np
 
 from .base_trainer import BaseTrainer

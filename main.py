@@ -1,27 +1,32 @@
 import keras
 from src.qubit.core.data import prepare_dataset
-from src.qubit.core.utils import get_device, parse_args
-from src.qubit.core.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config
-from src.qubit.registry import get_builder,get_trainer
+from src.qubit.utils.utils import get_device, parse_args
+from src.qubit.utils.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config
+from src.qubit.utils.registry import get_builder,get_trainer
 from src.qubit.core.save import save_outputs, make_run_output_dir,save_log
-from src.qubit.core.error import check_correctness
+from src.qubit.utils.error import check_correctness
 
-import src.qubit.rnn.builders  
-import src.qubit.transformer.builders
+# needed to register the models and trainers
+import src.qubit.models.rnn.builders  
+import src.qubit.models.trn.builders
 import src.qubit.training.rnn_trainer
 import src.qubit.training.trn_trainer
 
+import src.qubit.utils.config_keys as cfg_keys
 
 def main():
-
+    # print device information
     get_device()
 
+    # parse command line arguments 
     args = parse_args()
+
     run_cfg = load_run_config(args.run_cfg)
  
-    data_cfg = load_data_config(run_cfg["data"])
-    model_cfg = load_model_config(run_cfg["model"])
-    training_cfg = load_training_config(run_cfg["training"])
+    data_cfg = load_data_config(run_cfg[cfg_keys.DATA])
+    model_cfg = load_model_config(run_cfg[cfg_keys.MODEL])
+    training_cfg = load_training_config(run_cfg[cfg_keys.TRAINING])
+    plot_cfg = load_plot_config(run_cfg[cfg_keys.PLOT])
 
     check_correctness(model_cfg,training_cfg,data_cfg)
 
@@ -30,27 +35,34 @@ def main():
     run_dir = make_run_output_dir(model_cfg)
     save_log(run_dir)
     
+    # use the get_builder function to get the specific model builder function (Callable)
     builder = get_builder(model_cfg.type, model_cfg.variant,model_cfg.decoder_mode)
-    model = builder(splits.X_train, splits.Y_train, model_cfg, args.model)
+    
+    # after we call the function with the parameters to build the model 
+    model = builder(splits.X_train, splits.Y_train, model_cfg, training_cfg.prediction_mode, args.model)
 
+    # use get_trainer to get the specific trainer class 
     TrainerCls = get_trainer(model_cfg.type)
 
+    # after we instantiate the trainer 
     trainer = TrainerCls(model, model_cfg, training_cfg)
+    
+    # useful because if we used the pretrained model there is a possibility to don't perform again the training phase
     history = None
     
+    # default it is true if we don't specify 
     if args.training is True :
-        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}]  ---")
+        print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}/{model_cfg.decoder_mode.value}]  ---")
+        print(f"--- Number of Windows = {splits.X_train.shape[0]}")
+        
         history = trainer.fit(splits)
 
+        # print the final loss taken by the history object 
         print(f"Final loss: {history.history['loss'][-1]:.4f}")
 
     sample_x,sample_y, pred = trainer.predict_all_test(splits)
     trainer.report_sample(sample_x, sample_y, pred)
     
-
-    plot_cfg = load_plot_config(run_cfg["plot"])
-
-  
     save_outputs(splits, pred, model_cfg, feat_names, history, run_dir, training_cfg.fr_eval.split + "_fr_", plot_cfg, training_cfg, splits.Y_train.shape[1], model)  
 
 if __name__ == "__main__":
@@ -69,10 +81,10 @@ if __name__ == "__main__":
 #     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5
 
 
-# TODO IMPORTANTE 
-# 2) Problema strutturale con il curriculum: self._strategy è un oggetto Python dentro un train_step che Keras mette in graph
-# Keras (con run_eagerly=False) wrappa train_step in tf.function. Dentro una tf.function:
-# gli oggetti Python catturati (come self._strategy) diventano “costanti” del trace
-# quando tu fai set_context(... strategy=...) e cambi strategia per fase/epoch, la graph potrebbe NON “vedere” il cambio oppure forzare retracing in modo brutto (memory/instabilità/errori strani)
-# Tu hai già fatto bene a mettere ctx_epoch/ctx_total_epochs/ctx_horizon come tf.Variable per evitare retracing… ma la strategia resta Python, quindi il problema rimane.
+# TODO controllre ora che abbiamo messo errore manualmente se ne vale la pena oppure ritorniamo come prima
 
+# TODO controllare strategie masked modelling e ss in step wise e poi fare custom model per full seq e per trn
+
+# TODO check the fr_curve_loss with different horizon we obtain the same error loss
+
+# TODO strategies are not connected to the fullseq model
