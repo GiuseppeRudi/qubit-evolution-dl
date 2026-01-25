@@ -9,7 +9,11 @@ from ..inference.step_wise_lstm_adapter import StepWiseLstmAdapter
 @register_trainer(ModelType.LSTM)
 class RNNTrainer(BaseTrainer):
     
-    def _create_inference_adapter(self):
+    def _create_inference_adapter(self, outsteps: int):
         if isinstance(self.model, StepWiseLstmModel):
             return StepWiseLstmAdapter(self.model, verbose=self.model_cfg.inference.verbose)
-        return FullSeqLstmAdapter(self.model, verbose=self.model_cfg.inference.verbose)
+        return FullSeqLstmAdapter(self.model,
+                                  out_steps=outsteps,
+                                  verbose=self.model_cfg.inference.verbose,
+                                  inference_mode=self.model_cfg.inference.mode,
+                                  start_mode=self.model_cfg.inference.start_mode)

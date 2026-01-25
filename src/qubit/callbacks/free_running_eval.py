@@ -5,10 +5,10 @@ from typing import cast
 
 from ..dataclasses.fr_eval_config import FrEvalProbeConfig, OutStepsSpec
 
-from ..inference.base import  decode
 from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
 from ..enums.inference_mode import InferenceMode
+from ..enums.prediction_mode import PredictionMode
 from ..dataclasses.training_config import TrainingConfig
 
 from ..models.rnn.step_wise_lstm_model import StepWiseLstmModel
@@ -34,14 +34,14 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         verbose: VerboseMode,
         start_mode: StartMode,   
         inference_mode : InferenceMode,   
-        training_cfg : TrainingConfig       
+        training_cfg : TrainingConfig,
     ):
         super().__init__()
         self.X_eval = X_eval
         self.Y_eval = Y_eval
 
-        # X_eval => X_test or X_val => .shape(batch_size, t_in, feature_dim)
-        # Y_eval => Y_test or Y_val => .shape(batch_size, t_out, feature_dim)
+        # X_eval => X_test or X_val => .shape(num_windows, t_in, feature_dim)
+        # Y_eval => Y_test or Y_val => .shape(num_windows, t_out, feature_dim)
 
         self.batch_size = training_cfg.fr_eval.batch_size
 
@@ -52,62 +52,30 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         self.log_prefix = training_cfg.fr_eval.split
 
         self.verbose = verbose
-        self.adapter = None
+        self.inference_adapter = None
         self.phase_epoch = 0
         self.inference_mode = inference_mode
         self.phase_horizon = None 
         self.end_of_phase = False
         self.probes = training_cfg.fr_eval.probes
+        self.prediction_mode = training_cfg.prediction_mode
 
     def on_train_begin(self, logs=None):
         # This function is called before the training starting
 
-        trained_model = cast(keras.Model, self.model)
+        if self.prediction_mode == PredictionMode.HORIZON: return
         
-        if isinstance(self.model, StepWiseLstmModel):
-            self.adapter = StepWiseLstmAdapter(trained_model, verbose=self.verbose)
-        elif isinstance(self.model, StepWiseTrnModel):
-            self.adapter = StepWiseTrnAdapter(trained_model, verbose=self.verbose)
-        elif isinstance(self.model, FullSeqLstmModel):
-            self.adapter = FullSeqLstmAdapter(trained_model, verbose=self.verbose)
-
-    def _scalar_loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
-        y_true_t = tf.convert_to_tensor(y_true)
-        y_pred_t = tf.convert_to_tensor(y_pred)
-        print(f"\n{y_true_t.shape}")
-        print(y_pred_t.shape)
-        if self.loss_fn is not None:
-            v = self.loss_fn(y_true_t, y_pred_t)     
-        return float(tf.reduce_mean(cast(tf.Tensor,v)).numpy()) 
-
-    def _should_run_probe(self, probe: FrEvalProbeConfig, phase_epoch: int) -> bool:
-        every = probe.every_epochs
-        if (every == "end_of_phase" and probe.name!="fr_phase"): return bool(self.end_of_phase)
-        return (phase_epoch % int(every) == 0)
-
-    def _resolve_steps(self, spec: OutStepsSpec) -> list[int]:
-        if isinstance(spec, list):
-            return spec
-        elif spec == "phase":
-            if self.phase_horizon is None:
-                raise RuntimeError("phase_horizon is None: call set_phase_context() from Trainer.")
-            return [int(self.phase_horizon)]
-        else:
-            return [int(self.Y_eval.shape[1])]
+        self.inference_adapter = self._create_adapter(self.Y_eval.shape[1])
 
     def _slice_eval(self, p_eval: float):
-        if p_eval <= 0 or p_eval > 1:
-            raise ValueError("p_eval must be in (0,1].")
         n = int(self.X_eval.shape[0] * p_eval)
         return self.X_eval[:n], self.Y_eval[:n]
 
     def on_epoch_end(self, epoch, logs=None):
-        print("on_epoch_end")
-    
-        logs = logs or {}
 
-        if self.adapter is None:
-            raise RuntimeError("Adapter not initialized.")
+        print("on_epoch_end")
+        if logs is None:
+            logs = {}
 
         # choose the active probe in this epoch and take the requested horizon
         active_probes: list[tuple[FrEvalProbeConfig, list[int]]] = []
@@ -118,13 +86,12 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
         for probe in self.probes:
 
-            # out_steps of probe => list or string
-            steps = self._resolve_steps(probe.out_steps)
+            # probe.out_steps => list or string
+            outsteps = self._outsteps(probe.out_steps)
 
-            steps = [int(k) for k in steps if int(k) > 0]
-
-            # TODO verify it work
-            for step in steps : 
+            for step in outsteps : 
+                # prefix => test or val 
+                # probe.name => fr_curve, fr_target, fr_phase
                 key = f"{prefix}_{probe.name}_loss_{step}"
                 logs.setdefault(key, np.nan)
 
@@ -132,46 +99,111 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
             if not self._should_run_probe(probe, self.phase_epoch):
                 continue
 
-            active_probes.append((probe, steps))
-            requested_steps.extend(steps)
+            active_probes.append((probe, outsteps))
+            requested_steps.extend(outsteps)
 
         
         if not active_probes: return
 
-        p_eval = max(p.p_eval for p in self.probes)
-        # one slice for max p_eval (after each probe use our slie)
-        X_big, Y_big = self._slice_eval(p_eval)
-        n_big = X_big.shape[0]
+        # one slice for max p_eval (after each probe use our slice)
+        p_eval_max = max(p.p_eval for p in self.probes)
+
+        # p_eval_max is the maximum values from all probes
+        # that bring the least possible reduction of windows
+
+        # num_reduced_windows => p_eval_max * num_windows
+        X_reduced, Y_reduced = self._slice_eval(p_eval_max)
+
+        # X_reduced => X_test or X_val => .shape(num_reduced_windows, t_in, feature_dim)
+
+        # if prediction_mode == ALL so t => Y.shape[1] == output_seq_len
+        # if prediction_mode == HORIZON so t => max_steps
+        # Y_reduced => Y_test or Y_val => .shape(num_reduced_windows, t, feature_dim)
 
         # decode once for a max requested horizon and after each probe take our part
         max_steps = int(max(requested_steps))
-        pred_max = decode(
-            self.adapter,
-            X_big,
-            out_steps=max_steps,
-            start_mode=cast(StartMode, self.start_mode),
-            batch_size=self.batch_size,
-            mode=self.inference_mode,
-            y_true=Y_big,
-        )
 
-    
+        if self.prediction_mode == PredictionMode.HORIZON:    
+            self.inference_adapter = self._create_adapter(max_steps)
+
+            # TF needs the ground truth until max_steps if prediction_mode == HORIZON
+            Y_reduced  = Y_reduced[:,:max_steps,:]
+
+        if self.inference_adapter is None : 
+            raise ValueError("Adapter is None")
+        
+        # number of batch =>  num_reduced_windows / batch_size
+        if self.inference_mode == InferenceMode.FREE_RUNNING:
+            Y_pred_max = self.inference_adapter.predict(X_reduced, batch_size=self.batch_size)
+            
+        elif self.inference_mode == InferenceMode.TEACHER_FORCING:
+            Y_pred_max = self.inference_adapter.predict((X_reduced, Y_reduced), batch_size=self.batch_size)
+
+        # Y_pred_max.shape(n_reduced, t, feature_dim )
+        # if prediction_mode == ALL so t => Y.shape[1] == output_seq_len
+        # if prediction_mode == HORIZON so t => max_steps
 
         # log for each prob with specific p_eval and horizon
-        for probe, steps in active_probes:
+        for probe, outsteps in active_probes:
            
-            n_probe = int(self.X_eval.shape[0] * probe.p_eval)
-            n_probe = min(n_probe, n_big)  # safety
+            n_reduced_probe = int(self.X_eval.shape[0] * probe.p_eval)
 
-            Yp = Y_big[:n_probe]
-            Pp = pred_max[:n_probe]
+            Y_reduced_probe = Y_reduced[:n_reduced_probe]
+            # Y_reduced_probe.shape(n_reduced_probe, t, feature_dim)
+            Y_pred_reduced_probe = Y_pred_max[:n_reduced_probe]
+            # Y_pred_reduced_probe.shape(n_reduced_probe, t, feature_dim)
 
-            for k in steps:
-                y_k = Yp[:, :k, :]
-                p_k = Pp[:, :k, :]
-                fr_loss = self._scalar_loss(y_k, p_k)  # float
+            for k in outsteps:
+                Y_per_step = Y_reduced_probe[:, :k, :]
+                # Y_per_step.shape(n_reduced_probe, k, feature_dim)
 
-                logs[f"{prefix}_{probe.name}_loss_{k}"] = fr_loss
+                Y_pred_per_step = Y_pred_reduced_probe[:, :k, :]
+                # Y_pred_per_step.shape(n_reduced_probe, k, feature_dim)
 
-    def sum_trainable_tf(self,m: keras.Model) -> float:
-        return float(tf.add_n([tf.reduce_sum(v) for v in m.trainable_variables]).numpy())
+                trained_model = cast(keras.Model, self.model)
+                fr_loss = trained_model.compute_loss(y=Y_per_step, y_pred=Y_pred_per_step)
+
+                logs[f"{prefix}_{probe.name}_loss_{k}"] = float(fr_loss.numpy())  # type: ignore[arg-type]
+
+
+    def _should_run_probe(self, probe: FrEvalProbeConfig, phase_epoch: int) -> bool:
+        
+        # need for the fr_target or fr_curve at each end_of_phase
+        if (probe.every_epochs == "end_of_phase" and probe.name!="fr_phase"): return bool(self.end_of_phase)
+        
+        # need for fr_phase at probe.every_epochs
+        return (phase_epoch % int(probe.every_epochs) == 0)
+
+
+    def _outsteps(self, spec: OutStepsSpec) -> list[int]:
+        
+        if isinstance(spec, list): return spec
+
+        # Phase horizon
+        elif spec == "phase":
+
+            if self.phase_horizon is None:
+                raise RuntimeError("phase_horizon is None: call set_phase_context() from Trainer.")
+            
+            return [int(self.phase_horizon)]
+        
+        # output_seq_len => Global horizon
+        else: return [int(self.Y_eval.shape[1])]
+
+    def _create_adapter(self, outsteps: int):
+
+        # timesteps => max horizon 
+        trained_model = cast(keras.Model, self.model)
+        if isinstance(self.model, StepWiseLstmModel):
+            return StepWiseLstmAdapter(trained_model, verbose=self.verbose)
+        elif isinstance(self.model, StepWiseTrnModel):
+            return StepWiseTrnAdapter(trained_model, verbose=self.verbose)
+        elif isinstance(self.model, FullSeqLstmModel):
+            return FullSeqLstmAdapter(trained_model, 
+                                            verbose = self.verbose,
+                                            start_mode = self.start_mode,
+                                            inference_mode = self.inference_mode,
+                                            out_steps = outsteps 
+            )
+        else:
+            raise ValueError("Unsupported model type")

@@ -8,7 +8,7 @@ from ...enums.start_mode import StartMode
 from ..strategy_chooser import StrategyChooserModel
 from .lstm2_layer_state import LSTM2LayerTFState
 
-from ...utils.layers_name import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_DENSE
+from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_DENSE
 
 class FullSeqLstmModel(StrategyChooserModel):
 
@@ -34,7 +34,7 @@ class FullSeqLstmModel(StrategyChooserModel):
 
     @property
     def metrics(self):
-        return [self.loss_tracker]
+        return [self.loss_tracker] + super().metrics
 
     # this function is useful to create for each layers the dimension of the weights accordly 
     # from the last dimension => feature_dim 
@@ -49,10 +49,10 @@ class FullSeqLstmModel(StrategyChooserModel):
         feature_dim  = x_shape[-1] 
 
         # Encoder build
-        
+
         # we insert only the last dimension because only this is important for the weights
         # enc_lstm1 return sequence of dimension (batch_size, t_in , latent_dim)
-        self.enc_lstm_1.build((None, None, feature_dim))        # (batch_size , t_in, feature_dim)
+        self.enc_lstm_1.build((None, None, feature_dim))  # (batch_size , t_in, feature_dim)
 
         # since enc_lstm_2 takes in input the sequence of enc_lstm1 so the 3rd dimension is latent_dim
         self.enc_lstm_2.build((None, None, self.latent_dim))  # (batch, t_in , latent_dim)
@@ -239,12 +239,11 @@ class FullSeqLstmModel(StrategyChooserModel):
         # backpropagation => update weights
         self.optimizer.apply_gradients(zip(g_list, v_list))
 
+        self.loss_tracker.update_state(loss)      
         # update metrics (includes the metric that tracks the loss)
         self.compute_metrics(x = X, y=Y_true, y_pred=Y_pred)
-        logs = {m.name: m.result() for m in self.metrics}
-        logs["loss"] = loss
 
-        return logs
+        return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
         # at the end of each epoch we evaluate the metrics with the validation splits

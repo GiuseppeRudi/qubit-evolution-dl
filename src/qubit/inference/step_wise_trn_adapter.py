@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
-from .base import AutoregressiveAdapter  # il tuo
+from .base import BaseAutoregressiveAdapter  # il tuo
 
 @dataclass
 class TransformerStepWiseNPState:
@@ -14,7 +14,7 @@ class TransformerStepWiseNPState:
     prefix: np.ndarray   # (B, L, D)  -> decoder inputs già consumati (D = feature_dim)
 
 
-class StepWiseTrnAdapter(AutoregressiveAdapter):
+class StepWiseTrnAdapter(BaseAutoregressiveAdapter):
     def __init__(self, model, *, verbose: VerboseMode):
         self.model = model
         self.verbose = verbose

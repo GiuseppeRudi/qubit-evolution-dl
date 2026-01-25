@@ -44,6 +44,9 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
                     f"cannot be used with phase '{p.name}'. "
                     f"Use DecoderMode.STEP_WISE (or remove that phase)."
                 )
+    for fr in training_cfg.fr_eval.probes:
+        if fr.p_eval <= 0 or fr.p_eval > 1:
+            raise ValueError("p_eval must be in (0,1].")
 
 
 def validate_masked_modeling_phase(p: MaskedModelingPhase) -> None:

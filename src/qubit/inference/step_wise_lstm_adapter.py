@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from ..enums.start_mode import StartMode
 
-from .base import AutoregressiveAdapter
+from .base import BaseAutoregressiveAdapter
 from ..models.rnn.step_wise_lstm_model import LSTM2LayerTFState
 
 from ..enums.verbose_mode import VerboseMode
@@ -17,7 +17,7 @@ class LSTM2LayerNPState:
     c2: np.ndarray
 
 
-class StepWiseLstmAdapter(AutoregressiveAdapter):
+class StepWiseLstmAdapter(BaseAutoregressiveAdapter):
     def __init__(self, model, *, verbose: VerboseMode ):
         self.model = model
         self.verbose = verbose

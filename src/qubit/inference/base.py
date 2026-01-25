@@ -1,83 +1,122 @@
 from __future__ import annotations
-from typing import Protocol, Any, Optional
-import tensorflow as tf
+from typing import Any
 
+import keras
+import tensorflow as tf
 from ..enums.start_mode import StartMode
 from ..enums.inference_mode import InferenceMode
 from ..enums.start_mode import StartMode
+from abc import ABC, abstractmethod
 
-class AutoregressiveAdapter(Protocol):
-    @property
-    def feature_dim(self) -> int: ...
+from ..models.rnn.lstm2_layer_state import LSTM2LayerTFState 
+from ..enums.start_mode import StartMode
+from ..enums.inference_mode import InferenceMode
 
-    def encode(self, X: tf.Tensor, *, batch_size: int) -> Any:
-        """X: (batch_size, input_seq_len, feature_dim) -> state"""
+class BaseAutoregressiveAdapter(keras.Model, ABC):
+    def __init__(self, *, out_steps: int, start_mode: StartMode, inference_mode: InferenceMode, name: str = "ar_infer"):
+        super().__init__(name=name)
+        self.out_steps = out_steps
+        self.start_mode = start_mode
+        self.inference_mode = inference_mode  # FREE_RUNNING / TEACHER_FORCING
+
 
     def init_decoder_input(self, X: tf.Tensor, *, start_mode: StartMode) -> tf.Tensor:
-        """Return dec0: (batch_size, 1, feature_dim)"""
+        
+        # X.shape(batch_size, input_seq_len, feature_dim)
+        if start_mode == StartMode.LAST_X:
+            return X[:, -1:, :]  # (batch_size, 1, feature_dim)
+        
+        batch_size = tf.shape(X)[0]
+        feature_dim = tf.shape(X)[2]
 
-    def step(
-        self,
-        dec_t: tf.Tensor,   # (batch_size, 1, feature_dim)
-        state: Any,
-        *,
-        batch_size: int,
-    ) -> tuple[tf.Tensor, Any]:
-        """Return (y_t_pred: (batch_size,1,feature_dim), new_state)"""
+        return tf.zeros((batch_size, 1, feature_dim), dtype=X.dtype)
+    
+
+    @abstractmethod
+    def encode(self, X: tf.Tensor) -> Any: ...
 
 
-# def decode(
-#     adapter,
-#     X: np.ndarray,
-#     *,
-#     out_steps: int,
-#     start_mode,
-#     batch_size: int,
-#     mode : InferenceMode,                       # InferenceMode.FREE_RUNNING / TEACHER_FORCING
-#     y_true: Optional[np.ndarray] = None,   # richiesto se TEACHER_FORCING
-# ) -> np.ndarray:
-#     N = X.shape[0]
-#     D = adapter.feature_dim
+    @abstractmethod
+    def step(self, dec_t: tf.Tensor, state: Any) -> tuple[tf.Tensor, Any]: ...
 
-#     state = adapter.encode(X, batch_size=batch_size)
+    @tf.function
+    def call(self, inputs, training: bool = False) -> tf.Tensor:
+        
+        # self.outsteps 
+        # if prediction_mode == ALL outsteps = output_seq_len
+        # if prediction_mode == HORIZON outsteps = horizon for a specific phase (strategy)
 
-#     dec_t = adapter.init_decoder_input(X, start_mode=start_mode).astype(np.float32, copy=False)  # (N,1,D)
+        # X.shape(batch_size, input_seq_len, feature_dim)
 
-#     out = np.empty((N, out_steps, D), dtype=np.float32)
+        # if inference_mode == TEACHER_FORCING , inputs = (X, y_true)
+        if isinstance(inputs, (tuple, list)):
+            # y_true (batch_size, t, feature_dim)
+            # if prediction_mode == ALL t = output_seq_len
+            # if prediction_mode == HORIZON t = horizon for a specific phase (strategy)
+            X, y_true = inputs
+        
+        # if inference_mode == FREE_RUNNING , inputs = X
+        else:
+            X, y_true = inputs, None
 
-#     if mode == InferenceMode.TEACHER_FORCING :
-#         if y_true is None:
-#             raise ValueError("y_true deve essere fornito in TEACHER_FORCING.")
-#         if y_true.shape != (N, out_steps, D):
-#             raise ValueError(f"y_true atteso shape (N,out_steps,D)={(N,out_steps,D)}, got {y_true.shape}")
+        state : LSTM2LayerTFState = self.encode(X)
+        # LSTM2LayerTFState(h1=h1, c1=c1, h2=h2, c2=c2)
+        # h1 and c1 from encoder layer 1 
+        # h2 and c2 from encoder layer 2 
 
-#         y_tf = y_true.astype(np.float32, copy=False)
+        # h* and c* shape(batch_size, latent_dim)
+         
+        dec_t = self.init_decoder_input(X, start_mode=self.start_mode)
+        # dec_t where t = 0  startMode = ZEROS or LAST_x
+        # dec_t.shape(batch_size, 1 , feature_dim) 
 
-#         for t in range(out_steps):
-#             y_t_pred, state = adapter.step(dec_t, state, batch_size=batch_size)
-#             y_t_pred = np.asarray(y_t_pred)
+        ta = tf.TensorArray(dtype=X.dtype, size=self.out_steps)
+        # ta.shape(element_size = out_steps, batch_size, 1, feature_dim)
+        
+        def body(t, dec_t, state, ta):
+            
+            # dec_t.shape(batch_size, 1, feature_dim)
+            # if t != 0 dec_t => previous prediction, instead the start mode
 
-#             if y_t_pred.shape != (N, 1, D):
-#                 raise ValueError(f"step() must return (N,1,D)={(N,1,D)}, got {y_t_pred.shape}")
+            # if t = 0 hidden states and cell states from the encoder
+            # if t > 0 hidden states and cell states from the decoder at timestep t-1
+            
+            # state => LSTM2LayerTFState(h1=h1, c1=c1, h2=h2, c2=c2)
+            # h* and c* are shape(batch_size, latent_dim)
 
-#             out[:, t:t+1, :] = y_t_pred
+            y_t, state = self.step(dec_t, state)    
 
-#             # TEACHER FORCING: il prossimo input è la GT del tempo t
-#             dec_t = y_tf[:, t:t+1, :]
+            # y_t.shape(batch_size, 1 , feature_dim)
+            # state needed at the timesteps t+1 from decoder input for the next predictions 
+            
+            ta = ta.write(t, y_t)
+            # write at the index t the tensor y_t
 
-#         return out
+            # dec_t will be the decoder input for the next iteration (t+1) 
+            
+            if self.inference_mode == InferenceMode.TEACHER_FORCING and y_true is not None:
+                dec_t = y_true[:, t:t+1, :]
+            else:
+                dec_t = y_t
 
-#     # AUTOREGRESSIVO (standard)
-#     for t in range(out_steps):
-#         y_t_pred, state = adapter.step(dec_t, state, batch_size=batch_size)
-#         y_t_pred = np.asarray(y_t_pred)
+            return t + 1, dec_t, state, ta
 
-#         if y_t_pred.shape != (N, 1, D):
-#             raise ValueError(f"step() must return (N,1,D)={(N,1,D)}, got {y_t_pred.shape}")
+        # start from t = 0 and stop where t < outsteps
+        t0 = tf.constant(0, tf.int32)
 
-#         out[:, t:t+1, :] = y_t_pred
+        _, _, state, ta = tf.while_loop(
+            lambda t, *_: t < self.out_steps,
+            body,
+            (t0, dec_t, state, ta),
+        )
 
-#         # autoregressione: il prossimo input è la predizione corrente
-#         dec_t = y_t_pred
+        y = ta.stack()                 
+        # y.shape(element_size = out_steps, batch_size, 1, feature_dim)
 
-#     return out
+        tf.print(tf.shape(y))
+        # element_size will be the output_seq_len 
+        y = tf.transpose(y, [1, 0, 2, 3])  # (out_steps, batch_size, 1, feature_dim) => (batch_size, out_steps, 1, feature_dim)
+        
+        y = tf.squeeze(y, axis=2)     
+        # y.shape(batch_size, outsteps, feature_dim)
+        return y

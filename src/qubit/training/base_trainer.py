@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import cast
 import numpy as np
 import keras
+import tensorflow as tf
 
 from ..dataclasses.dataset_splits import DatasetSplits
 from ..dataclasses.model_config import ModelConfig
@@ -14,7 +15,6 @@ from ..callbacks.filtered_history import FilteredProgbar
 from ..enums.split_name import SplitName
 from ..enums.inference_mode import InferenceMode
 
-from ..inference.base import decode
 
 class BaseTrainer(ABC):
 
@@ -25,7 +25,7 @@ class BaseTrainer(ABC):
         self.phases = self.training_cfg.phases
     
     @abstractmethod
-    def _create_inference_adapter(self):
+    def _create_inference_adapter(self, outsteps: int):
         """
         Returns:
             Adapter object (es. Seq2SeqLSTM2LayerAdapter o TransformerAdapter)
@@ -60,123 +60,6 @@ class BaseTrainer(ABC):
         return history
 
     
-    # def fit(self, splits: DatasetSplits):
-
-    #     callbacks = self._prepare_callbacks(splits)
-
-    #     curriculum_no_dupe = list(dict.fromkeys(
-    #         splits.Y_train.shape[1] if h == -1 else int(h)
-    #         for h in self.training_cfg.curriculum
-    #     ))
-        
-    #     fr_target = self.training_cfg.fr_eval.split.value + '_fr_target_loss_' + str(splits.Y_train.shape[1])
-    #     fr_curve = self.training_cfg.fr_eval.split.value + '_fr_curve_loss_'
-    #     fr_phase = self.training_cfg.fr_eval.split.value + '_fr_phase_loss_'
-    #     out_steps_curve = next(p.out_steps for p in self.training_cfg.fr_eval.probes if p.name == "fr_curve")
-
-    #     history_combined = {
-    #         'loss': [],
-    #         **{fr_curve + str(h): [] for h in out_steps_curve},
-    #         **{fr_phase + str(h): [] for h in curriculum_no_dupe},
-    #         fr_target: [],
-    #         'val_loss': [],
-    #         'phase_names': []
-    #     }
-
-    #     current_epoch = 0
-    #     lr_global = self.model_cfg.compile.learning_rate
-    #     clip_norm_global = self.model_cfg.compile.clip_norm
-        
-    #     # for each phases (strategy)
-    #     for phase_idx, phase in enumerate(self.phases):
-
-    #         strategy = phase.strategy
-    #         phase_epochs = phase.cfg.epochs
-    #         horizon = self.training_cfg.curriculum[phase_idx] if self.training_cfg.curriculum[phase_idx] != -1 else splits.Y_train.shape[1]
-            
-    #         lr_local = self.phases[phase_idx].cfg.learning_rate
-    #         clip_norm_local = self.phases[phase_idx].cfg.clip_norm
-            
-    #         lr_to_use = lr_global if lr_local is None else lr_local
-    #         clip_norm_to_use = clip_norm_global if clip_norm_local is None else clip_norm_local
-
-    #         self.model.optimizer.learning_rate.assign(float(lr_to_use))
-    #         self.model.current_clip_norm = clip_norm_to_use
-
-    #         # clip_norm is used only for a custom model (not for full_seq model)
-    #         self.model.current_clip_norm = clip_norm_to_use
-
-    #         print(f"\n{'='*70}")
-    #         print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {strategy.get_name()}")
-    #         for key, value in phase.cfg.__dict__.items():
-    #             if (key != "epochs" and key != "name" and key != "learning_rate" and key != "clip_norm"): print(f"   {key.replace("_"," ").title()}: {value if not isinstance(value,str) else str(value)}")
-    #         print(f"   Epochs: {phase_epochs}")
-    #         print(f"   Learning Rate: {lr_to_use}")
-    #         print(f"   Clipping Norm: {clip_norm_to_use}")
-    #         print(f"   Horizon (train loss): {horizon}")
-    #         print(f"   Output timesteps (val_loss and fr_loss): {splits.Y_train.shape[1]}")
-    #         print(f"{'='*70}\n")
-
-            
-
-    #         callbacks[0].phase_horizon = horizon
-
-    #         # for each epoch of each phase 
-    #         for epoch in range(phase_epochs):
-    #             callbacks[0].end_of_phase = (epoch == phase_epochs-1)
-
-    #             print(f"Epoch {current_epoch + 1}/{self.training_cfg.epochs} ")
-
-    #             if isinstance(self.model,StepWiseLstmModel) or isinstance(self.model,StepWiseTrnModel):
-    #                 self.model.set_context(strategy=strategy, epoch=epoch, total_epochs=phase_epochs,horizon=horizon)
-    #                 train_inputs, train_targets = splits.X_train, splits.Y_train[:, :horizon, :]
-    #                 val_inputs, val_targets = splits.X_val, splits.Y_val[:, :horizon, :]
-    #             else:
-    #                 train_inputs, train_targets = strategy.prepare_inputs_full_seq(splits.X_train, splits.Y_train,epoch, phase_epochs,horizon)
-    #                 val_inputs, val_targets = strategy.prepare_inputs_full_seq(splits.X_val, splits.Y_val,epoch, phase_epochs, horizon)
-       
-    #             # TODO possibility to increase the performance moving the logical switching about strategy inside the custom model 
-    #             # training for 1 epoch because there are strategies that need results for each epoch
-    #             history = self.model.fit(
-    #                 train_inputs,
-    #                 train_targets,
-    #                 epochs=1,
-    #                 batch_size=self.training_cfg.batch_size,
-    #                 validation_data=(val_inputs, val_targets),
-    #                 verbose=self.training_cfg.verbose,
-    #                 callbacks=callbacks,
-    #             )
-                
-    #             # object useful to obtain a custom history for plotting
-    #             history_combined['loss'].extend(history.history['loss'])
-
-    #             if (fr_target in history.history):
-    #                 history_combined[fr_target].extend(history.history[fr_target])
-    #             else : history_combined[fr_target].append(None)
-
-    #             for h in out_steps_curve:
-    #                 curve = fr_curve + str(h)
-    #                 if (curve in history.history):
-    #                     history_combined[curve].extend(history.history[curve])
-    #                 else: history_combined[curve].append(None)
-
-    #             phase = fr_phase + str(horizon)
-
-    #             if (phase in history.history):
-    #                 history_combined[phase].extend(history.history[phase])
-    #             else : history_combined[phase].append(None)  
-            
-    #             history_combined['val_loss'].extend(history.history['val_loss'])
-    #             history_combined['phase_names'].append(strategy.get_name())
-                
-    #             current_epoch += 1
-            
-    #         callbacks[0].phase_epoch = 0
-        
-    #     # this functions is important to return a history like keras 
-    #     # we used this because we fit the model for 1 epoch and we dont have history.epoch = total epoch  
-    #     return self._create_history_object(history_combined)
-    
     def _prepare_callbacks(self, splits):
 
         callbacks = []
@@ -187,13 +70,16 @@ class BaseTrainer(ABC):
             is_test = self.training_cfg.fr_eval.split == SplitName.TEST
             X = splits.X_test if is_test else splits.X_val
             Y = splits.Y_test if is_test else splits.Y_val
+
+            # X.shape(num_windows, input_seq_len, feature_dim)
+            # Y.shape(num_windows, output_seq_len, feature_dim)
             
             fr_eval = FreeRunningEvalCallback(
                     X, Y,
                     start_mode=self.model_cfg.inference.start_mode,
                     verbose=self.model_cfg.inference.verbose,
                     inference_mode=self.model_cfg.inference.mode,
-                    training_cfg=self.training_cfg
+                    training_cfg=self.training_cfg,
                 )
          
         phase_scheduler = PhaseSchedulerCallback(
@@ -222,29 +108,24 @@ class BaseTrainer(ABC):
         X = splits.X_test
         Y = splits.Y_test
 
-        
-        
+        # X_test.shape(num_windows, input_seq_len, feature_dim)
+        # Y_test.shape(num_windows, output_seq_len, feature_dim)
+
         # this function is implemented in the concrete classes 
-        adapter = self._create_inference_adapter()
+        inference_adapter = self._create_inference_adapter(outsteps= Y.shape[1])
         
         # safety check
-        if adapter is None :
+        if inference_adapter is None :
             raise TypeError("Adapter is None ")
 
         if self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
-            pred = decode(adapter, X,
-                        out_steps=Y.shape[1],
-                        start_mode=self.model_cfg.inference.start_mode,
-                        batch_size=self.training_cfg.batch_size,
-                        mode=InferenceMode.TEACHER_FORCING,
-                        y_true=Y)
+            pred = inference_adapter.predict((X, Y), batch_size=self.training_cfg.fr_eval.batch_size)
+       
         else:
-            pred = decode(adapter, X,
-                        out_steps=Y.shape[1],
-                        start_mode=self.model_cfg.inference.start_mode,
-                        batch_size=self.training_cfg.batch_size,
-                        mode=InferenceMode.FREE_RUNNING)
+            pred = inference_adapter.predict(X, batch_size=self.training_cfg.fr_eval.batch_size)
 
+        # pred.shape(num_windows, output_seq_len,feature_dim)
+         
         return X, Y, pred
     
     def report_sample(self, sample_x, sample_y, pred):

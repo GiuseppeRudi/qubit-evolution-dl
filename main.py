@@ -49,11 +49,14 @@ def main():
     
     # useful because if we used the pretrained model there is a possibility to don't perform again the training phase
     history = None
+
+    print(f"--- Number of Windows for Train = {splits.X_train.shape[0]}")
+    print(f"--- Number of Windows for Val = {splits.X_val.shape[0]}")
+    print(f"--- Number of Windows for Test = {splits.X_test.shape[0]}")
     
     # default it is true if we don't specify 
     if args.training is True :
         print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}/{model_cfg.decoder_mode.value}]  ---")
-        print(f"--- Number of Windows = {splits.X_train.shape[0]}")
         
         history = trainer.fit(splits)
 
@@ -81,10 +84,5 @@ if __name__ == "__main__":
 #     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5
 
 
-# TODO controllre ora che abbiamo messo errore manualmente se ne vale la pena oppure ritorniamo come prima
 
-# TODO controllare strategie masked modelling e ss in step wise e poi fare custom model per full seq e per trn
-
-# TODO check the fr_curve_loss with different horizon we obtain the same error loss
-
-# TODO strategies are not connected to the fullseq model
+# TODO fix the loss tracker in full_seq_model and adding val loos
