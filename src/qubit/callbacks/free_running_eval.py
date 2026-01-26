@@ -72,8 +72,6 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         return self.X_eval[:n], self.Y_eval[:n]
 
     def on_epoch_end(self, epoch, logs=None):
-
-        print("on_epoch_end")
         if logs is None:
             logs = {}
 

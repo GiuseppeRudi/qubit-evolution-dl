@@ -10,6 +10,10 @@ class FilteredProgbar(keras.callbacks.ProgbarLogger):
         for k, v in logs.items():
             if isinstance(v, (float, np.floating)) and np.isnan(v):
                 continue
+            if isinstance(v, (float, np.floating)) and np.isnan(v):
+                continue
+            if isinstance(v, (int, float, np.integer, np.floating)) and float(v) == 0.0:
+                continue
             out[k] = v
         return out
 

@@ -36,7 +36,7 @@ temp/
 
 # Dati grandi (se non vuoi copiarli nell'immagine)
 data/
-predictions/
+# predictions/
 
 
 # Altro

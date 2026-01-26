@@ -43,7 +43,7 @@ def scheduled_sampling_next(
 
 @tf.function
 def scheduled_sampling_strategy(
-    y_true_t: tf.Tensor,
+    y_true_t: tf.Tensor, # y_true_t.shape()
     y_pred_t: tf.Tensor,
     *,
     epoch: tf.Tensor,
@@ -53,7 +53,9 @@ def scheduled_sampling_strategy(
     scope_id: tf.Tensor,
     stop_grad_pred: bool = True,
 ) -> tf.Tensor:
+    
     tf.print("\nRUNTIME scheduled_sampling_strategy")
+
     ratio = linear_ratio(epoch, total_epochs, tf_ratio_start, tf_ratio_end)
     return scheduled_sampling_next(
         y_true_t,

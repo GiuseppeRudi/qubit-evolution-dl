@@ -1,9 +1,10 @@
 from pathlib import Path
 from datetime import datetime
-from typing import List
+import shutil
 from xml.parsers.expat import model
 import numpy as np
 import json
+
 from .plot import save_loss_plots_keras
 
 from ..enums.model_type import ModelType
@@ -15,21 +16,8 @@ from ..dataclasses.plot_config import PlotConfig
 from ..dataclasses.training_config import TrainingConfig
 
 from ..utils.config_values import LOG_PATH, PREDICTION_PATH
-import sys
-from ..utils.utils import Logger
+from ..utils.utils import BufferedLogger, finish_log
 
-def save_log(run_dir : Path):
-
-    log_path = run_dir / LOG_PATH
-    
-    # buffering = 1 because we want to write line by line  
-    log_file = open(log_path, "w", buffering=1, encoding="utf-8")
-
-    # standard output => write the print to both console and log file 
-    sys.stdout = Logger(sys.__stdout__, log_file)
-
-    # standard error => write the errors to both console and log file 
-    # sys.stderr = Logger(sys.__stderr__, log_file)
 
 def make_run_output_dir(model_cfg : ModelConfig) -> Path:
 
@@ -48,19 +36,38 @@ def make_run_output_dir(model_cfg : ModelConfig) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
+
+def copy_yaml(yaml_name: str, run_dir: Path):
+
+    # path sorgente dello yaml
+    src = Path("configs/" + yaml_name + ".yaml").expanduser().resolve()
+
+    if not src.exists():
+        raise FileNotFoundError(f"YAML not found: {src}")
+
+    # path destinazione (stesso nome o nome custom)
+    dst = run_dir / src.name
+
+    # copia fisica del file
+    shutil.copy2(src, dst)
+
 def save_outputs(
     splits,
-    pred,
+    pred, # shape(num_windows, output_seq_len, feature_dim)
     model_cfg : ModelConfig,
     feat_names,
     history,
-    run_dir,
     fr_key: str,
     plot_cfg: PlotConfig,
     training_cfg : TrainingConfig,
     output_seq_len: int,
+    bufferedLogger: BufferedLogger, 
+    yaml_name: str,
     model = None,
 ) -> Path:
+    
+    run_dir = make_run_output_dir(model_cfg)
+
     sample_index = plot_cfg.sample_index
     save_model = model_cfg.save_model
     save_plots = plot_cfg.save_plots
@@ -91,8 +98,8 @@ def save_outputs(
 
         meta = {
             "experiment_name": model_cfg.name,
-            "model_type": str(model_cfg.type),
-            "variant": str(model_cfg.variant),
+            "model_type": model_cfg.type.value,
+            "variant": model_cfg.variant.value,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "sample_index": sample_index,
             "x_test_shape": list(splits.X_test.shape),
@@ -102,7 +109,9 @@ def save_outputs(
         }
         (run_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
-    
         print(f"Saved artifacts to: {run_dir}")
+
+    copy_yaml(yaml_name, run_dir)
+    finish_log(bufferedLogger,run_dir)
         
     return run_dir

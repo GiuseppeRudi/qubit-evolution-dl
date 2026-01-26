@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from ..enums.start_mode import StartMode
 from ..enums.verbose_mode import VerboseMode
-from .base import BaseAutoregressiveAdapter  # il tuo
+from .base_adapter import BaseAutoregressiveAdapter  # il tuo
 
 @dataclass
 class TransformerStepWiseNPState:
@@ -80,3 +80,4 @@ class StepWiseTrnAdapter(BaseAutoregressiveAdapter):
             prefix=new_pref.numpy().astype(np.float32, copy=False),
         )
         return y_np, new_state
+

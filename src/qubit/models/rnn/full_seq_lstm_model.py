@@ -13,18 +13,18 @@ from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2
 class FullSeqLstmModel(StrategyChooserModel):
 
     def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode, t_out: int, prediction_mode_id : int):
-        super().__init__(t_out=t_out, prediction_mode_id= prediction_mode_id)
+        super().__init__(t_out = t_out, prediction_mode_id = prediction_mode_id)
         self.feature_dim = feature_dim
-        self.latent_dim = latent_dim # dimensions of hidden states and cell states 
+        self.latent_dim = latent_dim # dimension of hidden states and cell states 
         self.start_mode = start_mode # inizialize the encoder with last_x or zeros 
 
         # Inizialize the layers of Model 
 
-        # Encoder (2 stacked LSTM)
+        # encoder (2 stacked LSTM)
         self.enc_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=ENC_LSTM_1)
         self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True, name=ENC_LSTM_2)
 
-        # Decoder full-seq (input: (B, T_out, D))
+        # decoder full-seq (input: (B, T_out, D))
         self.dec_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_1)
         self.dec_lstm_2 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_2)
 
@@ -39,29 +39,23 @@ class FullSeqLstmModel(StrategyChooserModel):
     # this function is useful to create for each layers the dimension of the weights accordly 
     # from the last dimension => feature_dim 
     def build(self, input_shape):
-
-        # input_shape is a tuple of [x_shape , y_shape]
-
-        # x_shape => (batch_size = None , t_int , feature_dim)
-        # y_shape => (batch_size = None , t_out , feature_dim)
-   
-        x_shape = input_shape[0]
-        feature_dim  = x_shape[-1] 
-
         # Encoder build
+
+        # input_shape: (batch_size, input_seq_len, feature_dim)
+        # input shape as parameter is needed to respect the build in function
 
         # we insert only the last dimension because only this is important for the weights
         # enc_lstm1 return sequence of dimension (batch_size, t_in , latent_dim)
-        self.enc_lstm_1.build((None, None, feature_dim))  # (batch_size , t_in, feature_dim)
+        self.enc_lstm_1.build((None, None, self.feature_dim))  # (batch_size , t_in, feature_dim)
 
         # since enc_lstm_2 takes in input the sequence of enc_lstm1 so the 3rd dimension is latent_dim
         self.enc_lstm_2.build((None, None, self.latent_dim))  # (batch, t_in , latent_dim)
 
-
-        # decoder take in input the dec_in (previous predictions or teacher forcing)
+        # Decoder build
+        # decoder take in input the dec_in (previous predictions with possibility to apply a different strategies)
         # at the start dec_in depends on the start_mode (zeros or last x)
         # dec_in.shape(batch_size,t_out, feauture_dim)
-        self.dec_lstm_1.build((None, None, feature_dim))       
+        self.dec_lstm_1.build((None, None, self.feature_dim))       
 
         # dec_lstm_2 take the dec_lstm_1 output sequence of dimension (batch_size, t_out, latent_dim)
         self.dec_lstm_2.build((None, None, self.latent_dim))   
@@ -154,7 +148,6 @@ class FullSeqLstmModel(StrategyChooserModel):
 
     # each batch call this function
     def train_step(self, data):
-        print("train_step full_seq")
 
         # X_train => X.shape => (batch_size, input_seq_len, feature_dim )
         # Y_train => Y.shape => (batch_size, output_seq_len, feature_dim )
@@ -241,14 +234,13 @@ class FullSeqLstmModel(StrategyChooserModel):
 
         self.loss_tracker.update_state(loss)      
         # update metrics (includes the metric that tracks the loss)
-        self.compute_metrics(x = X, y=Y_true, y_pred=Y_pred)
+        self.compute_metrics(x = X, y = Y_true, y_pred = Y_pred)
 
         return {m.name: m.result() for m in self.metrics}
 
+
     def test_step(self, data):
         # at the end of each epoch we evaluate the metrics with the validation splits
-
-        tf.print("\ntest_step full_seq")
         
         X, Y = data
         
@@ -305,5 +297,8 @@ class FullSeqLstmModel(StrategyChooserModel):
         Y_true, Y_pred = tf.cond(tf.equal(prediction_mode_id, 0), run_all, run_hor_only)
         
         val_loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
+        self.loss_tracker.update_state(val_loss)
 
-        return {"loss": val_loss}
+        self.compute_metrics(x=X, y=Y_true, y_pred=Y_pred)
+
+        return {m.name: m.result() for m in self.metrics}

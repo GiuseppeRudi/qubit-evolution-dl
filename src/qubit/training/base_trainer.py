@@ -98,56 +98,45 @@ class BaseTrainer(ABC):
         
         return callbacks
     
-    def predict_all_test(self, splits):
-        """
-        Inference in fre-running mode - uses the specific adapter
-        """
-
+    def predict_all_test(self, X_test: np.ndarray, Y_test: np.ndarray):
+    
         print("Predicting all test samples in " + str(self.model_cfg.inference.mode) + " mode...")
-
-        X = splits.X_test
-        Y = splits.Y_test
 
         # X_test.shape(num_windows, input_seq_len, feature_dim)
         # Y_test.shape(num_windows, output_seq_len, feature_dim)
 
         # this function is implemented in the concrete classes 
-        inference_adapter = self._create_inference_adapter(outsteps= Y.shape[1])
+        inference_adapter = self._create_inference_adapter(outsteps= Y_test.shape[1])
         
         # safety check
         if inference_adapter is None :
             raise TypeError("Adapter is None ")
 
         if self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
-            pred = inference_adapter.predict((X, Y), batch_size=self.training_cfg.fr_eval.batch_size)
-       
+            pred = inference_adapter.predict((X_test, Y_test), batch_size=self.training_cfg.fr_eval.batch_size)
         else:
-            pred = inference_adapter.predict(X, batch_size=self.training_cfg.fr_eval.batch_size)
+            pred = inference_adapter.predict(X_test, batch_size=self.training_cfg.fr_eval.batch_size)
 
         # pred.shape(num_windows, output_seq_len,feature_dim)
          
-        return X, Y, pred
+        return X_test, Y_test, pred
     
     def report_sample(self, sample_x, sample_y, pred):
-        """Report"""
         print(f"  X shape: {sample_x.shape}")
         print(f"  Y shape: {sample_y.shape}")
         print(f"  Pred shape: {pred.shape}")
-
-        np.set_printoptions(suppress=True, precision=16)
 
         print("\n step | target                | pred                  | abs_err")
         print("------|-----------------------|-----------------------|----------------------")
 
         for t in range(pred.shape[1] // 2, (pred.shape[1] // 2) + 5):
-            if t >= pred.shape[1]: 
-                break
+            if t >= pred.shape[1]: break
             y_t = sample_y[0, t]
             p_t = pred[0, t]
             err = np.abs(p_t - y_t)
 
             print(
-                f"{t:>5} | "
+                f"{t:>5} | " # align to the right in a space of 5
                 f"{np.array2string(y_t, precision=6)} | "
                 f"{np.array2string(p_t, precision=6)} | "
                 f"{np.array2string(err, precision=6)}"

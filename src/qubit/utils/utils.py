@@ -1,7 +1,10 @@
 import tensorflow as tf
 import argparse
+import sys
 import re
+from pathlib import Path
 
+from  .config_values import LOG_PATH
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -56,18 +59,19 @@ def get_device():
 
 # regex to match ANSI escape and remove that for log files
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+ 
+class BufferedLogger:
 
-# write to both console and file
-class Logger:
-    def __init__(self, console_stream, file_stream):
-
-        # console => original stdout or stderr
-        # file => log file
-        self.console = console_stream
-        self.file = file_stream
-
-    def write(self, s: str):
+    def __init__(self, console_stream):
         
+        # console => original stdout or stderr
+        self.console = console_stream
+
+        # buffer
+        self.lines: list[str] = []
+ 
+    def write(self, s: str):
+
         # console : write as it is 
         self.console.write(s)
         self.console.flush()
@@ -79,11 +83,31 @@ class Logger:
         if "\r" in s2 and "\n" not in s2:
             return  # skip the code line with the carriage return only
         s2 = s2.replace("\r", "")
-        
-        self.file.write(s2)
-        self.file.flush()
 
+        # append to the buffer
+        self.lines.append(s2)
+ 
     def flush(self):
         self.console.flush()
-        self.file.flush()
+ 
+    def dump_to_file(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.writelines(self.lines)
 
+ 
+def start_log() -> BufferedLogger:
+    logger = BufferedLogger(sys.__stdout__)
+    sys.stdout = logger
+    # se vuoi anche stderr:
+    # sys.stderr = logger
+    return logger
+ 
+ 
+def finish_log(logger: BufferedLogger, run_dir: Path):
+    log_path = run_dir / LOG_PATH
+    logger.dump_to_file(log_path)
+
+    # restore
+    sys.stdout = sys.__stdout__
+    # sys.stderr = sys.__stderr__

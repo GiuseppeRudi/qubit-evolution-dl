@@ -110,7 +110,6 @@ def masked_modeling_full_seq(
 ):
     
     # ! REMEMBER the masking modeling use always the groun truth for the input 
-    tf.print("\nRUNTIME masked_modeling_full_seq")
     # Y if prediction mode => ALL => Y.shape = (B, t = t_out == output_seq_len, F)
     # Y if prediction mode => HORIZON => Y.shape = (B, t = t_hor, F)
 

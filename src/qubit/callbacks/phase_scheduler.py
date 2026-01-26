@@ -2,59 +2,62 @@ import tensorflow as tf
 
 from typing import cast
 from ..dataclasses.phase_config import *
-from ..enums.prediction_mode import PredictionMode
 
+# Need to update the StategyLayer to track the different parameter for the custom loop
 class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
-    def __init__(self, phases: list[PhaseConfig], curriculum : list[int], lr_global : float, clip_global : float , fr_eval=None ):
+    def __init__(
+            self,
+            phases: list[PhaseConfig],
+            curriculum: list[int],
+            lr_global: float,
+            clip_global: float,
+            fr_eval=None
+        ):
         super().__init__()
         self.phases = phases
         self.curriculum = curriculum
-        self.lr_global = lr_global
+        self.lr_global = lr_global # learning rate 
         self.clip_global = clip_global
-        self.fr_eval = fr_eval
+        self.fr_eval = fr_eval # free running evaluations
         
-        # prefissi cumulativi delle epoche: [0, e0, e0+e1, ...]
+        # list of indexes (starts of each epoch)
         self.bounds = [0]
         s = 0
         for ph in phases:
             s += ph.epochs
             self.bounds.append(s)
 
-    def _phase_of(self, epoch):
-        # ritorna (phase_idx, epoch_in_phase)
-        for i in range(len(self.phases)):
-            if self.bounds[i] <= epoch < self.bounds[i+1]:
-                return i, epoch - self.bounds[i]
-        return len(self.phases)-1, self.phases[-1].epochs-1
 
-
-    # Codice corretto completo:
     def on_epoch_begin(self, epoch, logs=None):
-        phase_idx, e_in = self._phase_of(epoch)
+
+        phase_idx, epoch_in_phase = self._phase_of(epoch)
+        
         phase = self.phases[phase_idx]
         m = self.model
 
-        # Determina horizon
-        horizon_py = self.curriculum[phase_idx]
-        if horizon_py == -1: m.rt.horizon.assign(m.rt.t_out)
-        else: m.rt.horizon.assign(horizon_py)
+        # horizon for a specific phase 
+        horizon = self.curriculum[phase_idx]
 
-        # Aggiorna contesto TF
-        m.rt.epoch_in_phase.assign(e_in)
+        # if in the file yaml want to use the global output_seq_len
+        if horizon == -1: m.rt.horizon.assign(m.rt.t_out)
+        else: m.rt.horizon.assign(horizon)
+
+        m.rt.epoch_in_phase.assign(epoch_in_phase)
         m.rt.phase_epochs.assign(phase.epochs)
-        # NON riassegnare horizon qui!
 
-        # phase_id
+        # convert in  phase_id for the graph mode
         pid = {
             PhaseName.TEACHER_FORCING.value: 0,
             PhaseName.MASKED_MODELING.value: 1,
             PhaseName.SCHEDULED_SAMPLING.value: 2,
             PhaseName.FULL_AUTOREGRESSIVE.value: 3
         }[phase.name]
+        
         m.rt.phase_id.assign(pid)
 
-        # parametri strategy-specific
-        if pid == 1:  # MM
+        # strategy-specific parameter
+
+        if pid == 1:  # Masked Modeling 
             mask_mode_to_id = {MaskMode.ZERO.value: 0, MaskMode.CONSTANT.value: 1, MaskMode.NOISE.value: 2}[cast(MaskedModelingPhase, phase).mask_mode]
             mask_scope_to_id = {MaskScope.TIME.value: 0, MaskScope.FEATURE.value: 1, MaskScope.ELEMENT.value: 2}[cast(MaskedModelingPhase, phase).mask_scope]
 
@@ -65,24 +68,24 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             m.rt.noise_sigma.assign(cast(MaskedModelingPhase, phase).noise_sigma)
             m.rt.noise_replace.assign(cast(MaskedModelingPhase, phase).noise_replace)
 
-        if pid == 2:  # SS
+        if pid == 2:  # Scheduled Sampling 
             m.rt.tf_ratio_start.assign(cast(ScheduledSamplingPhase, phase).tf_ratio_start)
             m.rt.tf_ratio_end.assign(cast(ScheduledSamplingPhase, phase).tf_ratio_end)
             m.rt.per_feature.assign(cast(ScheduledSamplingPhase, phase).per_feature)
         
-        if pid == 3:  # FA
+        if pid == 3:  # FullAutoregressive
             m.rt.gradient_through_time.assign(cast(FullAutoregressivePhase, phase).gradient_through_time)
 
-        # lr / clip
+        # if a specific phase don't have the private values of learning rate and clip_norm 
+        # we set the global one
         lr = self.lr_global if phase.learning_rate is None else phase.learning_rate
         clip = self.clip_global if phase.clip_norm is None else phase.clip_norm
-        if m.optimizer is not None:
-            m.optimizer.learning_rate.assign(lr)
+        if m.optimizer is not None: m.optimizer.learning_rate.assign(lr)
         m.current_clip_norm = clip
 
-        # Print info solo all'inizio della fase
-        if e_in == 0:
-            actual_horizon = horizon_py if horizon_py != -1 else m.rt.t_out.numpy()
+        # Info print at the start of each phase
+        if epoch_in_phase == 0:
+            actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {phase.name}")
             for key, value in phase.__dict__.items():
@@ -95,9 +98,17 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             print(f"   Output timesteps (val_loss and fr_loss): {m.rt.t_out.numpy()}")
             print(f"{'='*70}\n")
 
-        # aggiorna callback FR
+        # update callback free_running
         if self.fr_eval is not None:
-            actual_horizon = horizon_py if horizon_py != -1 else m.rt.t_out.numpy()
+            actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
             self.fr_eval.phase_horizon = actual_horizon
-            self.fr_eval.end_of_phase = (e_in == phase.epochs - 1)
+            self.fr_eval.end_of_phase = (epoch_in_phase == phase.epochs - 1)
             
+    def _phase_of(self, epoch):
+        # return the (phase_idx and interally epoch phase) of a current epoch
+        for i in range(len(self.phases)):
+            if self.bounds[i] <= epoch < self.bounds[i+1]:
+                return i, epoch - self.bounds[i]
+            
+        # for the last phase 
+        return len(self.phases)-1, self.phases[-1].epochs-1

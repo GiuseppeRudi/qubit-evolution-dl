@@ -1,12 +1,10 @@
 import tensorflow as tf
 
-
 @tf.function
 def teacher_forcing_full_seq(
     Y: tf.Tensor,
     dec0: tf.Tensor,
 ):
-    tf.print("\nRUNTIME teacher_forcing_full_seq")
     # Y if prediction mode => ALL => Y.shape = (B, t = t_out == output_seq_len, F)
     # Y if prediction mode => HORIZON => Y.shape = (B, t = t_hor, F)
 
@@ -23,9 +21,8 @@ def teacher_forcing_full_seq(
 
 @tf.function
 def teacher_forcing_step_wise(
-    *,
-    y_true_t: tf.Tensor, # (B,1,F)
-    y_pred_t: tf.Tensor, # (B,1,F) (unused)
-) -> tf.Tensor:
+    y_true_t: tf.Tensor, ) -> tf.Tensor:
     tf.print("\nRUNTIME teacher_forcing_step_wise")
+
+    # y_true_t.shape(batch_size, 1, feature_dim)
     return y_true_t
