@@ -113,9 +113,9 @@ class BaseTrainer(ABC):
             raise TypeError("Adapter is None ")
 
         if self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
-            pred = inference_adapter.predict((X_test, Y_test), batch_size=self.training_cfg.fr_eval.batch_size)
+            pred = inference_adapter.predict((X_test, Y_test), batch_size=self.training_cfg.fr_eval.batch_size, verbose = self.model_cfg.inference.verbose)
         else:
-            pred = inference_adapter.predict(X_test, batch_size=self.training_cfg.fr_eval.batch_size)
+            pred = inference_adapter.predict(X_test, batch_size=self.training_cfg.fr_eval.batch_size, verbose = self.model_cfg.inference.verbose)
 
         # pred.shape(num_windows, output_seq_len,feature_dim)
          

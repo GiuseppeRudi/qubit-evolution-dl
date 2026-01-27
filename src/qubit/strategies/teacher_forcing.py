@@ -20,9 +20,8 @@ def teacher_forcing_full_seq(
 
 
 @tf.function
-def teacher_forcing_step_wise(
-    y_true_t: tf.Tensor, ) -> tf.Tensor:
-    tf.print("\nRUNTIME teacher_forcing_step_wise")
+def teacher_forcing_step_wise(y_true_t: tf.Tensor) -> tf.Tensor:
+    # tf.print("\nRUNTIME teacher_forcing_step_wise")
 
     # y_true_t.shape(batch_size, 1, feature_dim)
     return y_true_t

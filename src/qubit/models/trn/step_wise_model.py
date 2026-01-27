@@ -14,6 +14,7 @@ from .encoder import EncoderTRN
 
 from ..strategy_chooser import StrategyChooserModel
 
+from ...utils.layers_names import OUT_DENSE, ENC_IN_PROJ, ENC_IN_DROP, ENC_POS_EMB, ENC_BLOCK_, DEC_IN_PROJ, DEC_IN_DROP, DEC_POS_EMB, DEC_BLOCK_
 
 class StepWiseTrnModel(StrategyChooserModel):
     def __init__(
@@ -25,42 +26,65 @@ class StepWiseTrnModel(StrategyChooserModel):
         ff_dim: int,
         num_layers: int,
         dropout: float,
-        max_len: int,
         start_mode: StartMode,
         prediction_mode_id: int,
-        t_out : int
+        t_out: int,
+        t_in: int
     ):
         super().__init__(t_out=t_out,prediction_mode_id=prediction_mode_id)
         self.feature_dim = feature_dim
-        self.d_model = d_model
+        self.d_model = d_model # internal dimension of vector  
         self.n_heads = n_heads
         self.ff_dim = ff_dim
         self.num_layers = num_layers
         self.dropout = dropout
-        self.max_len = max_len
         self.start_mode = start_mode
-    
+        
         # Projections (continuous features -> d_model)
-        self.enc_in = layers.Dense(d_model, name="enc_in_proj")
-        self.dec_in = layers.Dense(d_model, name="dec_in_proj")
+        # needed because the internal rappresentations of transformer
+        # work with d_model as third dimension and not feature_dim
+        self.enc_in = layers.Dense(d_model, name = ENC_IN_PROJ)
+        self.dec_in = layers.Dense(d_model, name = DEC_IN_PROJ)
 
-        # Positional embeddings (learnable)
-        self.enc_pos = layers.Embedding(input_dim=max_len, output_dim=d_model, name="enc_pos_emb")
-        self.dec_pos = layers.Embedding(input_dim=max_len, output_dim=d_model, name="dec_pos_emb")
+        # Positional embeddings 
+        # The transformer architecture doesn't know the order of sequence in input
+        # instead the lstm use the second dimension automatically (timesteps)
+        # For this reason we need to use the Embedding layer to create a matrix of weights (input_dim ,output_dim)
+        # where there are input_dim vectors, each with size output_dim that contain the trainable weights
 
-        self.enc_drop = layers.Dropout(dropout, name="enc_in_drop")
-        self.dec_drop = layers.Dropout(dropout, name="dec_in_drop")
+        # enc_pos 
+        # input  => pos.shape(input_seq_len) => list of index from 0 to input_seq_len - 1
+        # output => (input_seq_len, d_model)
+        self.enc_pos = layers.Embedding(input_dim = t_in, output_dim = d_model, name = ENC_POS_EMB)
+        
+        # dec_pos 
+        # input  => pos.shape(input_seq_len) => list of index from 0 to input_seq_len - 1
+        # output => (input_seq_len, d_model)
+        self.dec_pos = layers.Embedding(input_dim = t_in, output_dim = d_model, name = DEC_POS_EMB)
+
+        self.enc_drop = layers.Dropout(dropout, name = ENC_IN_DROP)
+        self.dec_drop = layers.Dropout(dropout, name = DEC_IN_DROP)
 
         self.enc_blocks = [
-            EncoderTRN(d_model=d_model, n_heads=n_heads, ff_dim=ff_dim, dropout=dropout, name=f"enc_blk_{i}")
-            for i in range(num_layers)
-        ]
-        self.dec_blocks = [
-            DecoderTRN(d_model=d_model, n_heads=n_heads, ff_dim=ff_dim, dropout=dropout, name=f"dec_blk_{i}")
+            EncoderTRN(d_model = d_model, n_heads = n_heads, ff_dim = ff_dim, dropout = dropout, name = f"{ENC_BLOCK_}{i}")
             for i in range(num_layers)
         ]
 
-        self.out_dense = layers.Dense(feature_dim, name="out_dense")
+        self.dec_blocks = [
+            DecoderTRN(d_model = d_model, n_heads = n_heads, ff_dim = ff_dim, dropout = dropout, name = f"{DEC_BLOCK_}{i}")
+            for i in range(num_layers)
+        ]
+
+        self.out_dense = layers.Dense(feature_dim, name = OUT_DENSE)
+        print(self.enc_in)
+        print(self.dec_in)
+        print(self.enc_pos)
+        print(self.dec_pos)
+        print(self.enc_drop)
+        print(self.dec_drop)
+        print(self.enc_blocks)
+        print(self.dec_blocks)
+        print(self.out_dense)
 
         # Runtime strategy (per compatibilità col tuo Trainer attuale)
         # self._strategy: Optional[TrainingStrategy] = None
@@ -74,17 +98,22 @@ class StepWiseTrnModel(StrategyChooserModel):
         # Manual metric(s)
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
 
-    def build(self, input_shape):
-        # input_shape: (batch, Tin, feature_dim)
-        feature_dim = input_shape[-1] or self.feature_dim
+    def build(self, input_shape: tf.TensorShape):
+        
+        # input_shape => X.shape(batch_size,input_seq_len, feature_dim)
+        
+        # self.enc_in => layers.Dense 
+        # input => X.shape(batch_size, input_seq_len,feature_dim)
+        # output => (batch_size, input_seq_len, d_model)
+        self.enc_in.build(input_shape)
 
-        self.enc_in.build((None, None, feature_dim))
-        self.dec_in.build((None, None, feature_dim))
-        self.out_dense.build((None, None, self.d_model))
+        # self.dec_in => layers.Dense 
+        # input => dec_in.shape(batch_size, 1,feature_dim)
+        # output => (batch_size, 1, d_model)
+        self.dec_in.build((None, 1, self.feature_dim))
+        self.out_dense.build((None, 1, self.d_model))
 
         super().build(input_shape)
-
-
 
     def _causal_mask(self, L: tf.Tensor) -> tf.Tensor:
         # returns (1, L, L) boolean lower-triangular mask

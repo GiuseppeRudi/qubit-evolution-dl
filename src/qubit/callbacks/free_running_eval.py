@@ -100,7 +100,6 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
             active_probes.append((probe, outsteps))
             requested_steps.extend(outsteps)
 
-        
         if not active_probes: return
 
         # one slice for max p_eval (after each probe use our slice)
@@ -132,10 +131,10 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         
         # number of batch =>  num_reduced_windows / batch_size
         if self.inference_mode == InferenceMode.FREE_RUNNING:
-            Y_pred_max = self.inference_adapter.predict(X_reduced, batch_size=self.batch_size)
+            Y_pred_max = self.inference_adapter.predict(X_reduced, batch_size = self.batch_size, verbose = self.verbose)
             
         elif self.inference_mode == InferenceMode.TEACHER_FORCING:
-            Y_pred_max = self.inference_adapter.predict((X_reduced, Y_reduced), batch_size=self.batch_size)
+            Y_pred_max = self.inference_adapter.predict((X_reduced, Y_reduced), batch_size = self.batch_size, verbose = self.verbose)
 
         # Y_pred_max.shape(n_reduced, t, feature_dim )
         # if prediction_mode == ALL so t => Y.shape[1] == output_seq_len
@@ -143,7 +142,6 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
         # log for each prob with specific p_eval and horizon
         for probe, outsteps in active_probes:
-           
             n_reduced_probe = int(self.X_eval.shape[0] * probe.p_eval)
 
             Y_reduced_probe = Y_reduced[:n_reduced_probe]
@@ -162,13 +160,14 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
                 fr_loss = trained_model.compute_loss(y=Y_per_step, y_pred=Y_pred_per_step)
 
                 logs[f"{prefix}_{probe.name}_loss_{k}"] = float(fr_loss.numpy())  # type: ignore[arg-type]
-
+            
+        if self.end_of_phase:
+            self.phase_epoch = 0
 
     def _should_run_probe(self, probe: FrEvalProbeConfig, phase_epoch: int) -> bool:
         
         # need for the fr_target or fr_curve at each end_of_phase
         if (probe.every_epochs == "end_of_phase" and probe.name!="fr_phase"): return bool(self.end_of_phase)
-        
         # need for fr_phase at probe.every_epochs
         return (phase_epoch % int(probe.every_epochs) == 0)
 
@@ -193,15 +192,10 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         # timesteps => max horizon 
         trained_model = cast(keras.Model, self.model)
         if isinstance(self.model, StepWiseLstmModel):
-            return StepWiseLstmAdapter(trained_model, verbose=self.verbose)
+            return StepWiseLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
         elif isinstance(self.model, StepWiseTrnModel):
-            return StepWiseTrnAdapter(trained_model, verbose=self.verbose)
+            return StepWiseTrnAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
         elif isinstance(self.model, FullSeqLstmModel):
-            return FullSeqLstmAdapter(trained_model, 
-                                            verbose = self.verbose,
-                                            start_mode = self.start_mode,
-                                            inference_mode = self.inference_mode,
-                                            out_steps = outsteps 
-            )
+            return FullSeqLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
         else:
             raise ValueError("Unsupported model type")

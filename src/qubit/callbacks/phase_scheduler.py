@@ -69,9 +69,16 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             m.rt.noise_replace.assign(cast(MaskedModelingPhase, phase).noise_replace)
 
         if pid == 2:  # Scheduled Sampling 
+            ratio_mode_to_id = {RatioMode.LINEAR.value: 0, RatioMode.COSINE.value: 1, RatioMode.SIGMOID.value: 2, RatioMode.POWER.value: 3}[cast(ScheduledSamplingPhase, phase).ratio_mode]
+
             m.rt.tf_ratio_start.assign(cast(ScheduledSamplingPhase, phase).tf_ratio_start)
             m.rt.tf_ratio_end.assign(cast(ScheduledSamplingPhase, phase).tf_ratio_end)
             m.rt.per_feature.assign(cast(ScheduledSamplingPhase, phase).per_feature)
+            m.rt.stop_grad_pred.assign(cast(ScheduledSamplingPhase, phase).stop_grad_pred)
+            m.rt.ratio_mode.assign(ratio_mode_to_id)
+            m.rt.mid_point.assign(cast(ScheduledSamplingPhase, phase).mid_point)
+            m.rt.sharpness.assign(cast(ScheduledSamplingPhase, phase).sharpness)
+            m.rt.power_value.assign(cast(ScheduledSamplingPhase, phase).power_value)
         
         if pid == 3:  # FullAutoregressive
             m.rt.gradient_through_time.assign(cast(FullAutoregressivePhase, phase).gradient_through_time)

@@ -1,16 +1,16 @@
 data:
   dataset:
     csv_path: data/trajectories.csv
-    total_qubits: 10
+    total_qubits: 10 # fixed values 
     used_qubits: 8
-    time_steps: 1001
-    n_traj: 400
-    traj_fraction: 0.1
+    time_steps: 1001 # fixed 
+    n_traj: 400 # fixed 
+    traj_fraction: 0.025
 
   windowing:
-    input_seq_len: 200
-    output_seq_len: 10
-    stride: 50   
+    input_seq_len: 400
+    output_seq_len: 50
+    stride: 20
 
   split:
     seed: 42
@@ -18,7 +18,7 @@ data:
     test_ratio: 0.15
 
 model:
-  name: "prova"
+  name: "prova1"
   save_model: true
   type: "TRN"
   variant: "SEQ2SEQ"
@@ -30,7 +30,6 @@ model:
     ff_dim: 512
     num_layers: 2
     dropout: 0.1
-    max_len: 512
 
   compile:
     optimizer: "adam"
@@ -41,65 +40,70 @@ model:
     clip_norm: 1.0
 
   inference:
-    mode : "free_running"   # "teacher_forcing" | "free_running"
+    mode: "free_running"   # "teacher_forcing" | "free_running"
     start_mode: "last_x"    # "zeros" | "last_x"
-    verbose : 0  # 0,1,2
+    verbose: 0  # 0,1,2
 
 training:
-  verbose : 1
-  batch_size: 8
-  curriculum: [-1,5] # [5,10,25,30,-1,50]   # number of elements = number of strategies if we dont use a specific temporal horizon  insert -1 
-  # remember the number of epoch for each temporal horizon is decided by the specific strategy
+  prediction_mode: "all" # all | horizon => all predice sempre su outpu_seq_len e calcola la loss facendo slide su :horizon 
+                          # horizon => predice solo fino :horizon 
+                          # ALL => PRO : stabilita di grafo e non tracing CONTRO : lentezza computazionale
+                          # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
+  verbose: 1
+  batch_size: 64
+  curriculum: [20,-1,30,-1,10,5]
   phases:
+    - name: masked_modeling
+      epochs: 5
+      mask_prob: 0.20
+      learning_rate: 0.0005
+      clip_norm: 0.7
+      mask_scope: time        # time | element | feature
+      mask_mode: constant         # zero | constant | noise
+      mask_value: 0.2         # solo se constant
+      noise_sigma: 0.1        # solo se noise
+      noise_replace: false # true: mask replacing the original value with noise
+                          # false: mask adding noise to the original value
+
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: true
+      learning_rate: 0.0003
+      clip_norm: 0.5
 
     - name: teacher_forcing
-      epochs: 5
-
+      epochs: 10 
+    
     - name: full_autoregressive
       epochs: 5
       gradient_through_time: false
       learning_rate: 0.0005
       clip_norm: 0.5
 
-    # - name: teacher_forcing
-    #   epochs: 10 
-
-    # - name: masked_modeling
-    #   epochs: 8
-    #   mask_prob: 0.20
-    #   learning_rate: 0.0005
-    #   clip_norm: 0.7
-    #   mask_scope: element     # time | element | feature
-    #   mask_mode: noise         # zero | constant | noise
-    #   #mask_value: 0.0         # solo se constant
-    #   noise_sigma: 0.2       # solo se noise
-
-    # - name: full_autoregressive
-    #   epochs: 5
-    #   gradient_through_time: true
-    #   learning_rate: 0.0003
-    #   clip_norm: 0.5
-
-
-    # - name: scheduled_sampling
-    #   epochs: 8
-    #   tf_ratio_start: 1.0
-    #   tf_ratio_end: 0.5
-    #   learning_rate: 0.0003
-    #   clip_norm: 0.5
-    #   # mode : lineare, esponenziale, inverse-sigmoid.
-    #   # per_feature : true , false  
-      
-    # - name: full_autoregressive
-    #   epochs: 5
-    #   gradient_through_time: true
-    #   learning_rate: 0.0001
-    #   clip_norm: 0.3
+    - name: scheduled_sampling
+      epochs: 8
+      tf_ratio_start: 1.0
+      tf_ratio_end: 0.5
+      learning_rate: 0.0003
+      clip_norm: 0.5
+      ratio_mode: sigmoid  # linear , cosine , sigmoid, power 
+      mid_point: 0.6  # only for sigmoid 
+      sharpness: 10.0 # only for sigmoid
+      power_value: 2.0 # only per power 
+      per_feature: true # true , false # if per_feature = false so per_timestep= True
+      stop_grad_pred: true # true, false
+    
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: true
+      learning_rate: 0.0001
+      clip_norm: 0.3
 
   # free-running evaluation
   fr_eval:
     enabled: true
     split: val   # val || test 
+    batch_size: 32
     
     # p_eval => percentuage of the (val or test) split
     # out_steps can be 
@@ -118,11 +122,11 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [2, 6, 8, 10] 
+        out_steps: [2,4,6] 
         p_eval: 0.2
         every_epochs: end_of_phase
-  
+
 plot:
   sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
   save_plots: true
-  save_artifacts : true
+  save_artifacts: true

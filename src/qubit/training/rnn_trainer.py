@@ -11,9 +11,10 @@ class RNNTrainer(BaseTrainer):
     
     def _create_inference_adapter(self, outsteps: int):
         if isinstance(self.model, StepWiseLstmModel):
-            return StepWiseLstmAdapter(self.model, verbose=self.model_cfg.inference.verbose)
+            return StepWiseLstmAdapter(self.model,
+                                  out_steps=outsteps,
+                                  inference_mode=self.model_cfg.inference.mode)
+        
         return FullSeqLstmAdapter(self.model,
                                   out_steps=outsteps,
-                                  verbose=self.model_cfg.inference.verbose,
-                                  inference_mode=self.model_cfg.inference.mode,
-                                  start_mode=self.model_cfg.inference.start_mode)
+                                  inference_mode=self.model_cfg.inference.mode)

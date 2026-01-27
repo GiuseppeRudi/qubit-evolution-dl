@@ -18,11 +18,9 @@ class StrategyChooserModel(keras.Model, abc.ABC):
                 y_true_t: tf.Tensor,  # y_true_t.shape(batch_size,1,feature_dim)
                 y_pred_t: tf.Tensor) -> tf.Tensor: # y_true_t.shape(batch_size,1,feature_dim)
 
-
         # index of strategy 
         phase_index = tf.convert_to_tensor(self.rt.phase_id)
-
-        print("TRACING apply_strategy_step_wise")
+        
         def teacher_forcing():
             return teacher_forcing_step_wise(y_true_t = y_true_t)
         
@@ -45,8 +43,12 @@ class StrategyChooserModel(keras.Model, abc.ABC):
                 total_epochs=tf.convert_to_tensor(self.rt.phase_epochs, dtype=tf.int32),
                 tf_ratio_start=tf.convert_to_tensor(self.rt.tf_ratio_start, dtype=tf.float32),
                 tf_ratio_end=tf.convert_to_tensor(self.rt.tf_ratio_end, dtype=tf.float32),
-                scope_id=tf.convert_to_tensor(self.rt.per_feature, dtype=tf.int32),
-                stop_grad_pred=True,
+                per_feature=tf.convert_to_tensor(self.rt.per_feature, dtype=tf.int32),
+                stop_grad_pred=tf.convert_to_tensor(self.rt.stop_grad_pred, dtype=tf.bool),
+                ratio_mode_id=tf.convert_to_tensor(self.rt.ratio_mode, dtype=tf.int32),
+                mid_point=tf.convert_to_tensor(self.rt.mid_point, dtype=tf.float32),
+                sharpness=tf.convert_to_tensor(self.rt.sharpness, dtype=tf.float32),
+                power_value=tf.convert_to_tensor(self.rt.power_value, dtype=tf.float32),
             )
 
         def full_autoregressive():

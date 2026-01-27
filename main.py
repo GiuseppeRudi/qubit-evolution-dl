@@ -90,28 +90,6 @@ if __name__ == "__main__":
 #     sigma_start: 0.0
 #     sigma_end: 0.5  # ← Simula errori di magnitudine ~0.5
 
-# TODO fix the free running eval indexes
-
 # TODO try the different parameters changing the yaml
 
 
-# TODO resolve the error occurs in adapter i thing we should remove the
-# adapter wrapping keras.model becuase we already use the model took as parameter
-
-# RUNTIME teacher_forcing_step_wise
-# 6/6 ━━━━━━━━━━━━━━━━━━━━ 0s 1s/step - mae: 0.5964 - loss: 0.5580Traceback (most recent call last):
-#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 79, in <module>
-#     main()
-#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 61, in main
-#     history = trainer.fit(splits)
-#               ^^^^^^^^^^^^^^^^^^^
-#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/base_trainer.py", line 51, in fit
-#     history = self.model.fit(
-#               ^^^^^^^^^^^^^^^
-#   File "/home/giu20/miniconda3/envs/qubit/lib/python3.12/site-packages/keras/src/utils/traceback_utils.py", line 122, in error_handler
-#     raise e.with_traceback(filtered_tb) from None
-#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/callbacks/free_running_eval.py", line 135, in on_epoch_end
-#     Y_pred_max = self.inference_adapter.predict(X_reduced, batch_size=self.batch_size)
-#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# AttributeError: 'StepWiseLstmAdapter' object has no attribute '_distribute_strategy'. Did you mean: 'distribute_strategy'?
-# (qubit) giu20@RudiPC:~/projects/qubit-evolution-dl$ 

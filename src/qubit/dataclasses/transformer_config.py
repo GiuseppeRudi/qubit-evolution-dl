@@ -7,4 +7,3 @@ class TransformerConfig:
     ff_dim: int
     num_layers: int
     dropout: float
-    max_len: int

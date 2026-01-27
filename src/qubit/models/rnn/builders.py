@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional, cast
 import keras
 
-# to convert thre predcition enum into an integer index for graph mode 
+# to convert thre predictions enum into an integer index for graph mode 
 prediction_mode_id = {
     PredictionMode.ALL.value: 0,
     PredictionMode.HORIZON.value: 1,

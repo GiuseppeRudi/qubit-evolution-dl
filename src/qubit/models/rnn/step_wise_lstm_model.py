@@ -40,7 +40,7 @@ class StepWiseLstmModel(StrategyChooserModel):
 
     # this function is useful to create for each layers the dimension of the weights accordly 
     # from the last dimension => feature_dim 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape):
         
         # input_shape: (batch_size, input_seq_len, feature_dim)
         # input shape as parameter is needed to respect the build in function
@@ -50,7 +50,7 @@ class StepWiseLstmModel(StrategyChooserModel):
         
         # input => (batch_size, input_seq_len, feature_dim)
         # output => (batch_size, t_in, latent_dim)
-        self.enc_lstm_1.build((None, None, self.feature_dim))
+        self.enc_lstm_1.build(input_shape)
 
         # since enc_lstm_2 takes in input the sequence of enc_lstm1 so the 3rd dimension is latent_dim
         # input => (batch_size, t_in, latent_dim)
@@ -74,56 +74,6 @@ class StepWiseLstmModel(StrategyChooserModel):
 
         super().build(input_shape)
 
-    # called when we perform predict in fr_running_callback and we predict always up to output_seq_len
-    def call(self, X: tf.Tensor) -> tf.Tensor:
-        tf.print("call")
-        tf.print(X.shape)
-
-        # X.shape(batch_size, input_seq_len, feature_dim)
-        X = tf.ensure_shape(X, [None, None, self.feature_dim])
-
-        T_out = tf.convert_to_tensor(self.rt.t_out)
-
-        ta = tf.TensorArray(dtype=X.dtype, 
-                             size=T_out, 
-                             element_shape=tf.TensorShape([None, self.feature_dim]))
-        tf.print(ta.shape)
-        # ta.shape(T_out , batch_size, feature_dim)
-        
-        t0 = tf.constant(0, tf.int32)
-
-        state = self._encode(X)
-        # LSTM2LayerTFState(h1,c1,h2,c2) .shape(batch_size,latent_dim)
-        # state are the hidden states and cell states of the two encoder layers 
-
-        # inititialize to zeros or last_x based on the start_mode parameter
-        # dec_t.shape(batch_size, 1, feature_dim) where t = 0 
-        dec_t = self._init_dec0(X)
-
-        def cond(t, dec_t, state, ta):
-            return t < T_out
-
-        def body(t, dec_t, state, ta):
-            
-            y_pred_t, state = self._decode_step(dec_t, state)  
-            # y_pred_t.shape(batch_size, 1, feature_dim)
-            y_pred_t_2d = tf.squeeze(y_pred_t, axis=1)
-            # y_pred_t_nd.shape(batch_size, feature_dim)
-
-            ta = ta.write(t, y_pred_t_2d)
-            # ta.shape(index = t, element.shape(batch_size, feature_dim))
-
-            # free-running: next input = prediction
-            dec_t = y_pred_t
-            return t + 1, dec_t, state, ta
-
-        _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
-        
-        # (num_elements = T_out , batch_size , feature_dim) => (batch_size, T_out, feature_dim) 
-        Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
-        
-        # Y_pred.shape(batch_size,T_out = output_seq_len , feature_dim) 
-        return Y_pred
 
     def _encode(self, X: tf.Tensor) -> LSTM2LayerTFState:
         x_seq, h1, c1 = self.enc_lstm_1(X)   
@@ -238,9 +188,8 @@ class StepWiseLstmModel(StrategyChooserModel):
             _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
 
             # tf.print(ta.stack())
-            # stack: (T, N, D) -> transpose: (N, T, D)
+            # stack: (element_size = outsteps, batch_size, feature_dim) -> transpose: (batch_size, outsteps, feature_dim)
             Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
-            Y_pred = tf.slice(Y_pred, [0, 0, 0], [-1, T_hor, -1])
 
             # Y_true: (N, T_eff, D)
             Y_true = tf.slice(Y, [0, 0, 0], [-1, T_hor, -1])
@@ -250,9 +199,7 @@ class StepWiseLstmModel(StrategyChooserModel):
                 lambda: tf.slice(Y_pred, [0, 0, 0], [-1, T_hor, -1]),
                 lambda: Y_pred,
             )
-            tf.print(Y_pred)
-            tf.print(Y_true)
-
+        
             loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
                 
         # calculate gradients (backward pass)
@@ -277,47 +224,99 @@ class StepWiseLstmModel(StrategyChooserModel):
         return {m.name: m.result() for m in self.metrics}
 
     def test_step(self, data):
+        # at the end of each epoch we evaluate the metrics with the validation splits
+
         X, Y = data
+
+        # X_val => X.shape => (batch_size, input_seq_len, feature_dim )
+        # Y_val => Y.shape => (batch_size, output_seq_len, feature_dim )
 
         X = tf.ensure_shape(X, [None, None, self.feature_dim])
         Y = tf.ensure_shape(Y, [None, None, self.feature_dim])
 
-        T_out = tf.cast(self.rt.t_out, tf.int32)
+        # ! dec_in is always the ground truth => teacher forcing + dec0
+        # ! Y_pred second dimension is always => horizon => coerent with train_step
+       
 
+        prediction_mode_id = tf.convert_to_tensor(self.rt.prediction_mode_id)  # 0 => ALL | 1 => HORIZON
+        T_out = tf.convert_to_tensor(self.rt.t_out)
+        T_hor = tf.convert_to_tensor(self.rt.horizon)
+        
+        # IF  PREDICTION_MODE == ALL  (index 0) while condition is t < T_out
+        # IF  PREDICTION_MODE == HOR  (index 1) while condition is t < T_hor
+        T = tf.cond(
+            tf.equal(prediction_mode_id, 0),
+            lambda: T_out,
+            lambda: T_hor,
+        )
+
+        # return the internal states from encoder
         state = self._encode(X)
+
+        # inititialize to zeros or last_x based on the start_mode parameter
         dec_t = self._init_dec0(X)
+        
 
         ta = tf.TensorArray(
-            dtype=Y.dtype, size=T_out,  
+            dtype=Y.dtype, size=T,  
             element_shape=tf.TensorShape([None, self.feature_dim]),
         )
+        # ta.shape(element_size = T , element_shape= (batch_size, feature_dim))
         
         t0 = tf.constant(0, dtype=tf.int32)
 
         def cond(t, dec_t, state, ta):
-            return t < T_out
+            return t < T
 
         def body(t, dec_t, state, ta):
-            y_t, state = self._decode_step(dec_t, state)
-            y_t_nd = tf.squeeze(y_t, axis=1)
-            ta = ta.write(t, y_t_nd)
 
+            # dec_t.shape(batch_size, 1 , feature_dim)
+            # dec_t if t = 0 is the last_x or zeros according to startMode
+            # if t > 0 dec_t is the previous ground truth 
+            
+            # state contain h* and c* with shape(batch_size, latent_dim)
+            
+            y_pred_t, state = self._decode_step(dec_t, state)
+            # y_pred_t.shape(batch_size, 1, feature_dim)
+
+            # (batch_size, 1, feature_dim) => (batch_size, feature_dim)
+            y_pred_t_2d = tf.squeeze(y_pred_t, axis=1)
+
+            # at the index t we write y_pred_t_2d.shape(batch_size, feature_dim)
+            ta = ta.write(t, y_pred_t_2d)
+
+            # Y.shape(batch_size, output_seq_len, feature_dim)
             y_true = tf.gather(Y, t, axis=1)
+            # y_true at the index t we take (batch_size, feature_dim)
+            
             y_true_t = tf.expand_dims(y_true, axis=1)
-
+            # y_true_t.shape(batch_size, 1 , feature_dim)
+        
             return t + 1, y_true_t, state, ta
 
         _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
 
 
+        # ta.shape(element_size = T , element_shape= (batch_size, feature_dim))
+        
+        # (T, batch_size, feature_dim) => Y_pred.shape(batch_size, T, feature_dim)
+        # if Prediction_mode = ALL => T = T_out
+        # if Prediction_mode = HORIZON => T = T_hor
+
         Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
-        Y_true = tf.slice(Y, [0, 0, 0], [-1, T_out, -1])  # stesso slicing del train!
 
-        tf.print(Y_pred)
-        tf.print(Y_true)
+        # Y_true: (batch_size, output_seq_len, feature_dim) => Y_true: (batch_size, T_hor, feature_dim)
+        Y_true = tf.slice(Y, [0, 0, 0], [-1, T_hor, -1])
 
+        # if Prediction_mode = ALL => T = T_out
+        # Y_pred.shape(batch_size, T_out, feature_dim) => Y_pred.shape(batch_size, T_hor, feature_dim)
+        Y_pred = tf.cond(
+            tf.equal(prediction_mode_id, 0),
+            lambda: tf.slice(Y_pred, [0, 0, 0], [-1, T_hor, -1]),
+            lambda: Y_pred,
+        )
+        
         val_loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
-
         self.loss_tracker.update_state(val_loss)
 
         self.compute_metrics(x=X, y=Y_true, y_pred=Y_pred)

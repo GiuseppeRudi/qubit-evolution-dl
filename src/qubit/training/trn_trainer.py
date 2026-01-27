@@ -8,7 +8,9 @@ from ..enums.model_type import ModelType
 
 @register_trainer(ModelType.TRN)
 class TransformerTrainer(BaseTrainer):    
-    def _create_inference_adapter(self):
+    def _create_inference_adapter(self, outsteps: int):
         #if isinstance(self.model, Seq2SeqTransformerStepWiseModel):
-            return StepWiseTrnAdapter(self.model, verbose=self.model_cfg.inference.verbose)
+            return StepWiseTrnAdapter(self.model,
+                                  out_steps=outsteps,
+                                  inference_mode=self.model_cfg.inference.mode)
         #return Seq2SeqLSTM2LayerAdapter(self.model, verbose=self.model_cfg.inference.verbose)

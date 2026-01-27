@@ -2,10 +2,12 @@ from ..dataclasses.model_config import ModelConfig
 from ..dataclasses.phase_config import MaskedModelingPhase
 from ..dataclasses.training_config import TrainingConfig
 from ..dataclasses.data_config import DataConfig
+from ..dataclasses.phase_config import ScheduledSamplingPhase
 
 from ..enums.decoder_mode import DecoderMode
 from ..enums.mask_mode import MaskMode
 from ..enums.phase_name import PhaseName
+from ..enums.ratio_mode import RatioMode
 
 def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
 
@@ -27,8 +29,14 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
     
     for p in training_cfg.phases:
         if p.name == PhaseName.MASKED_MODELING:
-            if p.mask_prob <=0 or p.mask_prob >=1:
+            if p.mask_prob <= 0 or p.mask_prob >= 1:
                 raise ValueError("Can't set as mask_prob a number less or equal than 0 or greater or equal than 1")
+        if p.name == PhaseName.SCHEDULED_SAMPLING:
+            if p.tf_ratio_end < 0 or p.tf_ratio_end > 1:
+                raise ValueError("Can't set as tf_ratio_end a number less than 0 or greater than 1")
+            
+            if p.tf_ratio_start < 0 or p.tf_ratio_start > 1:
+                raise ValueError("Can't set as tf_ratio_start a number less than 0 or greater than 1")
     
     fr_curve_probe = next(p for p in training_cfg.fr_eval.probes if p.name == "fr_curve")
     for h in fr_curve_probe.out_steps:
@@ -58,3 +66,34 @@ def validate_masked_modeling_phase(p: MaskedModelingPhase) -> None:
         if p.noise_sigma is None:
             raise ValueError("MaskedModelingPhase: mask_mode=NOISE need noise_sigma.")
         
+def validate_scheduled_sampling_phase(s: ScheduledSamplingPhase) -> None:
+
+    if s.ratio_mode == RatioMode.SIGMOID:
+        if s.mid_point is None:
+            raise ValueError("ScheduledSamplingPhase: ratio_mode=SIGMOID needs mid_point.")
+        if s.sharpness is None:
+            raise ValueError("ScheduledSamplingPhase: ratio_mode=SIGMOID needs sharpness.")
+
+        mid = float(s.mid_point)
+        shp = float(s.sharpness)
+
+        # range checks
+        if not (0.0 < mid < 1.0):
+            raise ValueError("ScheduledSamplingPhase: mid_point must be in (0,1).")
+        if shp <= 0.0:
+            raise ValueError("ScheduledSamplingPhase: sharpness must be > 0.")
+        
+        if shp > 100.0:
+            raise ValueError("ScheduledSamplingPhase: sharpness is too large (>100).")
+
+    elif s.ratio_mode == RatioMode.POWER:
+        if s.power_value is None:
+            raise ValueError("ScheduledSamplingPhase: ratio_mode=POWER needs power_value.")
+
+        p = float(s.power_value)
+
+        if  p <= 0.0:
+            raise ValueError("ScheduledSamplingPhase: power_value must be > 0.")
+        
+        if p > 50.0:
+            raise ValueError("ScheduledSamplingPhase: power_value is too large (>50).")

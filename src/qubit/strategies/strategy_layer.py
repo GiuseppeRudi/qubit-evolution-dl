@@ -79,6 +79,36 @@ class StrategyLayer(layers.Layer):
             trainable=False
         )
 
+        self.stop_grad_pred = self.add_weight(
+            name="stop_grad_pred", shape=(), dtype=tf.bool,
+            initializer="zeros",
+            trainable=False
+        )
+
+        self.ratio_mode = self.add_weight(
+            name="ratio_mode", shape=(), dtype=tf.int32,
+            initializer=tf.keras.initializers.Constant(0),
+            trainable=False
+        )
+
+        self.mid_point = self.add_weight(
+            name="mid_point", shape=(), dtype=tf.float32,
+            initializer=tf.keras.initializers.Constant(0.0),
+            trainable=False
+        )
+
+        self.sharpness = self.add_weight(
+            name="sharpness", shape=(), dtype=tf.float32,
+            initializer=tf.keras.initializers.Constant(0.0),
+            trainable=False
+        )
+
+        self.power_value = self.add_weight(
+            name="power_value", shape=(), dtype=tf.float32,
+            initializer=tf.keras.initializers.Constant(0.0),
+            trainable=False
+        )
+
         #######################################################
         # Masked Modeling
 

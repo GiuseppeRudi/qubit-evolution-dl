@@ -15,14 +15,13 @@ class TransformerStepWiseNPState:
 
 
 class StepWiseTrnAdapter(BaseAutoregressiveAdapter):
-    def __init__(self, model, *, verbose: VerboseMode):
+    def __init__(self, model, *, out_steps, inference_mode):
+        super().__init__(out_steps=out_steps, inference_mode=inference_mode, name="stepwise_adapter")
         self.model = model
-        self.verbose = verbose
 
-    @property
-    def feature_dim(self) -> int:
-        return int(self.model.feature_dim)
-
+    def _init_dec0(self, X: tf.Tensor) -> tf.Tensor:
+        return tf.constant(0)
+    
     def encode(self, X: np.ndarray, *, batch_size: int) -> TransformerStepWiseNPState:
         Xtf = tf.convert_to_tensor(X, dtype=tf.float32)
 

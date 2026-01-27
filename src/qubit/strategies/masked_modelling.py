@@ -137,7 +137,7 @@ def masked_modeling_step_wise(
     noise_sigma: tf.Tensor,
     noise_replace : tf.Tensor,
 ) -> tf.Tensor:
-    tf.print("\nRUNTIME masked_modeling_step_wise")
+    # tf.print("\nRUNTIME masked_modeling_step_wise")
 
     # ! REMEMBER the masking modeling use always the groun truth for the input 
 
