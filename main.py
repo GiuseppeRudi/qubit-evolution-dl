@@ -1,12 +1,13 @@
 import keras
+from src.qubit.enums.model_type import ModelType
 from src.qubit.core.data import prepare_dataset
 from src.qubit.utils.utils import get_device, parse_args, start_log
 from src.qubit.utils.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config
 from src.qubit.utils.registry import get_builder,get_trainer
 import src.qubit.utils.config_keys as cfg_keys
 
-from src.qubit.core.save import save_outputs, make_run_output_dir
-from src.qubit.utils.error import check_correctness
+from src.qubit.core.save import save_outputs
+from src.qubit.utils.error import check_lstm_correctness, check_trn_correctness
 
 # needed to register the models and trainers
 import src.qubit.models.rnn.builders  
@@ -29,7 +30,10 @@ def main():
     training_cfg = load_training_config(run_cfg[cfg_keys.TRAINING])
     plot_cfg = load_plot_config(run_cfg[cfg_keys.PLOT])
 
-    check_correctness(model_cfg,training_cfg,data_cfg)
+    if model_cfg.type == ModelType.LSTM:
+        check_lstm_correctness(model_cfg,training_cfg,data_cfg)
+    else:
+        check_trn_correctness(model_cfg,training_cfg,data_cfg)
 
     splits, feat_names = prepare_dataset(data_cfg)
 
@@ -93,3 +97,4 @@ if __name__ == "__main__":
 # TODO try the different parameters changing the yaml
 
 
+# TODO check in all model if the flag training is correctly used 

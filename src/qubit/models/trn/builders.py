@@ -42,8 +42,8 @@ def build_transformer_step_wise_model(
     
     model = StepWiseTrnModel(
         feature_dim = feature_dim,
-        d_model = trn_cfg.d_model,
-        n_heads = trn_cfg.num_heads,
+        dim_model = trn_cfg.dim_model,
+        num_heads = trn_cfg.num_heads,
         ff_dim = trn_cfg.ff_dim,
         num_layers = trn_cfg.num_layers,
         dropout = trn_cfg.dropout,

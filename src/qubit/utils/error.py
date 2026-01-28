@@ -1,3 +1,4 @@
+from ..dataclasses.transformer_config import TransformerConfig
 from ..dataclasses.model_config import ModelConfig
 from ..dataclasses.phase_config import MaskedModelingPhase
 from ..dataclasses.training_config import TrainingConfig
@@ -9,7 +10,9 @@ from ..enums.mask_mode import MaskMode
 from ..enums.phase_name import PhaseName
 from ..enums.ratio_mode import RatioMode
 
-def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
+from typing import cast
+
+def check_lstm_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
 
     if data_cfg.dataset.traj_fraction > 1 or data_cfg.dataset.traj_fraction <= 0:
         raise ValueError("Can't set the traj_fraction greater than 1 or less equal than 0")
@@ -56,6 +59,10 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
         if fr.p_eval <= 0 or fr.p_eval > 1:
             raise ValueError("p_eval must be in (0,1].")
 
+def check_trn_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
+    params = cast(TransformerConfig,model_cfg.params)
+    if params.dim_model % params.num_heads != 0:
+        raise ValueError(f"d_model ({params.dim_model}) must be divisible by num_heads ({params.num_heads})")
 
 def validate_masked_modeling_phase(p: MaskedModelingPhase) -> None:
     if p.mask_mode == MaskMode.CONSTANT:

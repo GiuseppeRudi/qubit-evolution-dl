@@ -9,8 +9,8 @@ from keras import layers
 
 from ...enums.start_mode import StartMode
 
-from .decoder import DecoderTRN
-from .encoder import EncoderTRN
+from .decoder import DecoderTRNBlock
+from .encoder import EncoderTRNBlock
 
 from ..strategy_chooser import StrategyChooserModel
 
@@ -21,8 +21,8 @@ class StepWiseTrnModel(StrategyChooserModel):
         self,
         *,
         feature_dim: int,
-        d_model: int,
-        n_heads: int,
+        dim_model: int,
+        num_heads: int,
         ff_dim: int,
         num_layers: int,
         dropout: float,
@@ -33,18 +33,19 @@ class StepWiseTrnModel(StrategyChooserModel):
     ):
         super().__init__(t_out=t_out,prediction_mode_id=prediction_mode_id)
         self.feature_dim = feature_dim
-        self.d_model = d_model # internal dimension of vector  
-        self.n_heads = n_heads
+        self.dim_model = dim_model # internal dimension of vector  
+        self.num_heads = num_heads
         self.ff_dim = ff_dim
         self.num_layers = num_layers
         self.dropout = dropout
         self.start_mode = start_mode
+        self.t_in = t_in
         
-        # Projections (continuous features -> d_model)
+        # Projections (continuous features -> dim_model)
         # needed because the internal rappresentations of transformer
-        # work with d_model as third dimension and not feature_dim
-        self.enc_in = layers.Dense(d_model, name = ENC_IN_PROJ)
-        self.dec_in = layers.Dense(d_model, name = DEC_IN_PROJ)
+        # work with dim_model as third dimension and not feature_dim
+        self.enc_in = layers.Dense(dim_model, name = ENC_IN_PROJ)
+        self.dec_in = layers.Dense(dim_model, name = DEC_IN_PROJ)
 
         # Positional embeddings 
         # The transformer architecture doesn't know the order of sequence in input
@@ -53,49 +54,45 @@ class StepWiseTrnModel(StrategyChooserModel):
         # where there are input_dim vectors, each with size output_dim that contain the trainable weights
 
         # enc_pos 
-        # input  => pos.shape(input_seq_len) => list of index from 0 to input_seq_len - 1
-        # output => (input_seq_len, d_model)
-        self.enc_pos = layers.Embedding(input_dim = t_in, output_dim = d_model, name = ENC_POS_EMB)
+        # input  => pos_idx.shape(input_seq_len,) => list of index from 0 to input_seq_len - 1
+        # output => pos_emb.shape(input_seq_len, dim_model) => pos_emb[tf.newaxis, : ,: ].shape(1, input_seq_len, dim_model)
+        self.enc_pos = layers.Embedding(input_dim = t_in, output_dim = dim_model, name = ENC_POS_EMB)
         
         # dec_pos 
-        # input  => pos.shape(input_seq_len) => list of index from 0 to input_seq_len - 1
-        # output => (input_seq_len, d_model)
-        self.dec_pos = layers.Embedding(input_dim = t_in, output_dim = d_model, name = DEC_POS_EMB)
+        # input  => pos_idx.shape(output_seq_len) => list of index from 0 to output_seq_len - 1
+        # output => pos_emb.shape(output_seq_len, dim_model) => pos_emb[tf.newaxis, : ,: ].shape(1, output_seq_len, dim_model)
+        self.dec_pos = layers.Embedding(input_dim = t_out, output_dim = dim_model, name = DEC_POS_EMB)
 
+        # dropout layer needed to reduce the overfitting and increase the generalizations 
+        # putting some values of the tensor given in input to zero with a dropout ratio
+        # To activate it takes in input the flag training = true
+
+        # dropout layer don't change the shape so the input.shape == output.shape
         self.enc_drop = layers.Dropout(dropout, name = ENC_IN_DROP)
         self.dec_drop = layers.Dropout(dropout, name = DEC_IN_DROP)
 
+        # unlike the LSTM model where we use directly the layers.LSTM 
+        # in the transformer architecture we don't have a unique layer
+        # but we work with Block (encoder or decoder) that is used inside multi layers to create
+        # a structure using (self.attn + ffn) with layerNorm + residuals + dropout 
         self.enc_blocks = [
-            EncoderTRN(d_model = d_model, n_heads = n_heads, ff_dim = ff_dim, dropout = dropout, name = f"{ENC_BLOCK_}{i}")
+            EncoderTRNBlock(dim_model = dim_model, num_heads = num_heads, ff_dim = ff_dim, dropout = dropout, name = f"{ENC_BLOCK_}{i}")
             for i in range(num_layers)
         ]
 
         self.dec_blocks = [
-            DecoderTRN(d_model = d_model, n_heads = n_heads, ff_dim = ff_dim, dropout = dropout, name = f"{DEC_BLOCK_}{i}")
+            DecoderTRNBlock(dim_model = dim_model, num_heads = num_heads, ff_dim = ff_dim, dropout = dropout, name = f"{DEC_BLOCK_}{i}")
             for i in range(num_layers)
         ]
 
+        # input => (batch_size, T, d_model)
+        # output => (batch_size, T, feature_dim)
         self.out_dense = layers.Dense(feature_dim, name = OUT_DENSE)
-        print(self.enc_in)
-        print(self.dec_in)
-        print(self.enc_pos)
-        print(self.dec_pos)
-        print(self.enc_drop)
-        print(self.dec_drop)
-        print(self.enc_blocks)
-        print(self.dec_blocks)
-        print(self.out_dense)
-
-        # Runtime strategy (per compatibilità col tuo Trainer attuale)
-        # self._strategy: Optional[TrainingStrategy] = None
-
-        # Epoch context as TF vars (evita retracing in graph)
+        
         self.ctx_epoch = tf.Variable(tf.constant(0, dtype=tf.int32), trainable=False)
         self.ctx_total_epochs = tf.Variable(tf.constant(1, dtype=tf.int32), trainable=False)
         self.ctx_horizon = tf.Variable(tf.constant(0, dtype=tf.int32), trainable=False)
 
-        
-        # Manual metric(s)
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
 
     def build(self, input_shape: tf.TensorShape):
@@ -104,14 +101,35 @@ class StepWiseTrnModel(StrategyChooserModel):
         
         # self.enc_in => layers.Dense 
         # input => X.shape(batch_size, input_seq_len,feature_dim)
-        # output => (batch_size, input_seq_len, d_model)
+        # output => (batch_size, input_seq_len, dim_model)
         self.enc_in.build(input_shape)
 
-        # self.dec_in => layers.Dense 
-        # input => dec_in.shape(batch_size, 1,feature_dim)
-        # output => (batch_size, 1, d_model)
-        self.dec_in.build((None, 1, self.feature_dim))
-        self.out_dense.build((None, 1, self.d_model))
+        # self.dec_in => layers.Dense
+        # input  => dec_in.shape (batch_size, T, feature_dim)
+        # output =>            (batch_size, T, dim_model)
+        # where:
+        # - FULL_SEQ:  T = output_seq_len (t_out)
+        # - STEP_WISE (prefix growing): T starts from 1 and increases each step (1, 2, 3, ..., t_out)
+        #   because we decode the whole prefix at every iteration and take the last timestep as current prediction.
+        self.dec_in.build((None, None, self.feature_dim))
+
+        # self.out_dense => layers.Dense 
+        # input => y_pred.shape(batch_size, T,dim_model)
+        # output => (batch_size, T, feature_dim)
+        # if train_dec_mode_id == 0 (FULL_SEQ) where T = output_seq_len
+        # if train_dec_mode_id == 1 (STEP_WISE) where T = 1
+        self.out_dense.build((None, None, self.dim_model))
+
+        tf.print("enc_in output_shape:", self.enc_in.compute_output_shape(input_shape))
+        tf.print("dec_in output_shape:", self.dec_in.compute_output_shape((None, None, self.feature_dim)))
+        tf.print("out_dense output_shape:", self.out_dense.compute_output_shape((None, None, self.dim_model)))
+
+        tf.print(self.enc_pos)
+        tf.print(self.dec_pos)
+        tf.print(self.enc_drop)
+        tf.print(self.dec_drop)
+        tf.print(self.enc_blocks)
+        tf.print(self.dec_blocks)
 
         super().build(input_shape)
 
@@ -123,13 +141,13 @@ class StepWiseTrnModel(StrategyChooserModel):
         return mask[tf.newaxis, :, :]  # (1,L,L), broadcast over batch :contentReference[oaicite:1]{index=1}
 
     def _encode(self, X: tf.Tensor, *, training: bool) -> tf.Tensor:
-        # X: (B,Tin,D) -> memory: (B,Tin,d_model)
+        # X: (B,Tin,D) -> memory: (B,Tin,dim_model)
         B = tf.shape(X)[0]
         Tin = tf.shape(X)[1]
 
         x = self.enc_in(X)
         pos = tf.range(Tin, dtype=tf.int32)
-        pos_emb = self.enc_pos(pos)[tf.newaxis, :, :]  # (1,Tin,d_model)
+        pos_emb = self.enc_pos(pos)[tf.newaxis, :, :]  # (1,Tin,dim_model)
         x = x + pos_emb
         x = self.enc_drop(x, training=training)
 
@@ -137,7 +155,7 @@ class StepWiseTrnModel(StrategyChooserModel):
             x = blk(x, training=training)
 
         # memory
-        x = tf.ensure_shape(x, [None, None, self.d_model])
+        x = tf.ensure_shape(x, [None, None, self.dim_model])
         return x
 
     def _init_dec0(self, X: tf.Tensor) -> tf.Tensor:
@@ -155,9 +173,9 @@ class StepWiseTrnModel(StrategyChooserModel):
         # dec_prefix: (B,L,D) -> y_seq: (B,L,D)
         L = tf.shape(dec_prefix)[1]
 
-        y = self.dec_in(dec_prefix)  # (B,L,d_model)
+        y = self.dec_in(dec_prefix)  # (B,L,dim_model)
         pos = tf.range(L, dtype=tf.int32)
-        pos_emb = self.dec_pos(pos)[tf.newaxis, :, :]  # (1,L,d_model)
+        pos_emb = self.dec_pos(pos)[tf.newaxis, :, :]  # (1,L,dim_model)
         y = y + pos_emb
         y = self.dec_drop(y, training=training)
 
@@ -175,17 +193,16 @@ class StepWiseTrnModel(StrategyChooserModel):
         # come nel LSTM: una metrica loss manuale
         return [self.loss_tracker]
 
-
     def train_step(self, data):
         X, Y = data  # X:(B,Tin,D), Y:(B,Tout,D)
         X = tf.ensure_shape(X, [None, None, self.feature_dim])
         Y = tf.ensure_shape(Y, [None, None, self.feature_dim])
 
-        T_out = tf.cast(self.rt.t_out, tf.int32)
+        T_out = tf.convert_to_tensor(self.rt.t_out)
 
         with tf.GradientTape() as tape:
-            memory = self._encode(X, training=True)      # (B,Tin,d_model)
-            dec_prefix = self._init_dec0(X)              # (B,1,D)
+            memory = self._encode(X, training=True) # (B,Tin,dim_model)
+            dec_prefix = self._init_dec0(X) # (B,1,D)
 
             ta = tf.TensorArray(
                 dtype=Y.dtype,
@@ -200,11 +217,11 @@ class StepWiseTrnModel(StrategyChooserModel):
 
             def body(t, dec_prefix, ta):
                 # decode full prefix -> prendi ultimo passo come pred corrente
-                y_seq = self._decode_prefix(dec_prefix, memory, training=True)  # (B,L,D)
-                y_t   = y_seq[:, -1:, :]                                       # (B,1,D)
-                ta = ta.write(t, tf.squeeze(y_t, axis=1))                      # (B,D)
+                y_seq = self._decode_prefix(dec_prefix, memory, training=True) # (B,L,D)
+                y_t   = y_seq[:, -1:, :] # (B,1,D)
+                ta = ta.write(t, tf.squeeze(y_t, axis=1)) # (B,D)
 
-                y_true_t = Y[:, t:t+1, :]                                      # (B,1,D)
+                y_true_t = Y[:, t:t+1, :] # (B,1,D)
 
                 # >>> QUI come LSTM: scegli next input via phase_id + switch_case
                 next_in = self.apply_strategy_step_wise(
