@@ -22,7 +22,7 @@ model:
   save_model: true
   type: "TRN"
   variant: "SEQ2SEQ"
-  decoder_mode: "STEP_WISE"  # "FULL_SEQ"  ,  "STEP_WISE" # "HYBRID"
+  decoder_mode: "HYBRID"  # "FULL_SEQ"  ,  "STEP_WISE" # "HYBRID"
 
   params:
     dim_model: 64

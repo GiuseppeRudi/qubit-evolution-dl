@@ -1,3 +1,4 @@
+from ..enums.decoder_mode import DecoderMode
 import tensorflow as tf
 
 from typing import cast
@@ -11,6 +12,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             curriculum: list[int],
             lr_global: float,
             clip_global: float,
+            decoder_mode: DecoderMode,
             fr_eval=None
         ):
         super().__init__()
@@ -18,6 +20,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
         self.curriculum = curriculum
         self.lr_global = lr_global # learning rate 
         self.clip_global = clip_global
+        self.decoder_mode = decoder_mode
         self.fr_eval = fr_eval # free running evaluations
         
         # list of indexes (starts of each epoch)
@@ -54,6 +57,12 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
         }[phase.name]
         
         m.rt.phase_id.assign(pid)
+        
+        # only if the current model is Hybrid so work with either STEP_WISE or the FULL_SEQ
+        if self.decoder_mode == DecoderMode.HYBRID:
+            if pid == 0 or pid == 1:
+                m.rt.decoder_mode_id.assign(0)
+            else: m.rt.decoder_mode_id.assign(1)
 
         # strategy-specific parameter
 

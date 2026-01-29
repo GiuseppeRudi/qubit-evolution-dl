@@ -98,7 +98,7 @@ class EncoderTRNBlock(layers.Layer):
         # Residual Stream
         
         # x (new representation) =  x (current representation) + attn (update)
-        # x (batch_size, input_seq_len, dim_model) = x (batch_sie,input_len,dim_model) + attn(batch_size, input_seq_len, dim_model)
+        # x (batch_size, input_seq_len, dim_model) = x (batch_size,input_len,dim_model) + attn(batch_size, input_seq_len, dim_model)
         x = x + self.drop1(attn, training=training)
 
         # PreNorm FFN
@@ -109,7 +109,7 @@ class EncoderTRNBlock(layers.Layer):
         # f.shape(batch_size, input_seq_len, dim_model)
 
         # x (new representation) =  x (current representation) + f (update)
-        # x (batch_size, input_seq_len, dim_model) = x(batch_sie,input_len,dim_model) + f(batch_size, input_seq_len, dim_model)
+        # x (batch_size, input_seq_len, dim_model) = x(batch_size,input_len,dim_model) + f(batch_size, input_seq_len, dim_model)
         x = x + self.drop2(f, training=training)
         return x
 

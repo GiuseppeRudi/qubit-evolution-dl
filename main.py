@@ -98,3 +98,50 @@ if __name__ == "__main__":
 
 
 # TODO check in all model if the flag training is correctly used 
+
+
+# TODO resolve this error
+
+# Epoch 2/38
+# 6/6 ━━━━━━━━━━━━━━━━━━━━ 0s 89ms/step - mae: 0.8401 - loss: 1.1207Traceback (most recent call last):
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 83, in <module>
+#     main()
+#   File "/home/giu20/projects/qubit-evolution-dl/main.py", line 65, in main
+#     history = trainer.fit(splits)
+#               ^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/training/base_trainer.py", line 51, in fit
+#     history = self.model.fit(
+#               ^^^^^^^^^^^^^^^
+#   File "/home/giu20/miniconda3/envs/qubit/lib/python3.12/site-packages/keras/src/utils/traceback_utils.py", line 122, in error_handler
+#     raise e.with_traceback(filtered_tb) from None
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/callbacks/free_running_eval.py", line 134, in on_epoch_end
+#     Y_pred_max = self.inference_adapter.predict(X_reduced, batch_size = self.batch_size, verbose = self.verbose)
+#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/inference/step_wise_trn_adapter.py", line 123, in call
+#     Y_pred = tf.cond(use_tf, run_teacher_forcing, run_free_running)
+#              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   File "/home/giu20/projects/qubit-evolution-dl/src/qubit/inference/step_wise_trn_adapter.py", line 59, in run_teacher_forcing
+#     dec_in = Y_true[:, :self.out_steps, :]   # type: ignore[]
+#              ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+# TypeError: Exception encountered when calling StepWiseTrnAdapter.call().
+
+# 'NoneType' object is not subscriptable
+
+# Arguments received by StepWiseTrnAdapter.call():
+#   • inputs=tf.Tensor(shape=(32, 400, 36), dtype=float32)
+#   • training=False
+
+
+# TODO in trn adapter look if without shape invariants work instead we pass feature dim in the base adapter 
+
+# _, _, ta = tf.while_loop(
+#     cond,
+#     body,
+#     loop_vars=[t0, dec_prefix0, ta],
+#     parallel_iterations=1,
+#     # shape_invariants=[
+#     #     t0.get_shape(),
+#     #     tf.TensorShape([None, None, self.feature_dim]),  # prefix length grows
+#     #     tf.TensorShape([]),
+#     # ],
+# )

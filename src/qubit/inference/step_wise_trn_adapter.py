@@ -1,18 +1,7 @@
 from __future__ import annotations
-
-from dataclasses import dataclass
-import numpy as np
+from ..enums.inference_mode import InferenceMode
 import tensorflow as tf
-
-from ..enums.start_mode import StartMode
-from ..enums.verbose_mode import VerboseMode
-from .base_adapter import BaseAutoregressiveAdapter  # il tuo
-
-@dataclass
-class TransformerStepWiseNPState:
-    memory: np.ndarray   # (B, Tin, d_model)
-    prefix: np.ndarray   # (B, L, D)  -> decoder inputs già consumati (D = feature_dim)
-
+from .base_adapter import BaseAutoregressiveAdapter  
 
 class StepWiseTrnAdapter(BaseAutoregressiveAdapter):
     def __init__(self, model, *, out_steps, inference_mode):
@@ -20,63 +9,117 @@ class StepWiseTrnAdapter(BaseAutoregressiveAdapter):
         self.model = model
 
     def _init_dec0(self, X: tf.Tensor) -> tf.Tensor:
-        return tf.constant(0)
+        return self.model._init_dec0(X)
     
-    def encode(self, X: np.ndarray, *, batch_size: int) -> TransformerStepWiseNPState:
-        Xtf = tf.convert_to_tensor(X, dtype=tf.float32)
+    def encode(self, X: tf.Tensor, training : bool) -> tf.Tensor:
+        return self.model._encode(X, training=training)
 
-        # IMPORTANT: il tuo model deve esporre _encode(X, training=...)
-        mem_tf = self.model._encode(Xtf, training=False)  # (B, Tin, d_model)
-        mem = mem_tf.numpy().astype(np.float32, copy=False)
+    def step(self, dec_prefix: tf.Tensor, memory: tf.Tensor, training: bool) -> tf.Tensor:
+        return self.model._decode_prefix(dec_prefix, memory, training = training)
+        
+    def call(self, inputs, training: bool = False) -> tf.Tensor:
+        
+        # self.outsteps 
+        # if prediction_mode == ALL outsteps = output_seq_len
+        # if prediction_mode == HORIZON outsteps = max(horizons) for a specific phase (strategy)
 
-        # prefix inizialmente vuota: (B, 0, D)
-        B = X.shape[0]
-        D = self.feature_dim
-        prefix0 = np.zeros((B, 0, D), dtype=np.float32)
+        # X.shape(batch_size, input_seq_len, feature_dim)
 
-        return TransformerStepWiseNPState(memory=mem, prefix=prefix0)
+        # if inference_mode == TEACHER_FORCING , inputs = (X, y_true)
+        if isinstance(inputs, (tuple, list)):
+            
+            # Y_true (batch_size, t, feature_dim)
+            # if prediction_mode == ALL t = output_seq_len
+            # if prediction_mode == HORIZON t = max(horizons) for a specific phase (strategy)
+            X, Y_true = inputs
+        
+        # if inference_mode == FREE_RUNNING , inputs = X
+        else:
+            X, Y_true = inputs, None
 
-    def init_decoder_input(self, X: np.ndarray, *, start_mode: StartMode) -> np.ndarray:
-        # stesso comportamento del tuo LSTM adapter
-        self.model.start_mode = start_mode
-        Xtf = tf.convert_to_tensor(X, dtype=tf.float32)
+        memory = self.encode(X,training=training)
+        # memory.shape(batch_size, input_seq_len, dim_model)
 
-        # IMPORTANT: il tuo model deve esporre _init_dec0(X)
-        dec0 = self.model._init_dec0(Xtf)  # (B,1,D)
-        return dec0.numpy().astype(np.float32, copy=False)
+        dec0 = self._init_dec0(X) 
+        # dec0 where t = 0  startMode = ZEROS or LAST_x
+        # dec0.shape(batch_size, 1 , feature_dim) 
 
-    def step(
-        self,
-        dec_t: np.ndarray,
-        state: TransformerStepWiseNPState,
-        *,
-        batch_size: int,
-    ) -> tuple[np.ndarray, TransformerStepWiseNPState]:
-        """
-        dec_t: (B,1,D) input al decoder per questo step
-        state.memory: (B,Tin,d_model)
-        state.prefix: (B,L,D)  (decoder inputs già passati)
-        """
+        if self.inference_mode == InferenceMode.TEACHER_FORCING:
+            inference_mode_id = tf.constant(0, tf.int32)
+        else: inference_mode_id = tf.constant(1, tf.int32)
+        
+        tf.print(inference_mode_id)
+        use_tf = tf.logical_and(tf.equal(inference_mode_id, 0), Y_true is not None)
 
-        dec_tf = tf.convert_to_tensor(dec_t, dtype=tf.float32)
-        mem_tf = tf.convert_to_tensor(state.memory, dtype=tf.float32)
-        pref_tf = tf.convert_to_tensor(state.prefix, dtype=tf.float32)
+        def run_teacher_forcing():
 
-        # append input corrente alla prefix
-        new_pref = tf.concat([pref_tf, dec_tf], axis=1)  # (B, L+1, D)
+            # Y_true.shape(batch_size, ouput_seq_len , feature_dim)
+            
+            dec_in = Y_true[:, :self.out_steps, :]   # type: ignore[]
+            # dec_in.shape(batch_size, out_steps, feature_dim)
 
-        # safety: evitare overflow pos-embedding (se hai max_len piccolo)
-        # L = tf.shape(new_pref)[1]
-        # tf.debugging.assert_less(L, tf.cast(self.model.max_len, tf.int32))
+            # decoder model function
+            # step calls _decoder_prefix that returns the total predictions
+            Y_pred = self.step(dec_in, memory, training=training)  
+            
+            # Y_pred.(batch_size, outsteps, feature_dim)
+            return Y_pred
 
-        # IMPORTANT: il tuo model deve esporre _decode_prefix(prefix, memory, training=...)
-        y_seq = self.model._decode_prefix(new_pref, mem_tf, training=False)  # (B, L+1, D)
-        y_t = y_seq[:, -1:, :]  # (B,1,D)
+        def run_free_running():
+            
+            # Prefix growing loop: dec_prefix starts from dec0 and grows 1..T_target
+            ta = tf.TensorArray(
+                dtype=X.dtype,
+                size=self.out_steps,
+            )
 
-        y_np = y_t.numpy().astype(np.float32, copy=False)
-        new_state = TransformerStepWiseNPState(
-            memory=state.memory,                 # invariata
-            prefix=new_pref.numpy().astype(np.float32, copy=False),
-        )
-        return y_np, new_state
+            t0 = tf.constant(0, tf.int32)
+            dec_prefix0 = dec0 
+            # dec_prefix0.shape(batch_size, 1, feature_dim)
 
+            def cond(t, dec_prefix, ta):
+                return t < self.out_steps
+
+            def body(t, dec_prefix, ta):
+                
+                # Decode the whole prefix and take only the last timestep as current prediction
+                y_pred_seq = self.step(dec_prefix, memory, training=training)  
+                # y_pred_seq.shape(batch_size, L, feature_dim) where L = t+1
+                y_pred_t = y_pred_seq[:, -1:, :]
+                # y_pred_t.shape(batch_size, 1, feature_dim)
+
+                y_pred_t_2d = tf.squeeze(y_pred_t, axis=1)
+                # y_pred_t_2d,shape(batch_size, feature_dim)
+                
+                ta = ta.write(t, y_pred_t_2d) 
+                # write at the index t the tensor y_pred_t_2d
+
+                # previous => dec_prefix.shape(batch_size, t+1 = L, feature_dim)
+                dec_prefix = tf.concat([dec_prefix, y_pred_t], axis=1) 
+                # after =>    dec_prefix.shape(batch_size,(t+1)+1 == L +1 ,feature_dim)         
+
+                return t + 1, dec_prefix, ta
+
+            _, _, ta = tf.while_loop(
+                cond,
+                body,
+                loop_vars=[t0, dec_prefix0, ta],
+                parallel_iterations=1,
+                # shape_invariants=[
+                #     t0.get_shape(),
+                #     tf.TensorShape([None, None, self.feature_dim]),  # prefix length grows
+                #     tf.TensorShape([]),
+                # ],
+            )
+
+            # ta.shape(self.outsteps, batch_size, feature_dim)
+            Y_pred = tf.transpose(ta.stack(), [1, 0, 2])  
+            # Y_pred.shape(batch_size, outsteps , feature_dim)
+            return Y_pred
+
+        # run_teacher_forcing => run in decoder mode full_seq
+        # run_free_running => run in decoder mode step_wise 
+        Y_pred = tf.cond(use_tf, run_teacher_forcing, run_free_running)
+
+        # Y_pred.shape(batch_size, outsteps , feature_dim)
+        return Y_pred

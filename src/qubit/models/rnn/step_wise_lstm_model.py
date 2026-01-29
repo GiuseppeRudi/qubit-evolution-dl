@@ -173,13 +173,17 @@ class StepWiseLstmModel(StrategyChooserModel):
                 # Ground truth Y.shape(batch_size, timesteps, feature_dim)
                 
                 y_true_2d = tf.gather(Y, t, axis=1)             
-                # y_true_2d.shape(batch_size, feature)
+                # y_true_2d.shape(batch_size, feature_dim)
                 
                 # where index = t in y_true_2d and y_pred_t_2d
                 y_true_t = tf.expand_dims(y_true_2d, axis=1)
-                # y_true_t.shape(batch_size, 1, feature)
+                # y_true_t.shape(batch_size, 1, feature_dim)
 
-                dec_t = self.apply_strategy_step_wise(y_true_t = y_true_t, y_pred_t = y_pred_t)
+                dec_t = self.apply_strategy_step_wise(
+                    y_true_t = y_true_t,
+                    y_pred_t = y_pred_t
+                )
+                # dec_t.shape(batch_size,1,feature_dim)
                 
                 return t + 1, dec_t, state, ta
 
@@ -188,10 +192,10 @@ class StepWiseLstmModel(StrategyChooserModel):
             _, _, _, ta = tf.while_loop(cond, body, [t0, dec_t, state, ta], parallel_iterations=1)
 
             # tf.print(ta.stack())
-            # stack: (element_size = outsteps, batch_size, feature_dim) -> transpose: (batch_size, outsteps, feature_dim)
+            # stack: (element_size = T, batch_size, feature_dim) -> transpose: (batch_size, T, feature_dim)
             Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
 
-            # Y_true: (N, T_eff, D)
+            # Y_true: (N, T, D)
             Y_true = tf.slice(Y, [0, 0, 0], [-1, T_hor, -1])
 
             Y_pred = tf.cond(
@@ -256,7 +260,6 @@ class StepWiseLstmModel(StrategyChooserModel):
         # inititialize to zeros or last_x based on the start_mode parameter
         dec_t = self._init_dec0(X)
         
-
         ta = tf.TensorArray(
             dtype=Y.dtype, size=T,  
             element_shape=tf.TensorShape([None, self.feature_dim]),

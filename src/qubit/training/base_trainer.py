@@ -87,6 +87,7 @@ class BaseTrainer(ABC):
             curriculum=self.training_cfg.curriculum,
             lr_global=self.model_cfg.compile.learning_rate,
             clip_global=self.model_cfg.compile.clip_norm,
+            decoder_mode=self.model_cfg.decoder_mode,
             fr_eval=fr_eval
         )
         

@@ -26,6 +26,16 @@ class StrategyLayer(layers.Layer):
             trainable = False
         )
         
+        # decoder_mode_id => FULL_SEQ (0) | STEP_WISE (1)
+        # used to choose if decoder model work with full_seq or step_wise based on the current type of strategy
+        # decoder_mod_id.assign(1) => currerent strategy : Teacher Forcing or Masked Modeling 
+        # decoder_mod_id.assign(0) => currerent strategy : Scheduled Sampling  or Autoregressive
+        self.decoder_mode_id = self.add_weight(
+            name = "decoder_mode_id" , shape = (), dtype=tf.int32,
+            initializer=tf.keras.initializers.Constant(0),
+            trainable = False
+        )
+        
         # used to choose the different type of strategy using the id in the graph mode 
         self.phase_id = self.add_weight(
             name="phase_id", shape=(), dtype=tf.int32,

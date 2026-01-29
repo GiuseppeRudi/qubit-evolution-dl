@@ -98,7 +98,7 @@ class DecoderTRNBlock(layers.Layer):
         # prevents the decoder from attending to "future" timesteps (only past + current allowed).
         # FULL_SEQ: required, because the decoder input contains the whole sequence, so without the mask it would be cheating.
         # STEP_WISE (prefix growing): not highly necessary since the prefix has no future tokens, but we keep it for consistency 
-        print(x.shape)
+        # print(x.shape)
         # masked self-attn (causal)
         y = self.ln1(x)
         # y.shape(batch_size, T, dim_model)
