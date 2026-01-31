@@ -170,8 +170,7 @@ class FullSeqLstmModel(StrategyChooserModel):
         # self.rt.horizon when is = -1 so self.rt.horizon == self.rt.t_out
         T_hor = tf.convert_to_tensor(self.rt.horizon)
 
-        # inititialize to zeros or last_x based on the start_mode parameter
-        dec0 = self._init_dec0(X)         
+        # inititialize to zeros or last_x based on the start_mode parameter        
 
         prediction_mode_id = tf.convert_to_tensor(self.rt.prediction_mode_id)  # 0 => ALL | 1 => HORIZON
         
@@ -210,6 +209,7 @@ class FullSeqLstmModel(StrategyChooserModel):
         # It constructs a computational graph that tracks how the loss depends on the weights
         # This then allows the gradients to be calculated
         with tf.GradientTape() as tape:
+            dec0 = self._init_dec0(X) 
             Y_true, Y_pred = tf.cond(tf.equal(prediction_mode_id, 0), run_all, run_hor_only)
 
             # Y_true.shape(batch_size , T_hor , feature_dim)

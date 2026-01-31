@@ -5,16 +5,16 @@ from .base_adapter import BaseAutoregressiveAdapter
 from ..models.rnn.step_wise_lstm_model import LSTM2LayerTFState
 from ..enums.inference_mode import InferenceMode
 
-class StepWiseLstmAdapter(BaseAutoregressiveAdapter):
+class HybridLstmAdapter(BaseAutoregressiveAdapter):
     def __init__(self, model, *, out_steps, inference_mode):
-        super().__init__(out_steps=out_steps, inference_mode=inference_mode, name="step_wise_lstm_adapter")
+        super().__init__(out_steps=out_steps, inference_mode=inference_mode, name="hybrid_lstm_adapter")
         self.model = model
 
     def encode(self, X: tf.Tensor):
         return self.model._encode(X)
 
-    def step(self, dec_t: tf.Tensor, state):
-        return self.model._decode_step(dec_t, state)
+    def step(self, dec_in: tf.Tensor, states):
+        return self.model._decode_full_seq(dec_in, states)
     
     def _init_dec0(self, X: tf.Tensor):
         return self.model._init_dec0(X)
@@ -50,11 +50,24 @@ class StepWiseLstmAdapter(BaseAutoregressiveAdapter):
         # dec_t where t = 0  startMode = ZEROS or LAST_x
         # dec_t.shape(batch_size, 1 , feature_dim) 
 
+
+        if self.inference_mode == InferenceMode.TEACHER_FORCING and Y_true is not None:
+            # Y_true.shape(batch_size, ouput_seq_len , feature_dim)
+            
+            dec_in = Y_true[:, :self.out_steps, :] # type: ignore[]
+            # dec_in.shape(batch_size, out_steps, feature_dim)
+
+            # decoder model function
+            Y_pred = self.step(dec_in, state)  
+            
+            # Y_pred.(batch_size, outsteps, feature_dim)
+            return Y_pred
+        
+        
         ta = tf.TensorArray(dtype=X.dtype, 
                             size=self.out_steps)
         
-        use_tf = (self.inference_mode == InferenceMode.TEACHER_FORCING) and (Y_true is not None)
-        
+
         # ta.shape(element_size = out_steps, element_shape = (batch_size, feature_dim))
         
         def cond(t, dec_t, state, ta):
@@ -82,11 +95,7 @@ class StepWiseLstmAdapter(BaseAutoregressiveAdapter):
             # write at the index t the tensor y_pred_t_2d
 
             # dec_t will be the decoder input for the next iteration (t+1) 
-            
-            if use_tf:
-                dec_t = tf.slice(Y_true, [0, t, 0], [-1, 1, -1])
-            else:
-                dec_t = y_pred_t
+            dec_t = y_pred_t
 
             return t + 1, dec_t, state, ta
 

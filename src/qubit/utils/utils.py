@@ -3,6 +3,8 @@ import argparse
 import sys
 import re
 from pathlib import Path
+from copy import deepcopy
+from typing import Any, Mapping
 
 from  .config_values import LOG_PATH
 
@@ -56,6 +58,22 @@ def get_device():
         name = details.get("device_name", gpu.name)
         print(f"   - {name} ")
 
+def deep_merge_dict(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    """
+    Deep merge:
+    - dict + dict => merge ricorsivo
+    - qualsiasi altra cosa (incluse list) => override sovrascrive
+    """
+    result: dict[str, Any] = deepcopy(dict(base))
+
+    for k, v_over in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v_over, dict):
+            result[k] = deep_merge_dict(result[k], v_over)
+        else:
+            # qui includiamo list/None/scalari: sovrascrive
+            result[k] = deepcopy(v_over)
+
+    return result
 
 # regex to match ANSI escape and remove that for log files
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")

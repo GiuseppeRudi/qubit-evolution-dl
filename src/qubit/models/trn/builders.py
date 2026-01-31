@@ -3,7 +3,7 @@ from typing import Optional, cast
 
 import tensorflow as tf
 
-from .step_wise_model import StepWiseTrnModel
+from .hybrid_trn_model import HybridTrnModel
 
 from ...dataclasses.transformer_config import TransformerConfig
 from ...dataclasses.model_config import ModelConfig
@@ -23,13 +23,13 @@ prediction_mode_id = {
 }
 
 @register_model(ModelType.TRN, ModelVariant.SEQ2SEQ, DecoderMode.HYBRID)
-def build_transformer_step_wise_model(
+def build_transformer_hybrid_model(
     x_train,# X.shape (n_windows , input_seq_len , feature_dim)
     y_train, # Y.shape (n_windows , output_seq_len  , feature_dim)
     model_cfg: ModelConfig,
     prediction_mode: PredictionMode,
     model_path: Optional[str] = None,
-) -> StepWiseTrnModel:
+) -> HybridTrnModel:
     
     trn_cfg = cast(TransformerConfig, model_cfg.params)
     feature_dim = x_train.shape[2]
@@ -40,7 +40,7 @@ def build_transformer_step_wise_model(
     # number of time steps to give in input 
     t_in = x_train.shape[1]
     
-    model = StepWiseTrnModel(
+    model = HybridTrnModel(
         feature_dim = feature_dim,
         dim_model = trn_cfg.dim_model,
         num_heads = trn_cfg.num_heads,

@@ -1,9 +1,8 @@
 from pathlib import Path
 from typing import Optional, cast
+
 from ...enums.prediction_mode import PredictionMode
 import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, LSTM, Dense, RepeatVector, TimeDistributed
 
 from ...dataclasses.model_config import ModelConfig
 from ...dataclasses.rnn_config import RNNConfig
@@ -11,6 +10,8 @@ from ...dataclasses.rnn_config import RNNConfig
 from ...utils.registry import register_model
 from .step_wise_lstm_model import StepWiseLstmModel
 from .full_seq_lstm_model import FullSeqLstmModel
+from .hybrid_lstm_model import HybridLstmModel
+
 from ...core.core import build_optimizer
 
 from ...enums.decoder_mode import DecoderMode
@@ -123,4 +124,49 @@ def build_lstm_step_wise_model(
 
     return model
 
+
+@register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.HYBRID)
+def build_lstm_hybrid_model(
+        x_train, # x_train.shape(num_windows, input_seq_len, feature_dim)
+        y_train, # y_train.shape(num_windows, output_seq_len, feature_dim)
+        model_cfg: ModelConfig,
+        prediction_mode: PredictionMode,  
+        model_path: Optional[str] = None
+    ) -> StepWiseLstmModel:
+    
+    latent_dim = cast(RNNConfig, model_cfg.params).latent_dim
+    feature_dim = int(x_train.shape[2])
+
+    # number of time steps to predict 
+    t_out = y_train.shape[1]
+
+    # number of time steps to give in input 
+    t_in = x_train.shape[1]
+    
+    model = HybridLstmModel(
+        feature_dim=feature_dim,
+        latent_dim=latent_dim,
+        start_mode=model_cfg.inference.start_mode,
+        prediction_mode_id=prediction_mode_id[prediction_mode],
+        t_out = t_out
+    )
+
+    model.build(tf.TensorShape([None, t_in, feature_dim]))
+
+    optimizer = build_optimizer(
+        model_cfg.compile.optimizer,
+        model_cfg.compile.learning_rate,
+    )
+
+    model.compile(
+        loss = model_cfg.compile.loss,
+        metrics= model_cfg.compile.metrics,
+        optimizer=optimizer,
+        run_eagerly=model_cfg.compile.run_eagerly
+    )
+
+    if model_path is not None:
+        model.load_weights(Path(model_path) / "model.weights.h5")
+
+    return model
 

@@ -6,15 +6,21 @@ from ..enums.model_type import ModelType
 from ..models.rnn.step_wise_lstm_model import StepWiseLstmModel
 from ..inference.step_wise_lstm_adapter import StepWiseLstmAdapter
 
+from ..models.rnn.full_seq_lstm_model import FullSeqLstmModel
+from ..inference.full_seq_lstm_adapter import FullSeqLstmAdapter
+
+from ..models.rnn.hybrid_lstm_model import HybridLstmModel
+from ..inference.hybrid_lstm_adapter import HybridLstmAdapter
+
 @register_trainer(ModelType.LSTM)
 class RNNTrainer(BaseTrainer):
     
-    def _create_inference_adapter(self, outsteps: int):
+    def _create_inference_adapter(self, outsteps: int, feature_dim : int):
         if isinstance(self.model, StepWiseLstmModel):
-            return StepWiseLstmAdapter(self.model,
-                                  out_steps=outsteps,
-                                  inference_mode=self.model_cfg.inference.mode)
-        
-        return FullSeqLstmAdapter(self.model,
-                                  out_steps=outsteps,
-                                  inference_mode=self.model_cfg.inference.mode)
+            return StepWiseLstmAdapter(self.model,out_steps=outsteps,inference_mode=self.model_cfg.inference.mode)
+        elif isinstance(self.model, HybridLstmModel):
+            return HybridLstmAdapter(self.model,out_steps=outsteps,inference_mode=self.model_cfg.inference.mode)
+        elif isinstance(self.model, FullSeqLstmModel):
+            return FullSeqLstmAdapter(self.model,out_steps=outsteps,inference_mode=self.model_cfg.inference.mode)
+        else:
+            raise ValueError("Unsupported model type")

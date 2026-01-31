@@ -101,7 +101,7 @@ def build_inference_models(trained_model: keras.Model) -> tuple[keras.Model, ker
 
 class FullSeqLstmAdapter(BaseAutoregressiveAdapter):
     def __init__(self, trained_model: keras.Model, *, out_steps: int, inference_mode: InferenceMode):
-        super().__init__(out_steps=out_steps, inference_mode=inference_mode)
+        super().__init__(out_steps=out_steps, inference_mode=inference_mode,  name="full_seq_lstm_adapter")
         self.trained_model = trained_model
 
         (self.encoder_model,
@@ -163,7 +163,6 @@ class FullSeqLstmAdapter(BaseAutoregressiveAdapter):
         else:
             X, Y_true = inputs, None
 
-
         state : LSTM2LayerTFState = self.encode(X)
         # LSTM2LayerTFState(h1=h1, c1=c1, h2=h2, c2=c2)
         # h1 and c1 from encoder layer 1 
@@ -212,7 +211,7 @@ class FullSeqLstmAdapter(BaseAutoregressiveAdapter):
             # dec_t will be the decoder input for the next iteration (t+1) 
             
             if use_tf:
-                dec_t = Y_true[:, t:t+1, :] #type: ignore[] 
+                dec_t = tf.slice(Y_true, [0, t, 0], [-1, 1, -1])
             else:
                 dec_t = y_pred_t
 

@@ -5,6 +5,8 @@ def build_optimizer(name: str, lr: float, clip_norm: Optional[float] = None):
     name = name.lower()
 
     kwargs = {"learning_rate": lr}
+    if isinstance(lr, str):
+        kwargs["learning_rate"] = float(lr)
     if clip_norm is not None and clip_norm > 0:
         kwargs["global_clipnorm"] = clip_norm  
 

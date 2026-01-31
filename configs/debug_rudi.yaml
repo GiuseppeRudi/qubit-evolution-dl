@@ -5,12 +5,12 @@ data:
     used_qubits: 8
     time_steps: 1001 # fixed 
     n_traj: 400 # fixed 
-    traj_fraction: 0.025
+    traj_fraction: 0.8
 
   windowing:
-    input_seq_len: 400
+    input_seq_len: 200
     output_seq_len: 50
-    stride: 20
+    stride: 40
 
   split:
     seed: 42
@@ -22,7 +22,7 @@ model:
   save_model: true
   type: "LSTM"
   variant: "SEQ2SEQ"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE"
+  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE", # HYBRID
 
   params:
     latent_dim: 128
@@ -32,12 +32,12 @@ model:
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 1e-3
+    learning_rate: 0.001
     clip_norm: 1.0
 
   inference:
     mode: "free_running"   # "teacher_forcing" | "free_running"
-    start_mode: "zeros"    # "zeros" | "last_x"
+    start_mode: "last_x"    # "zeros" | "last_x"
     verbose: 0  # 0,1,2
 
 training:
@@ -47,24 +47,32 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [20,-1]
+  curriculum: [15,30, 25,-1]
   phases:
     - name: masked_modeling
       epochs: 5
       mask_prob: 0.20
-      learning_rate: 5e-4
-      clip_norm: 0.7
       mask_scope: time        # time | element | feature
       mask_mode: constant         # zero | constant | noise
       mask_value: 0.2         # solo se constant
       noise_sigma: 0.1        # solo se noise
       noise_replace: false # true: mask replacing the original value with noise
                           # false: mask adding noise to the original value
-    
     - name: teacher_forcing
+      epochs: 10
+    
+    - name: masked_modeling
       epochs: 5
+      mask_prob: 0.20
+      mask_scope: feature        # time | element | feature
+      mask_mode: noise         # zero | constant | noise
+      mask_value: 0.2         # solo se constant
+      noise_sigma: 0.1        # solo se noise
+      noise_replace: false # true: mask replacing the original value with noise
+                          # false: mask adding noise to the original value
 
-# SCHEDULED SAMPLING and FULL AUTOREGRESSIVE in fullseq cannot be done
+    - name: teacher_forcing
+      epochs: 10
 
   # free-running evaluation
   fr_eval:
@@ -89,7 +97,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [2,4,6] 
+        out_steps: [20,30,40] 
         p_eval: 0.2
         every_epochs: end_of_phase
 

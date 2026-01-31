@@ -36,7 +36,7 @@ model:
     clip_norm: 1.0
 
   inference:
-    mode: "free_running"   # "teacher_forcing" | "free_running"
+    mode: "teacher_forcing"   # "teacher_forcing" | "free_running"
     start_mode: "last_x"    # "zeros" | "last_x"
     verbose: 0  # 0,1,2
 

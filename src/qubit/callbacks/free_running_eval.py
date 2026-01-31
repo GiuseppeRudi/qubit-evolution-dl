@@ -17,8 +17,11 @@ from ..inference.step_wise_lstm_adapter import StepWiseLstmAdapter
 from ..models.rnn.full_seq_lstm_model import FullSeqLstmModel
 from ..inference.full_seq_lstm_adapter import FullSeqLstmAdapter
 
-from ..models.trn.step_wise_model import StepWiseTrnModel
-from ..inference.step_wise_trn_adapter import StepWiseTrnAdapter
+from ..models.rnn.hybrid_lstm_model import HybridLstmModel
+from ..inference.hybrid_lstm_adapter import HybridLstmAdapter
+
+from ..models.trn.hybrid_trn_model import HybridTrnModel
+from ..inference.hybrid_trn_adapter import HybridTrnAdapter
 
 class FreeRunningEvalCallback(keras.callbacks.Callback):
     """
@@ -39,6 +42,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
         super().__init__()
         self.X_eval = X_eval
         self.Y_eval = Y_eval
+        self.feature_dim = X_eval.shape[2] 
 
         # X_eval => X_test or X_val => .shape(num_windows, t_in, feature_dim)
         # Y_eval => Y_test or Y_val => .shape(num_windows, t_out, feature_dim)
@@ -151,6 +155,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
             for k in outsteps:
                 Y_per_step = Y_reduced_probe[:, :k, :]
+                
                 # Y_per_step.shape(n_reduced_probe, k, feature_dim)
 
                 Y_pred_per_step = Y_pred_reduced_probe[:, :k, :]
@@ -191,11 +196,13 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
         # timesteps => max horizon 
         trained_model = cast(keras.Model, self.model)
-        if isinstance(self.model, StepWiseLstmModel):
-            return StepWiseLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
-        elif isinstance(self.model, StepWiseTrnModel):
-            return StepWiseTrnAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
-        elif isinstance(self.model, FullSeqLstmModel):
+        if isinstance(self.model, FullSeqLstmModel):
             return FullSeqLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
+        elif isinstance(self.model, StepWiseLstmModel):
+            return StepWiseLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
+        elif isinstance(self.model,HybridLstmModel):
+            return HybridLstmAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode)
+        elif isinstance(self.model, HybridTrnModel):
+            return HybridTrnAdapter(trained_model, out_steps = outsteps, inference_mode = self.inference_mode,feature_dim = self.feature_dim)
         else:
             raise ValueError("Unsupported model type")

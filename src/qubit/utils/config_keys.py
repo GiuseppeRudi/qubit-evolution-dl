@@ -51,8 +51,8 @@ OPTIMIZER = "optimizer"
 LOSS = "loss"
 METRICS = "metrics"
 RUN_EAGERLY = "run_eagerly"
-LEARNING_RATE = "learning_rate"
-CLIP_NORM = "clip_norm"
+LEARNING_RATE = "learning_rate" ########
+CLIP_NORM = "clip_norm" ########
 
 # model.inference.*
 MODE = "mode"

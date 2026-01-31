@@ -25,19 +25,22 @@ class BaseTrainer(ABC):
         self.phases = self.training_cfg.phases
     
     @abstractmethod
-    def _create_inference_adapter(self, outsteps: int):
+    def _create_inference_adapter(self, outsteps: int, feature_dim: int):
         """
         Returns:
             Adapter object (es. Seq2SeqLSTM2LayerAdapter o TransformerAdapter)
         """
         pass
     
+
+
+
     
-    def fit(self, splits : DatasetSplits):
+    def fit(self, splits : DatasetSplits, optuna_callback = None):
 
         total_epochs = sum(p.epochs for p in self.phases)
 
-        callbacks = self._prepare_callbacks(splits)
+        callbacks = self._prepare_callbacks(splits, optuna_callback)
 
         # X_train and X_val.shape => (num_windows , input_seq_len , feauture_dim)
         # Y_train and Y_val.shape => (num_windows , output_seq_len , feauture_dim)
@@ -60,7 +63,7 @@ class BaseTrainer(ABC):
         return history
 
     
-    def _prepare_callbacks(self, splits):
+    def _prepare_callbacks(self, splits, optuna_callback):
 
         callbacks = []
 
@@ -90,12 +93,16 @@ class BaseTrainer(ABC):
             decoder_mode=self.model_cfg.decoder_mode,
             fr_eval=fr_eval
         )
+
+        # ! the order of this list is important 
         
         callbacks.append(phase_scheduler)
 
         if fr_eval is not None: callbacks.append(fr_eval)
 
         callbacks.append(FilteredProgbar())
+
+        if optuna_callback is not None: callbacks.append(optuna_callback)
         
         return callbacks
     
@@ -107,7 +114,7 @@ class BaseTrainer(ABC):
         # Y_test.shape(num_windows, output_seq_len, feature_dim)
 
         # this function is implemented in the concrete classes 
-        inference_adapter = self._create_inference_adapter(outsteps= Y_test.shape[1])
+        inference_adapter = self._create_inference_adapter(outsteps = Y_test.shape[1], feature_dim = Y_test.shape[2])
         
         # safety check
         if inference_adapter is None :

@@ -96,6 +96,8 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
         # we set the global one
         lr = self.lr_global if phase.learning_rate is None else phase.learning_rate
         clip = self.clip_global if phase.clip_norm is None else phase.clip_norm
+        
+        lr = float(lr)
         if m.optimizer is not None: m.optimizer.learning_rate.assign(lr)
         m.current_clip_norm = clip
 

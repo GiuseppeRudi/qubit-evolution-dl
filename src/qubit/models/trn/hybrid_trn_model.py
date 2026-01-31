@@ -16,7 +16,7 @@ from ..strategy_chooser import StrategyChooserModel
 
 from ...utils.layers_names import OUT_DENSE, ENC_IN_PROJ, ENC_IN_DROP, ENC_POS_EMB, ENC_BLOCK_, DEC_IN_PROJ, DEC_IN_DROP, DEC_POS_EMB, DEC_BLOCK_
 
-class StepWiseTrnModel(StrategyChooserModel):
+class HybridTrnModel(StrategyChooserModel):
     def __init__(
         self,
         *,
@@ -274,136 +274,134 @@ class StepWiseTrnModel(StrategyChooserModel):
             lambda: T_hor,
         )
 
-        # self._encode is run once for both decoder mode (STEP_WISE and FULL_SEQ)
-        memory = self._encode(X, training=True)  # (batch_size,input_seq_len,dim_model)
-        dec_prefix = self._init_dec0(X)  # (batch_size,1,feature_dim)
+        def run_full_seq():
+
+            def run_all():
+                
+                # decoder input  dec_in.shape(batch_size , T_out == output_seq_len, feature_dim)
+                dec_in = self.apply_strategy_full_seq(Y, dec0=dec_prefix)
+
+                # Y_pred.shape(batch_size, T_out == output_seq_len , feature_dim)
+                Y_pred = self._decode_prefix(dec_in, memory, training=True)
+                
+                # so we predict to all T_out to stabilize the graph and not occur the tracing
+                # but we return only the part we need (horizon)
+                return Y[:, :T_hor, :], Y_pred[:, :T_hor, :]
+
+            def run_hor_only():
+
+                # Y.shape(batch_size, T_out, feature_dim)
+                # Y_hor(batch_size , T_hor, feature_dim)
+                Y_hor = Y[:, :T_hor, :]
+
+                dec_in = self.apply_strategy_full_seq(Y_hor, dec0=dec_prefix) 
+                # decoder_input dec_in.shape(batch_size, T_hor, feature_dim)  
+
+                # Y_pred.shape(batch_size, T_hor , feature_dim)
+                Y_pred = self._decode_prefix(dec_in, memory, training=True)
+                                    
+                return Y_hor, Y_pred
+
+            Y_true, Y_pred = tf.cond(tf.equal(prediction_mode_id, 0), run_all, run_hor_only)
+
+            loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
+            return loss, Y_true, Y_pred
+
+
+        def run_step_wise():
+
+            # array with T elements and each element have shape(batch_size, feature_dim)
+            # batch_size is None because is dinamic 
+            ta = tf.TensorArray(
+                dtype=Y.dtype,
+                size=T,
+                element_shape=tf.TensorShape([None, self.feature_dim]),
+            )
+
+            # ta = shape (batch_size, T, feature_dim)
+            # print(ta.element_shape) = shape (batch_size, feature_dim) ,  ta.size() = T_out
+
+            t0 = tf.constant(0, tf.int32)
+
+            def cond(t, dec_prefix, ta):
+                return t < T
+
+            def body(t, dec_prefix, ta):
+                # if t = 0  dec_prefix.shape(batch_size, 1, feature_dim)
+                # if t > 0  dec_prefix.shape(batch_size, t+1, feature_dim)
+
+                # encoder_ouput => memory.shape(batch_size, 1, dim_model)
+
+            
+                y_pred_seq = self._decode_prefix(dec_prefix, memory, training=True)  # (batch_size,t+1,feature_dim)
+                y_pred_t = y_pred_seq[:, -1:, :] # (batch_size,1,feature_dim)
+                
+                y_pred_t_2d = tf.squeeze(y_pred_t, axis=1)
+                # y_pred_t_2d.shape(batch_size, feature_dim)
+
+                ta = ta.write(t, y_pred_t_2d)
+                # ta.shape(index = t , element.shape(batch_size, feature_dim))
+
+                # Ground truth Y.shape(batch_size, timesteps, feature_dim)
+
+                y_true_2d = tf.gather(Y, t, axis=1)             
+                # y_true_2d.shape(batch_size, feature_dim)
+                
+                # where index = t in y_true_2d and y_pred_t_2d
+                y_true_t = tf.expand_dims(y_true_2d, axis=1)
+                # y_true_t.shape(batch_size, 1, feature_dim)
+
+                next_in = self.apply_strategy_step_wise(
+                    y_true_t = y_true_t,
+                    y_pred_t = y_pred_t,
+                )
+
+                # choose as send the current prediction based on the strategy to the decoder input of the next timestep      
+                # next_in.shape(batch_size,1, feature_dim)
+                
+                # previous => dec_prefix.shape(batch_size, t+1 == L, feature_dim)
+                dec_prefix = tf.concat([dec_prefix, next_in], axis=1) 
+                # after =>    dec_prefix.shape(batch_size,(t+1)+1 == L+1,feature_dim)         
+                return t + 1, dec_prefix, ta
+
+
+            _, _, ta = tf.while_loop(
+                cond,
+                body,
+                loop_vars=[t0, dec_prefix, ta],
+                parallel_iterations=1,
+                shape_invariants=[
+                    t0.get_shape(),
+                    # L changes, so without shape_invariants the loop fail
+                    tf.TensorShape([None, None, self.feature_dim]),
+                    tf.TensorShape([]),
+                ],
+            )
+
+            # tf.print(ta.stack())
+            # stack: (element_size = T, batch_size, feature_dim) -> transpose: (batch_size, T, feature_dim)
+            Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
+
+            # Y_true: (N, T, D)
+            Y_true = tf.slice(Y, [0, 0, 0], [-1, T_hor, -1])
+
+            Y_pred = tf.cond(
+                tf.equal(prediction_mode_id, 0),
+                lambda: tf.slice(Y_pred, [0, 0, 0], [-1, T_hor, -1]),
+                lambda: Y_pred,
+            )
+    
+            loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
+            return loss, Y_true, Y_pred
 
         with tf.GradientTape() as tape:
-            
-            def run_full_seq():
 
-                def run_all():
-                    
-                    # decoder input  dec_in.shape(batch_size , T_out == output_seq_len, feature_dim)
-                    dec_in = self.apply_strategy_full_seq(Y, dec0=dec_prefix)
-
-                    # Y_pred.shape(batch_size, T_out == output_seq_len , feature_dim)
-                    Y_pred = self._decode_prefix(dec_in, memory, training=True)
-                    
-                    # so we predict to all T_out to stabilize the graph and not occur the tracing
-                    # but we return only the part we need (horizon)
-                    return Y[:, :T_hor, :], Y_pred[:, :T_hor, :]
-
-                def run_hor_only():
-
-                    # Y.shape(batch_size, T_out, feature_dim)
-                    # Y_hor(batch_size , T_hor, feature_dim)
-                    Y_hor = Y[:, :T_hor, :]
-
-                    dec_in = self.apply_strategy_full_seq(Y_hor, dec0=dec_prefix) 
-                    # decoder_input dec_in.shape(batch_size, T_hor, feature_dim)  
-
-                    # Y_pred.shape(batch_size, T_hor , feature_dim)
-                    Y_pred = self._decode_prefix(dec_in, memory, training=True)
-                                        
-                    return Y_hor, Y_pred
-
-                Y_true, Y_pred = tf.cond(tf.equal(prediction_mode_id, 0), run_all, run_hor_only)
-
-                loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
-                return loss, Y_true, Y_pred
-
-
-            def run_step_wise():
-
-                # array with T elements and each element have shape(batch_size, feature_dim)
-                # batch_size is None because is dinamic 
-                ta = tf.TensorArray(
-                    dtype=Y.dtype,
-                    size=T,
-                    element_shape=tf.TensorShape([None, self.feature_dim]),
-                )
-
-                # ta = shape (batch_size, T, feature_dim)
-                # print(ta.element_shape) = shape (batch_size, feature_dim) ,  ta.size() = T_out
-
-                t0 = tf.constant(0, tf.int32)
-
-                def cond(t, dec_prefix, ta):
-                    return t < T
-
-                def body(t, dec_prefix, ta):
-                    # if t = 0  dec_prefix.shape(batch_size, 1, feature_dim)
-                    # if t > 0  dec_prefix.shape(batch_size, t+1, feature_dim)
-
-                    # encoder_ouput => memory.shape(batch_size, 1, dim_model)
-
-                
-                    y_pred_seq = self._decode_prefix(dec_prefix, memory, training=True)  # (batch_size,t+1,feature_dim)
-                    y_pred_t = y_pred_seq[:, -1:, :] # (batch_size,1,feature_dim)
-                    
-                    y_pred_t_2d = tf.squeeze(y_pred_t, axis=1)
-                    # y_pred_t_2d.shape(batch_size, feature_dim)
-
-                    ta = ta.write(t, y_pred_t_2d)
-                    # ta.shape(index = t , element.shape(batch_size, feature_dim))
-
-                    # Ground truth Y.shape(batch_size, timesteps, feature_dim)
-
-                    y_true_2d = tf.gather(Y, t, axis=1)             
-                    # y_true_2d.shape(batch_size, feature_dim)
-                    
-                    # where index = t in y_true_2d and y_pred_t_2d
-                    y_true_t = tf.expand_dims(y_true_2d, axis=1)
-                    # y_true_t.shape(batch_size, 1, feature_dim)
-
-                    next_in = self.apply_strategy_step_wise(
-                        y_true_t = y_true_t,
-                        y_pred_t = y_pred_t,
-                    )
-
-                    # choose as send the current prediction based on the strategy to the decoder input of the next timestep      
-                    # next_in.shape(batch_size,1, feature_dim)
-                    
-                    # previous => dec_prefix.shape(batch_size, t+1 == L, feature_dim)
-                    dec_prefix = tf.concat([dec_prefix, next_in], axis=1) 
-                    # after =>    dec_prefix.shape(batch_size,(t+1)+1 == L+1,feature_dim)         
-                    return t + 1, dec_prefix, ta
-
-
-                _, _, ta = tf.while_loop(
-                    cond,
-                    body,
-                    loop_vars=[t0, dec_prefix, ta],
-                    parallel_iterations=1,
-                    shape_invariants=[
-                        t0.get_shape(),
-                        # L changes, so without shape_invariants the loop fail
-                        tf.TensorShape([None, None, self.feature_dim]),
-                        tf.TensorShape([]),
-                    ],
-                )
-
-                # tf.print(ta.stack())
-                # stack: (element_size = T, batch_size, feature_dim) -> transpose: (batch_size, T, feature_dim)
-                Y_pred = tf.transpose(ta.stack(), [1, 0, 2])
-
-                # Y_true: (N, T, D)
-                Y_true = tf.slice(Y, [0, 0, 0], [-1, T_hor, -1])
-
-                Y_pred = tf.cond(
-                    tf.equal(prediction_mode_id, 0),
-                    lambda: tf.slice(Y_pred, [0, 0, 0], [-1, T_hor, -1]),
-                    lambda: Y_pred,
-                )
-        
-                loss = self.compute_loss(y=Y_true, y_pred=Y_pred)
-                return loss, Y_true, Y_pred
-
-            # Selezione mode (0=full-seq, 1=step-wise)
-            # Puoi usare un tf.Variable self.decoder_mode_id aggiornato dal trainer.
+            # self._encode is run once for both decoder mode (STEP_WISE and FULL_SEQ)
+            memory = self._encode(X, training=True)  # (batch_size,input_seq_len,dim_model)
+            dec_prefix = self._init_dec0(X)  # (batch_size,1,feature_dim)
+    
             loss, Y_true, Y_pred = tf.switch_case(
-                decoder_mode_id,  # tf.int32 scalar
+                decoder_mode_id,  
                 branch_fns={
                     0: run_full_seq,
                     1: run_step_wise,

@@ -2,7 +2,9 @@ import os, random
 import numpy as np
 import tensorflow as tf
 
-def set_seed(seed=42, deterministic=True):
+
+
+def set_seed(seed, deterministic=True):
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)

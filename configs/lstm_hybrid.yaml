@@ -22,7 +22,7 @@ model:
   save_model: true
   type: "LSTM"
   variant: "SEQ2SEQ"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE"
+  decoder_mode: "HYBRID"  # "FULL_SEQ"  ,  "STEP_WISE"
 
   params:
     latent_dim: 128
@@ -32,12 +32,12 @@ model:
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 1e-3
+    learning_rate: 0.001
     clip_norm: 1.0
 
   inference:
     mode: "free_running"   # "teacher_forcing" | "free_running"
-    start_mode: "zeros"    # "zeros" | "last_x"
+    start_mode: "last_x"    # "zeros" | "last_x"
     verbose: 0  # 0,1,2
 
 training:
@@ -47,12 +47,12 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [20,-1]
+  curriculum: [20,-1,30,-1,10,5]
   phases:
     - name: masked_modeling
       epochs: 5
       mask_prob: 0.20
-      learning_rate: 5e-4
+      learning_rate: 0.0005
       clip_norm: 0.7
       mask_scope: time        # time | element | feature
       mask_mode: constant         # zero | constant | noise
@@ -60,11 +60,40 @@ training:
       noise_sigma: 0.1        # solo se noise
       noise_replace: false # true: mask replacing the original value with noise
                           # false: mask adding noise to the original value
-    
-    - name: teacher_forcing
-      epochs: 5
 
-# SCHEDULED SAMPLING and FULL AUTOREGRESSIVE in fullseq cannot be done
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: true
+      learning_rate: 0.0003
+      clip_norm: 0.5
+
+    - name: teacher_forcing
+      epochs: 10 
+    
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: false
+      learning_rate: 0.0005
+      clip_norm: 0.5
+
+    - name: scheduled_sampling
+      epochs: 8
+      tf_ratio_start: 1.0
+      tf_ratio_end: 0.5
+      learning_rate: 0.0003
+      clip_norm: 0.5
+      ratio_mode: sigmoid  # linear , cosine , sigmoid, power 
+      mid_point: 0.6  # only for sigmoid 
+      sharpness: 10.0 # only for sigmoid
+      power_value: 2.0 # only per power 
+      per_feature: true # true , false # if per_feature = false so per_timestep= True
+      stop_grad_pred: true # true, false
+    
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: true
+      learning_rate: 0.0001
+      clip_norm: 0.3
 
   # free-running evaluation
   fr_eval:
