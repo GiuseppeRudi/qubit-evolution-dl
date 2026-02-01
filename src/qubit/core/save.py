@@ -15,13 +15,17 @@ from ..dataclasses.model_config import ModelConfig
 from ..dataclasses.plot_config import PlotConfig
 from ..dataclasses.training_config import TrainingConfig
 
-from ..utils.config_values import LOG_PATH, PREDICTION_PATH
+from ..utils.config_values import PREDICTION_PATH, RUN_PATH
 from ..utils.utils import BufferedLogger, finish_log
 
 
-def make_run_output_dir(model_cfg : ModelConfig) -> Path:
+def make_run_output_dir(model_cfg : ModelConfig, out_dir: str) -> Path:
 
-    root_dir = Path(PREDICTION_PATH)
+    root_dir = Path(RUN_PATH + "/" + out_dir)
+    if out_dir != PREDICTION_PATH:
+        root_dir.mkdir(parents=True, exist_ok=True)
+        return root_dir
+    
     model_type : ModelType = model_cfg.type
     variant : ModelVariant = model_cfg.variant
     decoder_mode : DecoderMode = model_cfg.decoder_mode
@@ -33,7 +37,10 @@ def make_run_output_dir(model_cfg : ModelConfig) -> Path:
     run_name = f"{model_cfg.name}__{ts}"
 
     run_dir = root_dir / model_type / variant / decoder_mode / run_name
+
+
     run_dir.mkdir(parents=True, exist_ok=True)
+
     return run_dir
 
 
@@ -63,10 +70,12 @@ def save_outputs(
     output_seq_len: int,
     bufferedLogger: BufferedLogger, 
     yaml_name: str,
+    out_dir : str,
     model = None,
 ) -> Path:
     
-    run_dir = make_run_output_dir(model_cfg)
+    
+    run_dir = make_run_output_dir(model_cfg, out_dir)
 
     sample_index = plot_cfg.sample_index
     save_model = model_cfg.save_model

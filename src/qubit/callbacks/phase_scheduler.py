@@ -42,7 +42,9 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
         horizon = self.curriculum[phase_idx]
 
         # if in the file yaml want to use the global output_seq_len
-        if horizon == -1: m.rt.horizon.assign(m.rt.t_out)
+        if horizon == -1:
+            horizon = m.rt.t_out.numpy()
+            m.rt.horizon.assign(m.rt.t_out)
         else: m.rt.horizon.assign(horizon)
 
         m.rt.epoch_in_phase.assign(epoch_in_phase)
@@ -103,7 +105,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
 
         # Info print at the start of each phase
         if epoch_in_phase == 0:
-            actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
+            actual_horizon = horizon # if horizon != -1 else m.rt.t_out.numpy()
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {phase.name}")
             for key, value in phase.__dict__.items():
@@ -118,7 +120,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
 
         # update callback free_running
         if self.fr_eval is not None:
-            actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
+            actual_horizon = horizon # if horizon != -1 else m.rt.t_out.numpy()
             self.fr_eval.phase_horizon = actual_horizon
             self.fr_eval.end_of_phase = (epoch_in_phase == phase.epochs - 1)
             

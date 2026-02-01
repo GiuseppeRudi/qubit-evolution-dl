@@ -47,7 +47,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
     name = m[MODEL_NAME]
     save_model = m[SAVE_MODEL]
-    model_type = ModelType(m[TYPE])
+    model_type = ModelType(m[MODEL_TYPE])
     variant = ModelVariant(m[VARIANT])
     decoder_mode = DecoderMode(m[DECODER_MODE])
 

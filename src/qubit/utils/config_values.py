@@ -8,3 +8,4 @@ OUT_STEPS_SPEC = Literal["phase", "global"] #######
 # logs
 LOG_PATH = "train.log"
 PREDICTION_PATH = "predictions"
+RUN_PATH = "runs"

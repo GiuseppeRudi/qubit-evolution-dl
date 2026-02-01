@@ -70,11 +70,13 @@ def compute_score(metrics: dict[str, Any], base_cfg : dict) -> float:
                                 
     split = base_cfg[TRAINING][FR_EVAL][FR_EVAL_SPLIT] 
     out_seq_len = base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
-    curriculum = base_cfg[TRAINING][CURRICULUM]
+
+    if base_cfg[TRAINING][CURRICULUM][-1] == -1: last_curriculum = out_seq_len
+    else: last_curriculum = base_cfg[TRAINING][CURRICULUM][-1]
 
     fr_target = _pick_fr_target(metrics, split, out_seq_len)
     fr_curve  = _pick_fr_curve(metrics, split=split, curve_steps=curve_steps)
-    fr_phase  = _pick_fr_phase(metrics, split=split,last_curriculum=curriculum[-1])
+    fr_phase  = _pick_fr_phase(metrics, split=split,last_curriculum=last_curriculum)
 
 
     score = 0.70 * fr_target

@@ -1,5 +1,5 @@
 # -------------------------
-# Top-level sections
+# Top-level sections (CONFIGS)
 # -------------------------
 DATA = "data" ########
 MODEL = "model" ########
@@ -36,7 +36,7 @@ TEST_RATIO = "test_ratio"
 # -------------------------
 MODEL_NAME = "name" ########
 SAVE_MODEL = "save_model" ########
-TYPE = "type" ########
+MODEL_TYPE = "type" ########
 VARIANT = "variant" ########
 DECODER_MODE = "decoder_mode" ########
 PARAMS = "params" ########
@@ -96,3 +96,40 @@ P_EVAL = "p_eval" ########
 SAMPLE_INDEX = "sample_index" ########
 SAVE_PLOTS = "save_plots" ########
 SAVE_ARTIFACTS = "save_artifacts" ########
+
+##########################################################
+# TUNING
+
+TUNING = "tuning"
+OPTUNA_PATH = "optuna" 
+# -------------------------
+# Top-level sections (TUNING)
+# -------------------------
+STUDY_NAME = "study_name" ########
+SEED = "seed" ########
+N_TRIALS = "n_trials" ########
+LEVEL = "level" ########
+BASE_NAME = "base_name" ########
+MONITORS = "monitors" ########
+OUTPUT = "output" ########
+SAMPLER = "sampler" ########
+PRUNER = "pruner" ########
+
+# -------------------------
+# output.*
+# -------------------------
+ROOT_DIR = "root_dir" ########
+STORAGE_FILENAME = "storage_filename" ########
+REPORT_FILENAME = "report_filename" ########
+
+# -------------------------
+# sampler.*
+# -------------------------
+SAMPLER_TYPE = "type" ########
+
+# -------------------------
+# pruner.*
+# -------------------------
+PRUNER_TYPE = "type" ########
+N_STARTUP_TRIALS = "n_startup_trials" ########
+N_WARMUP_STEPS = "n_warmup_steps" ########

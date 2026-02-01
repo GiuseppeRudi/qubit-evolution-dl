@@ -1,0 +1,27 @@
+tuning:
+  seed: 42
+  study_name: study_lstm_prova
+  n_trials: 40
+  level: 2
+
+  # Base config filename
+  # Ex: load_yaml("lstm_step_wise") -> takes configs/lstm_step_wise.yaml
+  base_name: debug_rudi
+  
+  monitors:
+    - "_fr_phase_loss_"
+
+  output:
+    root_dir: runs/tuning
+    storage_filename: optuna.db
+    report_filename: report.csv
+
+  sampler:
+    type: tpe
+
+  pruner:
+    type: median
+    n_startup_trials: 5
+    n_warmup_steps: 3
+
+

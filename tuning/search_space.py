@@ -23,9 +23,6 @@ class ParamSpec:
     # if the type is categorical so we insert a list of numbers
     choices: list[Any] | None = None
     
-
-    # choices_fn: Optional[Callable[[dict[str, Any]], list[Any]]] = None
-
 SEARCH_SPACE: dict[str, dict[str, list[ParamSpec]]] = {
     "LSTM": {
         "level1": [
@@ -59,7 +56,24 @@ SEARCH_SPACE: dict[str, dict[str, list[ParamSpec]]] = {
             ),
         ],
         "level2": [
-            # WIP
+            ParamSpec(
+                name="input_seq_len",
+                path="data.windowing.input_seq_len",
+                type="categorical",
+                choices=[100, 200, 250, 300, 350, 400, 450, 500, 600, 650, 700, 750, 800],
+            ),
+            ParamSpec(
+                name="output_seq_len",
+                path="data.windowing.output_seq_len",
+                type="categorical",
+                choices=[20, 40, 60, 80, 100, 120, 140, 160, 180, 200],
+            ),
+            ParamSpec(
+                name="stride",
+                path="data.windowing.stride",
+                type="categorical",
+                choices=[10, 15, 20, 25, 20, 35, 40, 45, 50, 55],
+            ),
         ],
         "level3": [
             # WIP
@@ -97,13 +111,11 @@ SEARCH_SPACE: dict[str, dict[str, list[ParamSpec]]] = {
                 choices=[2, 4, 8],
             ),
 
-            # attention dim_mode depends from num_heads (must be dividible)
             ParamSpec(
                 name="dim_model",
                 path="model.params.dim_model",
                 type="categorical",
                 choices=[64, 128, 192, 256, 384, 512],
-                # choices_fn=lambda ctx: [d for d in [64, 128, 192, 256, 384, 512] if d % int(ctx["num_heads"]) == 0],
             ),
             ParamSpec(
                 name="ff_dim",
@@ -127,7 +139,24 @@ SEARCH_SPACE: dict[str, dict[str, list[ParamSpec]]] = {
             ),
         ],
         "level2": [
-            # WIP
+            ParamSpec(
+                name="input_seq_len",
+                path="data.windowing.input_seq_len",
+                type="categorical",
+                choices=[100, 200, 250, 300, 350, 400, 450, 500, 600, 650, 700, 750, 800],
+            ),
+            ParamSpec(
+                name="output_seq_len",
+                path="data.windowing.output_seq_len",
+                type="categorical",
+                choices=[20, 40, 60, 80, 100, 120, 140, 160, 180, 200],
+            ),
+            ParamSpec(
+                name="stride",
+                path="data.windowing.stride",
+                type="categorical",
+                choices=[10, 15, 20, 25, 20, 35, 40, 45, 50, 55],
+            ),
         ],
         "level3": [
             # WIP
