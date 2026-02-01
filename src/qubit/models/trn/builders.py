@@ -22,7 +22,7 @@ prediction_mode_id = {
     PredictionMode.HORIZON.value: 1,
 }
 
-@register_model(ModelType.TRN, ModelVariant.SEQ2SEQ, DecoderMode.HYBRID)
+@register_model(ModelType.TRN, ModelVariant.FORECASTING, DecoderMode.HYBRID)
 def build_transformer_hybrid_model(
     x_train,# X.shape (n_windows , input_seq_len , feature_dim)
     y_train, # Y.shape (n_windows , output_seq_len  , feature_dim)

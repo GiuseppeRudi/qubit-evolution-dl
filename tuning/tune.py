@@ -134,7 +134,7 @@ def main():
             metrics = run_experiment(
                 base_name,
                 override=override,
-                tuning_out_dir=f"tuning/{study_name}/trial_{trial.number:04d}",
+                out_dir=f"tuning/{study_name}/trial_{trial.number:04d}",
                 optuna_callback=callbacks,
                 do_predict=False,
             )

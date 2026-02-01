@@ -8,22 +8,23 @@ gpus = tf.config.list_physical_devices("GPU")
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-from tensorflow.keras import mixed_precision
-mixed_precision.set_global_policy("mixed_float16")
+# from tensorflow.keras import mixed_precision
+# mixed_precision.set_global_policy("mixed_float16")
 
 
 
 from src.qubit.enums.model_type import ModelType
 from src.qubit.core.data import prepare_dataset
 from src.qubit.utils.utils import *
-from src.qubit.utils.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config
+from src.qubit.utils.config_loader import load_run_config, load_model_config, load_training_config, load_plot_config, load_data_config, load_sr_config
 from src.qubit.utils.registry import get_builder,get_trainer
 from src.qubit.utils.config_values import PREDICTION_PATH
 import src.qubit.utils.config_keys as cfg_keys
 
 from src.qubit.core.save import save_outputs
-from src.qubit.utils.error import check_lstm_correctness, check_trn_correctness
+from src.qubit.utils.error import check_correctness
 
+from src.qubit.enums.model_variant import ModelVariant
 # needed to register the models and trainers
 import src.qubit.models.rnn.builders  
 import src.qubit.models.trn.builders
@@ -34,7 +35,7 @@ def run_experiment(
     yaml_name: str,
     *,
     override: dict | None = None,
-    tuning_out_dir: str | None = None,
+    out_dir: str,
     optuna_callback: list[tf.keras.callbacks.Callback] | None = None,
     do_predict: bool = True,
     training: bool = True
@@ -45,19 +46,21 @@ def run_experiment(
 
     if override:
         print(override)
-        out_dir = tuning_out_dir
         run_cfg = deep_merge_dict(run_cfg, override)
-    else: out_dir = PREDICTION_PATH
 
     data_cfg = load_data_config(run_cfg[cfg_keys.DATA])
     model_cfg = load_model_config(run_cfg[cfg_keys.MODEL])
-    training_cfg = load_training_config(run_cfg[cfg_keys.TRAINING])
+
+    if model_cfg.variant == ModelVariant.SUPER_RESOLUTION: 
+        sr_cfg = load_sr_config(run_cfg[cfg_keys.SUPER_RESOLUTION])
+        print(sr_cfg)
+
+
+    training_cfg = load_training_config(run_cfg[cfg_keys.TRAINING],model_cfg.variant)
+    
     plot_cfg = load_plot_config(run_cfg[cfg_keys.PLOT])
 
-    if model_cfg.type == ModelType.LSTM:
-        check_lstm_correctness(model_cfg,training_cfg,data_cfg)
-    else:
-        check_trn_correctness(model_cfg,training_cfg,data_cfg)
+    check_correctness(model_cfg,training_cfg,data_cfg)
 
     splits, feat_names = prepare_dataset(data_cfg)
 
@@ -88,7 +91,7 @@ def run_experiment(
         save_outputs(splits, pred, model_cfg, feat_names, 
                      history, training_cfg.fr_eval.split + "_fr_", plot_cfg, 
                      training_cfg, splits.Y_train.shape[1], logger, 
-                     yaml_name, model, out_dir)  
+                     yaml_name, out_dir, model)  
    
     return history_dict
     
@@ -98,7 +101,8 @@ def main():
     get_device()
 
     args = parse_args()
-    run_experiment(args.run_cfg, do_predict=True, training=args.training)
+    out_dir = PREDICTION_PATH
+    run_experiment(args.run_cfg, do_predict=True, out_dir=out_dir, training=args.training)
 
 if __name__ == "__main__":
     main()

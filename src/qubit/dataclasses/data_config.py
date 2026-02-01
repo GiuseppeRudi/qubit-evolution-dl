@@ -2,8 +2,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Any, Mapping
 
-from ..utils.config_keys import DATA, DATASET, WINDOWING, DATA_SPLIT
+from ..enums.loss_on import LossOn
 
+from ..utils.config_keys import DATA, DATASET, WINDOWING, DATA_SPLIT,SUPER_RESOLUTION, TASK
+
+from ..enums.task_mode import TaskMode
 @dataclass(frozen=True)
 class DatasetConfig:
     csv_path: str
@@ -12,7 +15,6 @@ class DatasetConfig:
     time_steps: int
     n_traj: int
     traj_fraction: float
-
 
 @dataclass(frozen=True)
 class WindowingConfig:
@@ -26,8 +28,6 @@ class SplitConfig:
     seed: int
     val_ratio: float
     test_ratio: float
-
-
 
 @dataclass(frozen=True)
 class DataConfig:

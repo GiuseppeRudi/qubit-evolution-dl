@@ -29,7 +29,7 @@ prediction_mode_id = {
     PredictionMode.HORIZON.value: 1,
 }
 
-@register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.FULL_SEQ)
+@register_model(ModelType.LSTM, ModelVariant.FORECASTING, DecoderMode.FULL_SEQ)
 def build_lstm_full_seq_custom_model(
         x_train, # X.shape (n_windows , input_seq_len , feature_dim)
         y_train, # Y.shape (n_windows , output_seq_len  , feature_dim)
@@ -79,7 +79,7 @@ def build_lstm_full_seq_custom_model(
     return model
 
 
-@register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.STEP_WISE)
+@register_model(ModelType.LSTM, ModelVariant.FORECASTING, DecoderMode.STEP_WISE)
 def build_lstm_step_wise_model(
         x_train, # x_train.shape(num_windows, input_seq_len, feature_dim)
         y_train, # y_train.shape(num_windows, output_seq_len, feature_dim)
@@ -125,7 +125,7 @@ def build_lstm_step_wise_model(
     return model
 
 
-@register_model(ModelType.LSTM, ModelVariant.SEQ2SEQ, DecoderMode.HYBRID)
+@register_model(ModelType.LSTM, ModelVariant.FORECASTING, DecoderMode.HYBRID)
 def build_lstm_hybrid_model(
         x_train, # x_train.shape(num_windows, input_seq_len, feature_dim)
         y_train, # y_train.shape(num_windows, output_seq_len, feature_dim)

@@ -47,7 +47,7 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [15,200, 25,-1]
+  curriculum: [15,20, 25,-1]
   phases:
     - name: masked_modeling
       epochs: 5

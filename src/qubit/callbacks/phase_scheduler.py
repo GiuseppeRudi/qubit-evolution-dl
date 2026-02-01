@@ -105,7 +105,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
 
         # Info print at the start of each phase
         if epoch_in_phase == 0:
-            actual_horizon = horizon # if horizon != -1 else m.rt.t_out.numpy()
+            # actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
             print(f"\n{'='*70}")
             print(f"   PHASE {phase_idx+1}/{len(self.phases)}: {phase.name}")
             for key, value in phase.__dict__.items():
@@ -114,14 +114,14 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             print(f"   Epochs: {phase.epochs}")
             print(f"   Learning Rate: {lr}")
             print(f"   Clipping Norm: {clip}")
-            print(f"   Horizon (train loss): {actual_horizon}")
+            print(f"   Horizon (train loss): {horizon}")
             print(f"   Output timesteps (val_loss and fr_loss): {m.rt.t_out.numpy()}")
             print(f"{'='*70}\n")
 
         # update callback free_running
         if self.fr_eval is not None:
-            actual_horizon = horizon # if horizon != -1 else m.rt.t_out.numpy()
-            self.fr_eval.phase_horizon = actual_horizon
+            # actual_horizon = horizon if horizon != -1 else m.rt.t_out.numpy()
+            self.fr_eval.phase_horizon = horizon
             self.fr_eval.end_of_phase = (epoch_in_phase == phase.epochs - 1)
             
     def _phase_of(self, epoch):

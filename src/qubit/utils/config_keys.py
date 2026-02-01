@@ -12,6 +12,8 @@ PLOT = "plot" ########
 DATASET = "dataset" ########
 WINDOWING = "windowing" ########
 DATA_SPLIT = "split" ########
+TASK = "task" ########
+SUPER_RESOLUTION = "sr" ########
 
 # data.dataset.*
 CSV_PATH = "csv_path"
@@ -97,11 +99,20 @@ SAMPLE_INDEX = "sample_index" ########
 SAVE_PLOTS = "save_plots" ########
 SAVE_ARTIFACTS = "save_artifacts" ########
 
+# -------------------------
+# sr.*
+# -------------------------
+SR_STRIDE = "stride" ########
+OFFSET = "offset" ########
+SR_MASK_VALUE = "mask_value" ########
+LOSS_ON = "loss_on" ########
+OBSERVED_WEIGHT = "observed_weight" ########
+
 ##########################################################
 # TUNING
 
-TUNING = "tuning"
-OPTUNA_PATH = "optuna" 
+TUNING = "tuning" ########
+OPTUNA_PATH = "optuna" ########
 # -------------------------
 # Top-level sections (TUNING)
 # -------------------------

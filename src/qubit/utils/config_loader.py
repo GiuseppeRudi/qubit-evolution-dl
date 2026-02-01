@@ -13,6 +13,7 @@ from ..dataclasses.fr_eval_config import *
 from ..dataclasses.plot_config import PlotConfig
 from ..dataclasses.data_config import DataConfig
 from ..dataclasses.phase_config import *
+from ..dataclasses.sr_config import SuperResolutionConfig
 
 from ..utils.config_keys import *
 
@@ -23,6 +24,11 @@ from ..enums.split_name import SplitName
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant
 from ..enums.decoder_mode import DecoderMode
+from ..enums.prediction_mode import PredictionMode
+from ..enums.inference_mode import InferenceMode
+from ..enums.start_mode import StartMode
+from ..enums.verbose_mode import VerboseMode
+
 
 def get_project_root() -> Path:
     return Path(__file__).resolve().parents[3]  # core -> qubit -> src -> qubit-evolution-dl
@@ -54,7 +60,17 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
     # parse the config dict into a dataclass (dict is unpacked as kwargs).
     params_dict = m[PARAMS]
     compile_cfg = CompileConfig(**m[COMPILE])
-    inference_cfg = InferenceConfig(**m[INFERENCE])
+
+    # in SR mode we don't use this stuff so for now to put the random values 
+    # we know that it is not the very professional way to solv this 
+    if variant == ModelVariant.SUPER_RESOLUTION: 
+        inference_cfg = InferenceConfig(
+            mode = InferenceMode.FREE_RUNNING,
+            start_mode = StartMode.ZEROS,
+            verbose = VerboseMode.MODE_0
+        )
+        
+    else: inference_cfg = InferenceConfig(**m[INFERENCE])
 
     if model_type == ModelType.LSTM:
         if variant in ModelVariant: params = RNNConfig(**params_dict)
@@ -109,44 +125,62 @@ def parse_phase(d: Dict[str, Any]) -> PhaseConfig:
 
 
 
-def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
+def load_training_config(t: Dict[str, Any], variant: ModelVariant) -> TrainingConfig:
     
     verbose = t[TRAINING_VERBOSE]
-    curriculum = t[CURRICULUM]
     batch_size = t[BATCH_SIZE]
-    prediction_mode = t[PREDICTION_MODE]
 
-    # parse phases
-    phases_raw = t[PHASES]
-    phases = [parse_phase(p) for p in phases_raw]
+    # in SR mode we don't use this stuff so for now to put the random values 
+    # we know that it is not the very professional way to solv this 
+    if variant == ModelVariant.SUPER_RESOLUTION: 
+        curriculum = []
+        prediction_mode = PredictionMode.ALL
+        epochs = t[EPOCHS]
+        phases = []
 
-    for p in phases:
-        if isinstance(p, MaskedModelingPhase):
-            validate_masked_modeling_phase(p)    
+        fr_eval = FrEvalConfig(
+            enabled=False,
+            split=SplitName.TEST,
+            batch_size=-1,
+            probes=(),
+        )
 
-    epochs = sum(p.epochs for p in phases)
+    else:
+        curriculum = t[CURRICULUM]
+        prediction_mode = t[PREDICTION_MODE]
+        
+        # parse phases
+        phases_raw = t[PHASES]
+        phases = [parse_phase(p) for p in phases_raw]
 
-    # parse probes 
-    fr_eval_raw = t[FR_EVAL]
-    split = SplitName(fr_eval_raw[FR_EVAL_SPLIT]) 
-    enabled = bool(fr_eval_raw[ENABLED])
-    batch_size = int(fr_eval_raw[FR_BATCH_SIZE])
+        for p in phases:
+            if isinstance(p, MaskedModelingPhase):
+                validate_masked_modeling_phase(p)    
 
-    probes_raw = fr_eval_raw[PROBES]
-    if probes_raw is None:
-        raise ValueError("fr_eval config must define probes field.")
-    
-    probes = tuple(_parse_fr_eval_probe(cast(Dict[str, Any], p)) for p in probes_raw)
+        epochs = sum(p.epochs for p in phases)
 
-    if enabled and len(probes) == 0:
-        raise ValueError("if fr_eval.enabled=true requires at least one probe")
 
-    fr_eval = FrEvalConfig(
-        enabled=enabled,
-        split=split,
-        batch_size=batch_size,
-        probes=cast(tuple[FrEvalProbeConfig],probes),
-    )
+        # parse probes 
+        fr_eval_raw = t[FR_EVAL]
+        split = SplitName(fr_eval_raw[FR_EVAL_SPLIT]) 
+        enabled = bool(fr_eval_raw[ENABLED])
+        batch_size = int(fr_eval_raw[FR_BATCH_SIZE])
+
+        probes_raw = fr_eval_raw[PROBES]
+        if probes_raw is None:
+            raise ValueError("fr_eval config must define probes field.")
+        
+        probes = tuple(_parse_fr_eval_probe(cast(Dict[str, Any], p)) for p in probes_raw)
+
+        if enabled and len(probes) == 0:
+            raise ValueError("if fr_eval.enabled=true requires at least one probe")
+
+        fr_eval = FrEvalConfig(
+            enabled=enabled,
+            split=split,
+            batch_size=batch_size,
+            probes=cast(tuple[FrEvalProbeConfig],probes),
+        )
 
     return TrainingConfig(
         prediction_mode=prediction_mode,
@@ -157,6 +191,10 @@ def load_training_config(t: Dict[str, Any]) -> TrainingConfig:
         verbose=verbose,
         curriculum=curriculum,
     )
+
+
+def load_sr_config(d : Dict[str, Any]) -> SuperResolutionConfig : 
+    return SuperResolutionConfig.from_dict(d) 
 
 def load_data_config(d: Dict[str, Any]) -> DataConfig:
     return DataConfig.from_dict(d)

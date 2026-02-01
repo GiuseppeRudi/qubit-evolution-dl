@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import  Union
 
-from .training_config import TrainingConfig
 from .transformer_config import TransformerConfig
 from .compile_config import CompileConfig
 from .rnn_config import RNNConfig
@@ -9,8 +8,7 @@ from .inference_config import InferenceConfig
 
 from ..enums.model_type import ModelType
 from ..enums.model_variant import ModelVariant       
-from ..enums.decoder_mode import DecoderMode      
-from ..enums.compile_mode import CompileMode          
+from ..enums.decoder_mode import DecoderMode    
 
 @dataclass(frozen=True)
 class ModelConfig:
@@ -20,5 +18,5 @@ class ModelConfig:
     variant: ModelVariant
     decoder_mode: DecoderMode
     compile: CompileConfig 
-    inference: InferenceConfig 
+    inference: InferenceConfig
     params: Union[RNNConfig, TransformerConfig] 

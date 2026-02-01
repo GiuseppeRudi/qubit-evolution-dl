@@ -21,7 +21,7 @@ model:
   name: "prova1"
   save_model: true
   type: "TRN"
-  variant: "SEQ2SEQ"
+  variant: "FC" # SR or FC
   decoder_mode: "HYBRID"  # "FULL_SEQ"  ,  "STEP_WISE" # "HYBRID"
 
   params:

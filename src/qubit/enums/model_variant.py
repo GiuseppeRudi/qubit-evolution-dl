@@ -1,5 +1,5 @@
 from enum import Enum
 
 class ModelVariant(str,Enum):
-    SEQ2SEQ = "SEQ2SEQ"
-    ENCODERDENSE = "ENCODERDENSE"
+    FORECASTING = "FC"
+    SUPER_RESOLUTION = "SR"
