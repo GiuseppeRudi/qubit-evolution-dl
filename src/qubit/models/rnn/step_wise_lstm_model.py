@@ -208,7 +208,7 @@ class StepWiseLstmModel(StrategyChooserModel):
                 
         # calculate gradients (backward pass)
         grads = tape.gradient(loss, self.trainable_variables) # type: ignore[reportCallIssue]
-
+           
         # filter the None gradients => take the variables that have gradients
         grads_and_vars = [(g, v) for g, v in zip(grads, self.trainable_variables) if g is not None]
         if not grads_and_vars:

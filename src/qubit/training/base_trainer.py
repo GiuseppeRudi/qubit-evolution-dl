@@ -14,7 +14,9 @@ from ..callbacks.filtered_history import FilteredProgbar
 
 from ..enums.split_name import SplitName
 from ..enums.inference_mode import InferenceMode
+from ..enums.model_variant import ModelVariant
 
+from ..inference.sr_trn_adapter import SrTrnAdapter
 
 class BaseTrainer(ABC):
 
@@ -32,13 +34,10 @@ class BaseTrainer(ABC):
         """
         pass
     
-
-
-
-    
     def fit(self, splits : DatasetSplits, optuna_callback = None):
 
-        total_epochs = sum(p.epochs for p in self.phases)
+        
+        total_epochs = sum(p.epochs for p in self.phases) if self.model_cfg.variant == ModelVariant.FORECASTING else self.training_cfg.epochs
 
         callbacks = self._prepare_callbacks(splits, optuna_callback)
 
@@ -68,6 +67,8 @@ class BaseTrainer(ABC):
         callbacks = []
 
         fr_eval = None
+
+
         
         if self.training_cfg.fr_eval.enabled:
             is_test = self.training_cfg.fr_eval.split == SplitName.TEST
@@ -84,19 +85,19 @@ class BaseTrainer(ABC):
                     inference_mode=self.model_cfg.inference.mode,
                     training_cfg=self.training_cfg,
                 )
-         
-        phase_scheduler = PhaseSchedulerCallback(
-            phases=self.phases,
-            curriculum=self.training_cfg.curriculum,
-            lr_global=self.model_cfg.compile.learning_rate,
-            clip_global=self.model_cfg.compile.clip_norm,
-            decoder_mode=self.model_cfg.decoder_mode,
-            fr_eval=fr_eval
-        )
+            
+        if self.model_cfg.variant == ModelVariant.FORECASTING: 
+            phase_scheduler = PhaseSchedulerCallback(
+                phases=self.phases,
+                curriculum=self.training_cfg.curriculum,
+                lr_global=self.model_cfg.compile.learning_rate,
+                clip_global=self.model_cfg.compile.clip_norm,
+                decoder_mode=self.model_cfg.decoder_mode,
+                fr_eval=fr_eval
+            )
+            callbacks.append(phase_scheduler)
 
         # ! the order of this list is important 
-        
-        callbacks.append(phase_scheduler)
 
         if fr_eval is not None: callbacks.append(fr_eval)
 
@@ -118,9 +119,10 @@ class BaseTrainer(ABC):
         
         # safety check
         if inference_adapter is None :
-            raise TypeError("Adapter is None ")
-
-        if self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
+            raise TypeError("Adapter is None")
+        if isinstance(inference_adapter , SrTrnAdapter) : 
+            pred = inference_adapter.predict(X_test, batch_size = self.training_cfg.batch_size, verbose = self.training_cfg.verbose)
+        elif  self.model_cfg.inference.mode == InferenceMode.TEACHER_FORCING:
             pred = inference_adapter.predict((X_test, Y_test), batch_size=self.training_cfg.fr_eval.batch_size, verbose = self.model_cfg.inference.verbose)
         else:
             pred = inference_adapter.predict(X_test, batch_size=self.training_cfg.fr_eval.batch_size, verbose = self.model_cfg.inference.verbose)

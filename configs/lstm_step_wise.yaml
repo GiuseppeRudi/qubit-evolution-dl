@@ -21,8 +21,8 @@ model:
   name: "prova1"
   save_model: true
   type: "LSTM"
-  variant: "SEQ2SEQ"
-  decoder_mode: "STEP_WISE"  # "FULL_SEQ"  ,  "STEP_WISE"
+  variant: "FC"
+  decoder_mode: "STEP_WISE"  # "FULL_SEQ"  ,  "STEP_WISE", "HYBRID"
 
   params:
     latent_dim: 128
@@ -36,7 +36,7 @@ model:
     clip_norm: 1.0
 
   inference:
-    mode: "teacher_forcing"   # "teacher_forcing" | "free_running"
+    mode: "free_running"   # "teacher_forcing" | "free_running"
     start_mode: "last_x"    # "zeros" | "last_x"
     verbose: 0  # 0,1,2
 

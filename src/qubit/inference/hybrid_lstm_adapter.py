@@ -14,8 +14,11 @@ class HybridLstmAdapter(BaseAutoregressiveAdapter):
         return self.model._encode(X)
 
     def step(self, dec_in: tf.Tensor, states):
-        return self.model._decode_full_seq(dec_in, states)
+        return self.model._decode_step(dec_in, states)
     
+    def step_full_seq(self, dec_in: tf.Tensor, states):
+        return self.model._decode_full_seq(dec_in, states)
+
     def _init_dec0(self, X: tf.Tensor):
         return self.model._init_dec0(X)
     
@@ -58,15 +61,13 @@ class HybridLstmAdapter(BaseAutoregressiveAdapter):
             # dec_in.shape(batch_size, out_steps, feature_dim)
 
             # decoder model function
-            Y_pred = self.step(dec_in, state)  
+            Y_pred = self.step_full_seq(dec_in, state)  
             
             # Y_pred.(batch_size, outsteps, feature_dim)
             return Y_pred
         
-        
         ta = tf.TensorArray(dtype=X.dtype, 
                             size=self.out_steps)
-        
 
         # ta.shape(element_size = out_steps, element_shape = (batch_size, feature_dim))
         

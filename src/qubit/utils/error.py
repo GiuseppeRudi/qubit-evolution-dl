@@ -22,7 +22,6 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
 
     if not (0.0 <= data_cfg.split.val_ratio < 1.0 and 0.0 <= data_cfg.split.test_ratio < 1.0 and (data_cfg.split.val_ratio + data_cfg.split.test_ratio) < 1.0):
         raise ValueError("val_ratio and test_ratio must be in [0,1) and val_ratio + test_ratio < 1")
-    
 
     if model_cfg.type == ModelType.LSTM:
         check_lstm_correctness(model_cfg,training_cfg,data_cfg)
@@ -37,17 +36,15 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
         check_fc_correctness(model_cfg,training_cfg,data_cfg)
     else:
         raise ValueError(f"Unknown model variant: {model_cfg.variant}")
-
-    
     
 # super_resolution
 def check_sr_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
 
-    if data_cfg.windowing.input_seq_len > data_cfg.dataset.time_steps:
-        raise ValueError("The sum of output_seq_len and input_seq_len can't be greater than the total time steps")
-    
-    if data_cfg.windowing.output_seq_len != data_cfg.windowing.input_seq_len:
-        raise ValueError("input_seq_len and output_seq_len must be equal in a super-resolution task")
+    if data_cfg.windowing.output_seq_len != (data_cfg.windowing.input_seq_len * data_cfg.windowing.stride):
+        raise ValueError("input_seq_len must be equal to the input_seq_len * stride in a super-resolution task")
+
+    if data_cfg.windowing.output_seq_len > data_cfg.dataset.time_steps:
+        raise ValueError("output_seq_len can't be greater than the total time steps")
     
 # forecasting
 def check_fc_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):

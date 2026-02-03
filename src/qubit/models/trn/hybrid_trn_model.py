@@ -244,10 +244,10 @@ class HybridTrnModel(StrategyChooserModel):
 
         # layers.Dense 
         # input => y.shape (batch_size,L,dim_model)
-        # output => out.shape (batch_size,L,feature_dim)
-        out = self.out_dense(y)  
+        # output => y_pred.shape (batch_size,L,feature_dim)
+        y_pred = self.out_dense(y)  
 
-        return out
+        return y_pred
 
     @property
     def metrics(self):
@@ -411,6 +411,7 @@ class HybridTrnModel(StrategyChooserModel):
         # calculate gradients (backward pass)
         grads = tape.gradient(loss, self.trainable_variables) # type: ignore[reportCallIssue]
 
+  
         # filter the None gradients => take the variables that have gradients
         grads_and_vars = [(g, v) for g, v in zip(grads, self.trainable_variables) if g is not None]
         if not grads_and_vars:

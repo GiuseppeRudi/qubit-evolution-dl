@@ -14,6 +14,7 @@ from ..enums.decoder_mode import DecoderMode
 from ..dataclasses.model_config import ModelConfig
 from ..dataclasses.plot_config import PlotConfig
 from ..dataclasses.training_config import TrainingConfig
+from ..dataclasses.sr_config import SuperResolutionConfig
 
 from ..utils.config_values import PREDICTION_PATH, RUN_PATH
 from ..utils.utils import BufferedLogger, finish_log
@@ -38,7 +39,6 @@ def make_run_output_dir(model_cfg : ModelConfig, out_dir: str) -> Path:
 
     run_dir = root_dir / model_type / variant / decoder_mode / run_name
 
-
     run_dir.mkdir(parents=True, exist_ok=True)
 
     return run_dir
@@ -46,34 +46,30 @@ def make_run_output_dir(model_cfg : ModelConfig, out_dir: str) -> Path:
 
 def copy_yaml(yaml_name: str, run_dir: Path):
 
-    # path sorgente dello yaml
     src = Path("configs/" + yaml_name + ".yaml").expanduser().resolve()
 
     if not src.exists():
         raise FileNotFoundError(f"YAML not found: {src}")
 
-    # path destinazione (stesso nome o nome custom)
     dst = run_dir / src.name
 
-    # copia fisica del file
     shutil.copy2(src, dst)
 
 def save_outputs(
     splits,
     pred, # shape(num_windows, output_seq_len, feature_dim)
-    model_cfg : ModelConfig,
+    model_cfg: ModelConfig,
     feat_names,
     history,
-    fr_key: str,
     plot_cfg: PlotConfig,
-    training_cfg : TrainingConfig,
-    output_seq_len: int,
+    training_cfg: TrainingConfig,
     bufferedLogger: BufferedLogger, 
     yaml_name: str,
-    out_dir : str,
+    out_dir: str,
+    mean : np.ndarray,
+    std : np.ndarray,
     model = None,
 ) -> Path:
-    
     
     run_dir = make_run_output_dir(model_cfg, out_dir)
 
@@ -88,13 +84,16 @@ def save_outputs(
         model.save_weights(run_dir / "model.weights.h5")
 
     if history is not None and save_plots:
-        save_loss_plots_keras(run_dir,history,training_cfg,fr_key,output_seq_len)
+        output_seq_len = splits.Y_test.shape[1]
+        save_loss_plots_keras(run_dir, history, training_cfg, output_seq_len)
 
     if save_artifacts:
         np.savez_compressed(
             run_dir / "data_splits.npz",
             X_test=splits.X_test,
             Y_test=splits.Y_test,
+            mean = mean,
+            std = std
         )
 
         np.savez_compressed(
@@ -116,6 +115,7 @@ def save_outputs(
             "pred_shape": list(np.asarray(pred).shape),
             "feature_names": feat_names,
         }
+
         (run_dir / "meta.json").write_text(json.dumps(meta, indent=2))
 
         print(f"Saved artifacts to: {run_dir}")

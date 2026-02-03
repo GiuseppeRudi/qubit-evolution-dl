@@ -21,8 +21,8 @@ model:
   name: "prova1"
   save_model: true
   type: "LSTM"
-  variant: "SEQ2SEQ"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE"
+  variant: "FC"
+  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE", "HYBRID", "ENCODER_ONLY"
 
   params:
     latent_dim: 128

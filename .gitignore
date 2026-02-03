@@ -49,7 +49,7 @@ Thumbs.db
 
 # Large data / training artifacts
 data/
-# predictions/
+runs/
 
 # Docker stuff (keep Dockerfile, ignore extra local files)
 docker-compose.override.yml

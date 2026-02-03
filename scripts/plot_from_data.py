@@ -8,35 +8,47 @@ import matplotlib.pyplot as plt
 import json
 import re
 
+from qubit.utils.config_values import PREDICTION_PATH
+from qubit.core.standardizer import inverse_standardizer 
+
+# datatime 
 RUN_RE = re.compile(r"_(\d{8})_(\d{6})$") 
 
 def find_latest_run_dir() -> str:
-    base_dir = Path("predictions")
+    base_dir = Path("runs/" + PREDICTION_PATH)
+
     if not base_dir.exists():
         raise FileNotFoundError(f"Directory not found: {base_dir}")
 
     best = None  # (datetime, Path)
 
+    # for each sub_dir that contain the base_dir 
     for p in base_dir.rglob("*"):
-        if not p.is_dir():
-            continue
-
+        if not p.is_dir(): continue
+        
+        # TODO when we change the name of dir and remove the datatime this function don't work
+        # filter the dir that not contain the datatime
         m = RUN_RE.search(p.name)
-        if not m:
-            continue
-
+        if not m: continue
+        
+        # extract date+hour and convert in datetime 
         dt = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
+        
+        # takes the most recent dir
         if best is None or dt > best[0]:
             best = (dt, p)
 
     if best is None:
         raise ValueError(f"No directory with pattern *_YYYYMMDD_HHMMSS found inside {base_dir}")
     
+    # return the path of the more recent dir
     return str(best[1])
 
-def load_run_artifacts(run_dir: str | Path):
-    # run_dir = Path("predictions") / Path(run_dir)
-    run_dir = Path(run_dir)
+def load_run_artifacts(run_str: str, destandardize : bool):
+
+    # run_dir = Path("runs" / "predictions") / ...
+    run_dir = Path(run_str)
+    
     data_path = run_dir / "data_splits.npz"
     pred_path = run_dir / "predictions.npz"
     meta_path = run_dir / "meta.json"
@@ -55,6 +67,33 @@ def load_run_artifacts(run_dir: str | Path):
     pred_npz = np.load(pred_path, allow_pickle=True)
     pred = pred_npz["pred"]
 
+    mean = data["mean"] if "mean" in data.files else None
+    std = data["std"]  if "std" in data.files else None
+
+    
+    if destandardize:
+        if mean is None or std is None:
+            raise ValueError("destandardize=True but mean/std not found in data_splits.npz")
+
+        feature_dim = mean.shape[-1]
+
+        Y_test = inverse_standardizer(Y_test, mean, std)
+        pred = inverse_standardizer(pred, mean, std)
+
+        if X_test.shape[-1] == feature_dim:
+            X_test = inverse_standardizer(X_test, mean, std)
+
+        elif X_test.shape[-1] == feature_dim + 1:
+            X_feat = inverse_standardizer(X_test[:, :, :feature_dim], mean, std)
+            X_mask = X_test[:, :, feature_dim:]  # keep mask unchanged
+            X_test = np.concatenate([X_feat, X_mask], axis=-1)
+
+        else:
+            raise ValueError(
+                f"Unexpected X_test last dim {X_test.shape[-1]} "
+                f"(expected {feature_dim} or {feature_dim+1})"
+            )
+
     meta = json.loads(meta_path.read_text())
 
     splits = SimpleNamespace(X_test=X_test, Y_test=Y_test)
@@ -69,52 +108,145 @@ def generate_plot_for_feature(
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
-    out_dir: str | Path = "predictions",
-) -> str:
+    out_dir: str | Path = PREDICTION_PATH,
+    ):
     X_test = splits.X_test
     Y_test = splits.Y_test
 
+    # FORECASTING 
+    # X_test.shape(num_windows, input_seq_len, feature_dim)
+    # Y_test.shape(num_windows, output_seq_len, feature_dim)
+
+    # SUPER RESOLUTION 
+    # X_test.shape(num_windows, window_size, feature_dim + 1 (mask channel))
+    # Y_test.shape(num_windows, window_size, feature_dim)
+
+    # ex. sample_index is in [0,2,4]
     if sample_index < 0 or sample_index >= X_test.shape[0]:
         raise IndexError(f"sample_index out of range: {sample_index} (max {X_test.shape[0]-1})")
 
-    if feature_index < 0 or feature_index >= X_test.shape[2]:
-        raise IndexError(f"feature_index out of range: {feature_index} (max {X_test.shape[2]-1})")
+    if feature_index < 0 or feature_index >= Y_test.shape[2]:
+        raise IndexError(f"feature_index out of range: {feature_index} (max {Y_test.shape[2]-1})")
 
-    input_sequence = X_test[sample_index, :, feature_index]
-    true_output = Y_test[sample_index, :, feature_index]
+    # with sample_index we plot only a specific index window and a specific feature_index
+    x_feat = X_test[sample_index, :, feature_index]
+    # If Forecasting => x_feat.shape(input_seq_len)
 
-    full_true = np.concatenate([input_sequence, true_output])
-    input_len = len(input_sequence)
-    out_len = len(true_output)
-    full_len = len(full_true)
+    # If SuperResolution => x_feat.shape(window_size)
 
-    time_axis = np.arange(full_len)
-    pred_time_axis = np.arange(input_len, input_len + out_len)
+    y_true = Y_test[sample_index, :, feature_index]
+    # If Forecasting => y_true.shape(output_seq_len)
+    # If SuperResolution => y_true.shape(window_size)
 
-    pred_a_2d = pred_a[sample_index]
-    out_a = pred_a_2d[:, feature_index][:out_len]
+    # decide mode
+    is_sr = (X_test.shape[2] == Y_test.shape[2]+1)
 
-    out_b = None
-    if pred_b is not None:
-        pred_b_2d = pred_b[sample_index]
-        out_b = pred_b_2d[:, feature_index][:out_len]
-
-    # 3) plot
-    out_dir = Path(str(out_dir) + "/s(" + str(sample_index) +")")
+    out_dir = Path(str(out_dir) + f"/s({sample_index})")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(15, 6))
-    plt.plot(time_axis, full_true, label="Real Dynamics (Ground Truth)", linewidth=2)
-    plt.plot(pred_time_axis, out_a, label=label_a)
-
-    if out_b is not None:
-        plt.plot(pred_time_axis, out_b, label=label_b)
-
-    plt.axvline(x=input_len - 1, linestyle=":", label="Fine Input")
-
     fname = feature_names[feature_index]
+
+    if not is_sr:
+        # --- FORECASTING ---
+
+        # the next index of input_sequence[-1] is true_output[0] 
+
+        # the full ground truth are the array with size = input_sequence + true_output
+        full_true = np.concatenate([x_feat, y_true])
+        input_len = len(x_feat)
+        out_len = len(y_true)
+        full_len = len(full_true)
+
+        # return an numpy array with values from 0 to full_seq-1
+        time_axis = np.arange(full_len)
+        
+        out_a = pred_a[sample_index, :, feature_index]
+        if out_a.shape[0] != out_len:
+            raise ValueError(f"pred_a length {out_a.shape[0]} != out_len {out_len}")
+    
+        pred_time_axis = np.arange(input_len, input_len + out_len)
+
+        plt.plot(time_axis, full_true, label="Ground Truth", linewidth=2)
+        plt.plot(pred_time_axis, out_a, label=label_a)
+        if pred_b is not None:
+            out_b = pred_b[sample_index, :, feature_index]
+            plt.plot(pred_time_axis, out_b, label=label_b)
+
+        plt.axvline(x=input_len - 1, linestyle=":", label="End of Input")
+        plt.xlabel(f"Time (Input 0-{input_len-1}, Output {input_len}-{input_len+out_len-1})")
+
+    else:
+        # --- SUPER RESOLUTION ---
+        L = Y_test.shape[1]
+        t = np.arange(L)
+
+        out_a = pred_a[sample_index, :, feature_index]      # (L,)
+        if out_a.shape[0] != L:
+            raise ValueError(f"pred_a length {out_a.shape[0]} != window {L}")
+
+        # mask channel: 1 = observed, 0 = missing (to predict)
+        mask = X_test[sample_index, :, -1]                  # (L,)
+        miss_idx = np.where(mask < 0.5)[0]
+
+        # Nice, readable palette (matplotlib "tab" colors)
+        c_gt   = "tab:gray"    # ground truth line
+        c_obs  = "tab:green"   # observed input points
+        c_a    = "tab:blue"    # model A predicted points
+        c_b    = "tab:purple"  # model B predicted points (optional)
+        c_err  = "tab:red"     # error connectors
+
+        # Ground truth as a line (neutral color so it doesn't compete with predictions)
+        plt.plot(t, y_true, color=c_gt, label="Ground Truth", linewidth=2.2, zorder=1)
+
+        # Observed input points (only where mask=1)
+        plt.scatter(
+            miss_idx, y_true[miss_idx],
+            s=22, color=c_obs, edgecolors="white", linewidths=0.5,
+            label="Holes (mask=1)", zorder=3
+        )
+
+        # Predicted points ONLY where mask=0 (missing)
+        plt.scatter(
+            miss_idx, out_a[miss_idx],
+            s=26, color=c_a, edgecolors="white", linewidths=0.6,
+            label=f"{label_a} preds (mask=0)", zorder=4
+        )
+
+        # Error connectors (GT ↔ prediction) for missing indices
+        for j, i in enumerate(miss_idx):
+            plt.plot(
+                [i, i], [y_true[i], out_a[i]],
+                color=c_err, linewidth=1.0, alpha=0.75,
+                label="Error (GT-pred)" if j == 0 else None,
+                zorder=2
+            )
+
+        if pred_b is not None:
+            out_b = pred_b[sample_index, :, feature_index]
+            if out_b.shape[0] != L:
+                raise ValueError(f"pred_b length {out_b.shape[0]} != window {L}")
+
+            # Model B predicted points (different color to avoid confusion with red error lines)
+            plt.scatter(
+                miss_idx, out_b[miss_idx],
+                s=26, color=c_b, edgecolors="white", linewidths=0.6,
+                label=f"{label_b} preds (mask=0)", zorder=4
+            )
+
+            # Error connectors for model B (dashed red to distinguish)
+            for j, i in enumerate(miss_idx):
+                plt.plot(
+                    [i, i], [y_true[i], out_b[i]],
+                    color=c_err, linestyle="--", linewidth=1.0, alpha=0.65,
+                    label="Error (GT-pred) [B]" if j == 0 else None,
+                    zorder=2
+                )
+
+        plt.xlabel("Time (window)")
+        plt.title(f"Super-Resolution: {fname}")
+
     plt.title(f"Comparison Prediction Quantum Dynamics: {fname}")
-    plt.xlabel(f"Time Steps (Input: 0-{input_len-1}, Output: {input_len}-{input_len+out_len-1})")
     plt.ylabel("Feature Value")
     plt.legend()
     plt.grid(True)
@@ -123,22 +255,22 @@ def generate_plot_for_feature(
     plot_path = out_dir / filename
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
     plt.close()
-
     return str(plot_path)
 
 def generate_all_plots(
     splits,
     pred_a,
-    sample_index,
-    feature_names,
+    meta,
     pred_b=None,
     label_a="Model A",
     label_b="Model B",
-    out_dir: str = "predictions",
+    out_dir: str = PREDICTION_PATH,
 ):
     paths = []
-    feature_dim = splits.X_test.shape[2]
-    for s in sample_index:
+    
+    # ! we take the feature_dim from Y because in SR X_test.shape[2] == feature_dim + 1 (mask channel)
+    feature_dim = splits.Y_test.shape[2]
+    for s in meta.get("sample_index"):
         for feature_index in range(feature_dim):
             p = generate_plot_for_feature(
                 splits=splits,
@@ -147,14 +279,13 @@ def generate_all_plots(
                 label_a=label_a,
                 label_b=label_b,
                 sample_index=s,
-                feature_names=feature_names,
+                feature_names = meta.get("feature_names", []),
                 feature_index=feature_index,
-                out_dir=out_dir,
+                out_dir=out_dir
             )
             paths.append(p)
     return paths
 
-# TODO now we plot the value for pred and true value with standardized value but this is not correct for the presentations so we need to perform the denormalization
 
 def parse_args():
     ap = argparse.ArgumentParser(
@@ -171,15 +302,18 @@ def parse_args():
 
 def main():
     args = parse_args()
+    
+    # ! important must indicate if the X and Y are standardized or not 
+    destandardized : bool = True
 
     if args.run_a is None and args.run_b is None:
         args.run_a = find_latest_run_dir()
 
-    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a)
+    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a,destandardized)
 
     pred_b = None
     if args.run_b is not None:
-        splits_b, pred_b, meta_b = load_run_artifacts(args.run_b)
+        splits_b, pred_b, _ = load_run_artifacts(args.run_b,destandardized)
 
         # safety check: to compare, X_test and Y_test should match
         if splits_a.X_test.shape != splits_b.X_test.shape or splits_a.Y_test.shape != splits_b.Y_test.shape:
@@ -198,6 +332,7 @@ def main():
         else:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             out_dir = Path("predictions") / "compare" / f"compare__{ts}"
+    
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.feature is not None:
@@ -220,8 +355,7 @@ def main():
             pred_b=pred_b,
             label_a=args.label_a,
             label_b=args.label_b,
-            feature_names= meta_a.get("feature_names", []),
-            sample_index=meta_a.get("sample_index"),
+            meta = meta_a,
             out_dir=str(out_dir),
         )
         print(f"Saved {len(paths)} plots in: {out_dir}")
@@ -229,3 +363,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

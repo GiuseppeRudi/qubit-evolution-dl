@@ -10,8 +10,9 @@ import numpy as np
 import pandas as pd
 
 
+from .standardizer import fit_standardizer, apply_standardizer
 
-
+from ..dataclasses.sr_config import SuperResolutionConfig
 from ..dataclasses.data_config import DataConfig
 
 def compute_feature_dim(n: int) -> int:
@@ -70,7 +71,7 @@ def build_trajectories(df: pd.DataFrame, data_cfg : DataConfig) -> Tuple[np.ndar
     # magnetization cols: m1..mk 
     mag_cols = list(range(1, 1 + used_qubits))
 
-    corr_cols = correlation_columns(corr_start=corr_start , used_qubits=used_qubits, total_qubits= total_qubits)
+    corr_cols = correlation_columns(corr_start=corr_start, used_qubits=used_qubits, total_qubits= total_qubits)
 
     # total cols to extract => list of index to extract from the dataframe
     cols = mag_cols + corr_cols
@@ -120,7 +121,8 @@ def correlation_columns(corr_start: int, used_qubits: int, total_qubits: int) ->
         
     return corr_cols
 
-def prepare_dataset(data_cfg : DataConfig ) -> Tuple[DatasetSplits, list[str]]:
+def prepare_dataset(data_cfg: DataConfig, sr_cfg: SuperResolutionConfig | None 
+ ) ->Tuple[DatasetSplits, list[str], np.ndarray, np.ndarray]:
 
     seed = data_cfg.split.seed
     set_seed(seed, deterministic=True)
@@ -135,26 +137,92 @@ def prepare_dataset(data_cfg : DataConfig ) -> Tuple[DatasetSplits, list[str]]:
     # input_len: piece of sequence that we give in input to the model
     input_len = data_cfg.windowing.input_seq_len
 
-    # output_len is a piece of sequence that we want the model to predict
-    output_len = data_cfg.windowing.output_seq_len
-    
     # stride for the sliding window
     stride = data_cfg.windowing.stride
 
     # percentages for validation and test sets
     val_ratio = data_cfg.split.val_ratio
     test_ratio = data_cfg.split.test_ratio
+    
+    # output_len is a piece of sequence that we want the model to predict
+    output_len = data_cfg.windowing.output_seq_len
+    
 
-    splits = split_by_trajectory_then_window(
+    splits, mean, std = split_by_trajectory_then_window(
         traj_3d,
         input_len=input_len,
         output_len=output_len,
         stride=stride,
         val_ratio=val_ratio,
         test_ratio=test_ratio,
+        sr_cfg=sr_cfg,
     )
     
-    return splits, feat_names
+    return splits, feat_names, mean, std
+
+def split_by_trajectory_then_window(
+    traj_3d: np.ndarray,   # (n_traj, time_steps, feature_dim)
+    input_len: int,
+    output_len: int,
+    stride: int,
+    val_ratio: float, # greater than 0 and less or equal than 1 
+    test_ratio: float,  # greater than 0 and less or equal than 1 
+    sr_cfg : SuperResolutionConfig | None
+) -> tuple[DatasetSplits, np.ndarray, np.ndarray]:
+
+    # from now on the n_traj is the number of trajectories after the fractioning
+    
+    # n_traj => number of trajectories 
+
+    # * n_traj are already shuffled in prepare_dataset function 
+    n_traj = traj_3d.shape[0]
+
+    # number of trajectories for each split 
+    n_test = int(round(n_traj * test_ratio))
+    n_val = int(round(n_traj * val_ratio))
+
+    # list of indices for each split
+    test_idx = list(range(0,n_test))
+    val_idx = list(range(n_test,n_test + n_val))
+    train_idx = list(range(n_test + n_val,n_traj))
+
+    # split trajectories
+    tr_train = traj_3d[train_idx]
+    tr_val = traj_3d[val_idx]
+    tr_test = traj_3d[test_idx]
+
+    # standardize based on training set 
+    mean, std = fit_standardizer(tr_train)
+
+    # mean.shape == (1, 1, feature_dim)
+    # std.shape == (1, 1, feature_dim)
+    
+    # apply standardization using mean and std from training set 
+    tr_train = apply_standardizer(tr_train, mean, std)
+    tr_val = apply_standardizer(tr_val, mean, std)
+    tr_test = apply_standardizer(tr_test, mean, std)
+    # X - mean / std
+
+    # windowing after splitting to prevent data leakage
+    if sr_cfg is not None : 
+        X_train, Y_train = make_sr_windows_from_trajectories(tr_train, input_len,stride, sr_cfg)
+        X_val, Y_val = make_sr_windows_from_trajectories(tr_val, input_len,stride, sr_cfg)
+        X_test, Y_test = make_sr_windows_from_trajectories(tr_test, input_len,stride, sr_cfg)
+    else : 
+        X_train, Y_train = make_windows_from_trajectories(tr_train, input_len, output_len, stride)
+        X_val, Y_val = make_windows_from_trajectories(tr_val, input_len, output_len, stride)
+        X_test, Y_test = make_windows_from_trajectories(tr_test, input_len, output_len, stride)
+
+    # *     X_* and Y_*
+    # *     X_*.shape[0] from now on don't have num_traj but num_windows
+    # *     num_windows is calculated as n_traj * number of windows for each trajectory
+    # *     X_*.shape => (num_windows , time_steps , feature_dim) 
+    
+    return DatasetSplits(
+        X_train=X_train, Y_train=Y_train,
+        X_val=X_val, Y_val=Y_val,
+        X_test=X_test, Y_test=Y_test,
+    ), mean,std
 
 def make_windows_from_trajectories(
     traj_3d: np.ndarray,  # (n_traj_split, time_steps, feature_dim)
@@ -197,72 +265,72 @@ def make_windows_from_trajectories(
     # Y => targets: (n_windows, output_len, feature_dim)
     return X, Y
 
-
-def split_by_trajectory_then_window(
-    traj_3d: np.ndarray,   # (n_traj, time_steps, feature_dim)
-    input_len: int,
-    output_len: int,
-    stride: int,
-    val_ratio: float, # greater than 0 and less or equal than 1 
-    test_ratio: float,  # greater than 0 and less or equal than 1 
-) -> DatasetSplits:
-
-    # from now on the n_traj is the number of trajectories after the fractioning
+def make_sr_windows_from_trajectories(
+    traj_3d: np.ndarray, # (n_traj_split, time_steps, feature_dim)
+    input_seq_len: int, # (low-res length)
+    slide_stride: int, # data.windowing.stride
+    sr_cfg : SuperResolutionConfig,
+) -> Tuple[np.ndarray, np.ndarray]:
     
-    # n_traj => number of trajectories 
+    window_len = input_seq_len * sr_cfg.stride
 
-    # * n_traj are already shuffled in prepare_dataset function 
-    n_traj = traj_3d.shape[0]
-
-    # number of trajectories for each split 
-    n_test = int(round(n_traj * test_ratio))
-    n_val  = int(round(n_traj * val_ratio))
-
-    # list of indices for each split
-    test_idx  = list(range(0,n_test))
-    val_idx   = list(range(n_test,n_test + n_val))
-    train_idx = list(range(n_test + n_val,n_traj))
-
-    # split trajectories
-    tr_train = traj_3d[train_idx]
-    tr_val   = traj_3d[val_idx]
-    tr_test  = traj_3d[test_idx]
-
-    # standardize based on training set 
-    mean, std = fit_standardizer(tr_train)
+    T = traj_3d.shape[1] # timesteps 
     
-    # apply standardization using mean and std from training set 
-    tr_train = apply_standardizer(tr_train, mean, std)
-    tr_val   = apply_standardizer(tr_val, mean, std)
-    tr_test  = apply_standardizer(tr_test, mean, std)
-    # X - mean / std
-
-    # windowing after splitting to prevent data leakage
-    X_train, Y_train = make_windows_from_trajectories(tr_train, input_len, output_len, stride)
-    X_val,   Y_val   = make_windows_from_trajectories(tr_val,   input_len, output_len, stride)
-    X_test,  Y_test  = make_windows_from_trajectories(tr_test,  input_len, output_len, stride)
-
-    # *     X_* and Y_*
-    # *     X_*.shape[0] from now on don't have num_traj but num_windows
-    # *     num_windows is calculated as n_traj * number of windows for each trajectory
-    # *     X_*.shape => (num_windows , time_steps , feature_dim) 
+    # X_list shape(num_windows, window_len, feature_dim + 1 (mask channel)) => inputs model with time holes filled with mask_value 
+    # the additional feature_dim is the mask_channel useful for the model to understand the difference between the observed and missed timestep s
     
-    return DatasetSplits(
-        X_train=X_train, Y_train=Y_train,
-        X_val=X_val,     Y_val=Y_val,
-        X_test=X_test,   Y_test=Y_test,
-    )
+    # Y_list (num_windows , window_len, feature_dim) => ground truth all the timesteps either observed and also not observed (without mask_value applied)
+    X_list, Y_list = [], []
 
-def fit_standardizer(X_train: np.ndarray):
-    # X_train : (n_traj, time_steps, feature_dim)
-    eps: float = 1e-8
-    
-    # for each feature calculate the mean and std over all trajectories and time steps
-    # sum of all values / (n_traj * time_steps) (for each feature)
-    mean = X_train.mean(axis=(0, 1), keepdims=True)  
-    std  = X_train.std(axis=(0, 1), keepdims=True) + eps
+    # list of index from 0 to windows_len - 1
+    idx = np.arange(window_len, dtype=np.int32)  
 
-    return mean, std
+    # create a boolean mask 1d when the index is observed put True else False (missed) and
+    # after we convert it in float mask with 0.0 or 1.0 values 
+    obs_1d = ((idx - sr_cfg.offset) % sr_cfg.stride == 0).astype(np.float32) 
+    # obs_1d.shape(windows_len)
 
-def apply_standardizer(A: np.ndarray, mean: np.ndarray, std: np.ndarray):
-    return (A - mean) / std
+    # obs_1d[i] == 1 is the specific index == timestep è observed 
+    # obs_1d[i] == 0 is the specific index == timestep è missed (hole) 
+
+    obs = obs_1d[:, None] 
+    # obs.shape(winows_len, None)
+
+    # traj_3d.shape(n_traj_split, time_steps, feature_dim)
+    for traj in traj_3d:
+
+        # traj.shape(time_steps, feature_dim)
+
+        # here we apply the windowing stride 
+        for start in range(0, T - window_len + 1, slide_stride):
+            
+            # here work in single window
+
+            y = traj[start:start + window_len, :] # (L,F) ground truth
+            # y.shape(window_len, feature_dim)
+
+            x = y.copy()
+            # miss boolean array .shape(windows_len)
+
+            # miss => is the opposite of obs_1d
+            # => True where the index is missed 
+            # => False where the index is observed 
+            miss = (obs_1d == 0)
+
+            # if the index of miss[i] == True so x[i,:] = mask_value (for all feature_dim)
+            x[miss, :] = sr_cfg.mask_value
+
+            # before: x.shape(window_len, feature_dim) and obs.shape(windows_len,None)
+            # after: x_in.shape(window_len, feature_dim + 1)
+            # if last feature is == 1 the specific timestep t is observed (not a hole)
+            # if last feature is == 0 the specific timestep t is a hole (missed)
+            x_in = np.concatenate([x, obs], axis=-1) 
+
+            X_list.append(x_in)
+            Y_list.append(y)
+
+    # X.shape(num_windows, windows_len, feature_dim + 1)
+    # Y.shape(num_windows, windows_len, feature_dim)
+    X = np.stack(X_list, axis=0)
+    Y = np.stack(Y_list, axis=0)
+    return X, Y

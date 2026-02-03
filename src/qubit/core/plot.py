@@ -22,23 +22,21 @@ phase_labels = {
 }
 
 def save_loss_plots_keras(
-    run_dir: str | Path,
+    run_dir: Path,
     history,
     training_cfg: TrainingConfig,
-    fr_key: str,
     output_seq_len: int,
     val_key: str = "val_",
     prefix: str = "loss",
-) -> tuple[Path | None, Path | None, Path | None, Path | None]:
+):
 
     run_dir = Path(str(run_dir) + "/loss_plots")
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    if not hasattr(history, "history") or not isinstance(history.history, dict):
-        raise TypeError("Expected a Keras History object (returned by model.fit), with a .history dict")
-
     h = history.history
     print(h)
+    
+    fr_key = training_cfg.fr_eval.split + "_fr_"
 
     target = fr_key + "target_" + prefix + "_" + str(output_seq_len)
     phase = fr_key + "phase_" + prefix
@@ -59,11 +57,6 @@ def save_loss_plots_keras(
 
     fr_curve = [(int(k.rsplit("_", 1)[-1]), h[k]) for k in curve_keys]
 
-    train_path: Path | None = None
-    val_path: Path | None = None
-    fr_path: Path | None = None
-    all_path: Path | None = None
-
     epoch_start = 0
     phase_intervals = []
     for ph in training_cfg.phases:
@@ -72,11 +65,11 @@ def save_loss_plots_keras(
         phase_intervals.append((start, end, ph.__class__.__name__))
         epoch_start = end
 
-    # legenda per fasi
+    # legend for each phases 
     legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
         for ph_type in {ph_type for _, _, ph_type in phase_intervals}]
 
-    # --- 1) Train plot ---
+    # --- Train plot ---
     if train is not None and len(train) > 0:
         y = np.asarray(train, dtype=float)
         x = np.arange(1, len(y) + 1)
@@ -85,7 +78,7 @@ def save_loss_plots_keras(
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
-        # linee verticali per inizio fase
+        # vertical lines for start of phase
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -100,16 +93,17 @@ def save_loss_plots_keras(
         plt.savefig(train_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-    # --- 2) Val plot ---
+    # --- Val plot ---
     if val is not None and len(val) > 0:
         y = np.asarray(val, dtype=float)
         x = np.arange(1, len(y) + 1)
 
         plt.figure()
+        # background for phase
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
-        # linee verticali per inizio fase
+        
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -124,7 +118,7 @@ def save_loss_plots_keras(
         plt.savefig(val_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-    # --- 3) Free-running plot ---
+    # --- Free-running plot ---
     if fr_phase is not None and any(not np.isnan(v) for v in fr_phase):
 
         x = [epoch + 1 for epoch, v in enumerate(fr_phase) if not np.isnan(v)]
@@ -134,7 +128,7 @@ def save_loss_plots_keras(
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
-        # linee verticali per inizio fase
+
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -158,7 +152,7 @@ def save_loss_plots_keras(
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
         plt.plot(x, y)
-        # linee verticali per inizio fase
+
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -174,7 +168,7 @@ def save_loss_plots_keras(
         plt.close()
     
 
-    if fr_curve is not None:
+    if fr_curve is not None and len(fr_curve)!=0:
         plt.figure()
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
@@ -185,7 +179,6 @@ def save_loss_plots_keras(
                 y = [v for v in c if not np.isnan(v)]
                 plt.plot(x, y, label=f"{k} horizons")
 
-        # linee verticali per inizio fase
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -204,7 +197,7 @@ def save_loss_plots_keras(
         plt.close()
                 
 
-    # --- 4) Combined plot  ---
+    # --- Combined plot  ---
     has_any = (
         (train is not None and len(train) > 0) or
         (val is not None and len(val) > 0) or
@@ -213,7 +206,7 @@ def save_loss_plots_keras(
     if has_any:
         plt.figure(figsize=(8,5))
 
-        # sfondi per fase
+        # background for phase
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
 
@@ -233,7 +226,6 @@ def save_loss_plots_keras(
             y = [v for v in fr_phase if not np.isnan(v)]
             plt.plot(x, y, label=f"{phase}")
 
-        # linee verticali per inizio fase
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
@@ -247,5 +239,3 @@ def save_loss_plots_keras(
         all_path = run_dir / f"{prefix}_all.jpg"
         plt.savefig(all_path, dpi=300, bbox_inches="tight")
         plt.close()
-
-    return train_path, val_path, fr_path, all_path

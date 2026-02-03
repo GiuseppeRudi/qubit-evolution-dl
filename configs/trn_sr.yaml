@@ -8,9 +8,9 @@ data:
     traj_fraction: 0.025
 
   windowing:
-    input_seq_len: 400
-    output_seq_len: 400     # SR: stesso intervallo (ricostruzione), non futuro
-    stride: 20              # slide stride delle finestre
+    input_seq_len: 200
+    output_seq_len: 400 # SR: stesso intervallo (ricostruzione), non futuro
+    stride: 2 # slide stride delle finestre
 
   split:
     seed: 42
@@ -18,18 +18,18 @@ data:
     test_ratio: 0.15
 
 sr:
-  stride: 2      # osservi un punto ogni 2 (even), mancano gli odd
-  offset: 0            # 0 => osservi 0,2,4,...  /  1 => osservi 1,3,5,...
-  mask_value: 0.0      # cosa metti nei missing
-  loss_on: missing     # missing | all
+  stride: 2 # osservi un punto ogni 2 (even), mancano gli odd
+  offset: 0 # 0 => osservi 0,2,4,...  /  1 => osservi 1,3,5,...
+  mask_value: 0.0 # cosa metti nei missing
+  loss_on: missing # missing | all
   observed_weight: 0.1 # se loss_on=all, peso sugli observed (stabilità)
     
 model:
   name: "sr1"
   save_model: true
   type: "TRN"
-  variant: "SR"             # nuovo variant
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE", # HYBRID
+  variant: "SR"
+  decoder_mode: "ENCODER_ONLY"  # "FULL_SEQ", "STEP_WISE", "HYBRID", "ENCODER_ONLY"
 
   params:
     dim_model: 64

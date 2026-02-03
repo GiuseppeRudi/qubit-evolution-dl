@@ -11,8 +11,6 @@ for gpu in gpus:
 # from tensorflow.keras import mixed_precision
 # mixed_precision.set_global_policy("mixed_float16")
 
-
-
 from src.qubit.enums.model_type import ModelType
 from src.qubit.core.data import prepare_dataset
 from src.qubit.utils.utils import *
@@ -43,7 +41,6 @@ def run_experiment(
 
     run_cfg = load_run_config(yaml_name)
 
-
     if override:
         print(override)
         run_cfg = deep_merge_dict(run_cfg, override)
@@ -51,10 +48,9 @@ def run_experiment(
     data_cfg = load_data_config(run_cfg[cfg_keys.DATA])
     model_cfg = load_model_config(run_cfg[cfg_keys.MODEL])
 
+    sr_cfg = None
     if model_cfg.variant == ModelVariant.SUPER_RESOLUTION: 
         sr_cfg = load_sr_config(run_cfg[cfg_keys.SUPER_RESOLUTION])
-        print(sr_cfg)
-
 
     training_cfg = load_training_config(run_cfg[cfg_keys.TRAINING],model_cfg.variant)
     
@@ -62,11 +58,12 @@ def run_experiment(
 
     check_correctness(model_cfg,training_cfg,data_cfg)
 
-    splits, feat_names = prepare_dataset(data_cfg)
+    splits, feat_names,mean, std = prepare_dataset(data_cfg, sr_cfg)
 
     logger = start_log() 
     builder = get_builder(model_cfg.type, model_cfg.variant, model_cfg.decoder_mode)
-    model = builder(splits.X_train, splits.Y_train, model_cfg, training_cfg.prediction_mode, model_path=None)
+
+    model = builder(splits.X_train, splits.Y_train, model_cfg, sr_cfg or training_cfg.prediction_mode , model_path=None)
 
     TrainerCls = get_trainer(model_cfg.type)
     trainer = TrainerCls(model, model_cfg, training_cfg)
@@ -89,9 +86,10 @@ def run_experiment(
         trainer.report_sample(sample_x, sample_y, pred)
 
         save_outputs(splits, pred, model_cfg, feat_names, 
-                     history, training_cfg.fr_eval.split + "_fr_", plot_cfg, 
-                     training_cfg, splits.Y_train.shape[1], logger, 
-                     yaml_name, out_dir, model)  
+                     history, plot_cfg, 
+                     training_cfg, logger, 
+                     yaml_name, out_dir, 
+                     mean, std, model)  
    
     return history_dict
     
@@ -107,10 +105,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
 # TODO check in all model if the flag training is correctly used 
-
 
 # TODO change the horizon list not with fixed value but with a percentage of output_seq_len
 
+# TODO try comparison between models

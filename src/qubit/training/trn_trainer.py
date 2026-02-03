@@ -7,6 +7,9 @@ from ..enums.model_type import ModelType
 from ..models.trn.hybrid_trn_model import HybridTrnModel
 from ..inference.hybrid_trn_adapter import HybridTrnAdapter
 
+from ..models.trn.sr_trn_model import SrTrnModel
+from ..inference.sr_trn_adapter import SrTrnAdapter
+
 @register_trainer(ModelType.TRN)
 class TransformerTrainer(BaseTrainer):  
       
@@ -16,5 +19,7 @@ class TransformerTrainer(BaseTrainer):
                                   out_steps=outsteps,
                                   feature_dim=feature_dim,
                                   inference_mode=self.model_cfg.inference.mode)
+        elif isinstance(self.model,SrTrnModel):
+            return SrTrnAdapter(self.model)
         else:
             raise ValueError("Unsupported model type")
