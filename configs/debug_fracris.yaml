@@ -21,7 +21,7 @@ model:
   name: "prova1"
   save_model: true
   type: "LSTM"
-  variant: "SEQ2SEQ"
+  variant: "FC"
   decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE"
 
   params:
@@ -47,7 +47,7 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [20,-1]
+  curriculum: [0.3,1]
   phases:
     - name: masked_modeling
       epochs: 5
@@ -89,7 +89,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [2,4,6] 
+        out_steps: [0.02,0.04,0.1] 
         p_eval: 0.2
         every_epochs: end_of_phase
 

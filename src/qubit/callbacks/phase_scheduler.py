@@ -9,7 +9,7 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
     def __init__(
             self,
             phases: list[PhaseConfig],
-            curriculum: list[int],
+            curriculum: list[float], # list[int]
             lr_global: float,
             clip_global: float,
             decoder_mode: DecoderMode,
@@ -39,13 +39,16 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
         m = self.model
 
         # horizon for a specific phase 
-        horizon = self.curriculum[phase_idx]
+        # horizon = self.curriculum[phase_idx]
+        horizon: int = round(self.curriculum[phase_idx] * m.rt.t_out.numpy())
 
         # if in the file yaml want to use the global output_seq_len
-        if horizon == -1:
-            horizon = m.rt.t_out.numpy()
-            m.rt.horizon.assign(m.rt.t_out)
-        else: m.rt.horizon.assign(horizon)
+        # if horizon == -1:
+        #     horizon = m.rt.t_out.numpy()
+        #     m.rt.horizon.assign(m.rt.t_out)
+        # else: m.rt.horizon.assign(horizon)
+
+        m.rt.horizon.assign(horizon)
 
         m.rt.epoch_in_phase.assign(epoch_in_phase)
         m.rt.phase_epochs.assign(phase.epochs)

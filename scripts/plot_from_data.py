@@ -44,7 +44,7 @@ def find_latest_run_dir() -> str:
     # return the path of the more recent dir
     return str(best[1])
 
-def load_run_artifacts(run_str: str, destandardize : bool):
+def load_run_artifacts(run_str: str, destandardize: bool):
 
     # run_dir = Path("runs" / "predictions") / ...
     run_dir = Path(run_str)
@@ -77,7 +77,12 @@ def load_run_artifacts(run_str: str, destandardize : bool):
 
         feature_dim = mean.shape[-1]
 
+        for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
+        print()
+
         Y_test = inverse_standardizer(Y_test, mean, std)
+        for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
+        print()
         pred = inverse_standardizer(pred, mean, std)
 
         if X_test.shape[-1] == feature_dim:
@@ -304,16 +309,16 @@ def main():
     args = parse_args()
     
     # ! important must indicate if the X and Y are standardized or not 
-    destandardized : bool = True
+    plot_in_original_units = True
 
     if args.run_a is None and args.run_b is None:
         args.run_a = find_latest_run_dir()
 
-    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a,destandardized)
+    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a,plot_in_original_units)
 
     pred_b = None
     if args.run_b is not None:
-        splits_b, pred_b, _ = load_run_artifacts(args.run_b,destandardized)
+        splits_b, pred_b, _ = load_run_artifacts(args.run_b,plot_in_original_units)
 
         # safety check: to compare, X_test and Y_test should match
         if splits_a.X_test.shape != splits_b.X_test.shape or splits_a.Y_test.shape != splits_b.Y_test.shape:

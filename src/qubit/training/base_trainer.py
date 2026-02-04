@@ -67,8 +67,6 @@ class BaseTrainer(ABC):
         callbacks = []
 
         fr_eval = None
-
-
         
         if self.training_cfg.fr_eval.enabled:
             is_test = self.training_cfg.fr_eval.split == SplitName.TEST
@@ -79,12 +77,12 @@ class BaseTrainer(ABC):
             # Y.shape(num_windows, output_seq_len, feature_dim)
             
             fr_eval = FreeRunningEvalCallback(
-                    X, Y,
-                    start_mode=self.model_cfg.inference.start_mode,
-                    verbose=self.model_cfg.inference.verbose,
-                    inference_mode=self.model_cfg.inference.mode,
-                    training_cfg=self.training_cfg,
-                )
+                X, Y,
+                start_mode=self.model_cfg.inference.start_mode,
+                verbose=self.model_cfg.inference.verbose,
+                inference_mode=self.model_cfg.inference.mode,
+                training_cfg=self.training_cfg,
+            )
             
         if self.model_cfg.variant == ModelVariant.FORECASTING: 
             phase_scheduler = PhaseSchedulerCallback(

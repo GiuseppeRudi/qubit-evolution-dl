@@ -6,7 +6,7 @@ tuning:
 
   # Base config filename
   # Ex: load_yaml("lstm_step_wise") -> takes configs/lstm_step_wise.yaml
-  base_name: debug_rudi
+  base_name: debug_fracris
   
   monitors:
     - "_fr_phase_loss_"

@@ -11,7 +11,7 @@ class TrainingConfig:
     prediction_mode: PredictionMode
     epochs: int 
     batch_size: int
-    curriculum: List[int]
+    curriculum: List[float] # List[int]
     verbose : VerboseMode
     phases: List[PhaseConfig]
     fr_eval: FrEvalConfig 

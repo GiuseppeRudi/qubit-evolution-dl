@@ -48,12 +48,12 @@ def build_pruner(cfg: dict[str, Any]) -> optuna.pruners.BasePruner:
         n_warmup_steps=n_warmup_steps,
     )
 
-def checkHorizon(out_seq_override: int, curriculum: list[int]) -> list[int]:
-    for i, h in enumerate(curriculum):
-        if h > out_seq_override:
-            curriculum[i] = out_seq_override
-            print("ho cambiato")
-    return curriculum
+# def checkHorizon(out_seq_override: int, curriculum: list[int]) -> list[int]:
+#     for i, h in enumerate(curriculum):
+#         if h > out_seq_override:
+#             curriculum[i] = out_seq_override
+#             print("ho cambiato")
+#     return curriculum
 
 
 def main():
@@ -122,11 +122,11 @@ def main():
         try:
             model_type = base_cfg[MODEL][MODEL_TYPE]
             override = suggest_level(trial, model_type=model_type, level=level)
-            out_seq_override = override[DATA][WINDOWING][OUTPUT_SEQ_LEN]
+            # out_seq_override = override[DATA][WINDOWING][OUTPUT_SEQ_LEN]
 
-            new_curriculum : list[int] = checkHorizon(out_seq_override,curriculum)
+            # new_curriculum : list[int] = checkHorizon(out_seq_override,curriculum)
 
-            override.setdefault("training", {})["curriculum"] = new_curriculum
+            # override.setdefault("training", {})["curriculum"] = new_curriculum
 
             
             callbacks : list[Callback] = [OptunaPruningCallback(trial, monitors)]

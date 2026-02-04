@@ -56,8 +56,12 @@ def check_fc_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, d
         raise ValueError(f"Can't set the length of curriculum different from the number of phases")
     
     for h in training_cfg.curriculum:
-        if h > data_cfg.windowing.output_seq_len or h == 0 or h < -1:
-            raise ValueError(f"Can't set as horizon of curriculum a number greater than output_seq_len ({data_cfg.windowing.output_seq_len}), equal to 0 or less than -1")
+        if h <= 0.0 or h > 1.0:
+        # if h > data_cfg.windowing.output_seq_len or h == 0 or h < -1:
+            raise ValueError(f"Can't set as horizon of curriculum a number greater than 1 or less equal than 0")
+            # raise ValueError(f"Can't set as horizon of curriculum a number greater than output_seq_len ({data_cfg.windowing.output_seq_len}), equal to 0 or less than -1")
+        if round(h * data_cfg.windowing.output_seq_len) == 0:
+            raise ValueError(f"Curriculum percentage {h} is too small, resulting horizon is 0.")
 
 
     for p in training_cfg.phases:
@@ -74,8 +78,12 @@ def check_fc_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, d
     fr_curve_probe = next(p for p in training_cfg.fr_eval.probes if p.name == "fr_curve")
     for h in fr_curve_probe.out_steps:
         if isinstance(h,int):
-            if h > data_cfg.windowing.output_seq_len or h <= 0:
-                raise ValueError(f"Can't set as horizon of fr_curve a number greater than output_seq_len ({data_cfg.windowing.output_seq_len}), equal to 0 or less than -1")
+            # if h > data_cfg.windowing.output_seq_len or h <= 0:
+            #     raise ValueError(f"Can't set as horizon of fr_curve a number greater than output_seq_len ({data_cfg.windowing.output_seq_len}), equal to 0 or less than -1")
+            if h <= 0 or h > 1:
+                raise ValueError(f"Can't set as out_steps of fr_curve a number greater than 1 or less equal than 0")
+            if round(h * data_cfg.windowing.output_seq_len) == 0:
+                raise ValueError(f"fr_curve out_steps percentage {h} is too small, resulting out_steps is 0.")
 
     for fr in training_cfg.fr_eval.probes:
         if fr.p_eval <= 0 or fr.p_eval > 1:

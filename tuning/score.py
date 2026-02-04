@@ -64,15 +64,15 @@ def compute_score(metrics: dict[str, Any], base_cfg : dict) -> float:
 
     curve_steps = []
     probes = base_cfg[TRAINING][FR_EVAL][PROBES]
+    out_seq_len = base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
+    print(out_seq_len)
     for p in probes:
         if p[PROBE_NAME] == "fr_curve":
-            curve_steps = p[OUT_STEPS]
+            curve_steps = [round(x * out_seq_len) for x in p[OUT_STEPS]]
                                 
     split = base_cfg[TRAINING][FR_EVAL][FR_EVAL_SPLIT] 
-    out_seq_len = base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
-
-    if base_cfg[TRAINING][CURRICULUM][-1] == -1: last_curriculum = out_seq_len
-    else: last_curriculum = base_cfg[TRAINING][CURRICULUM][-1]
+    
+    last_curriculum = base_cfg[TRAINING][CURRICULUM][-1] * out_seq_len
 
     fr_target = _pick_fr_target(metrics, split, out_seq_len)
     fr_curve  = _pick_fr_curve(metrics, split=split, curve_steps=curve_steps)
