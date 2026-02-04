@@ -29,7 +29,7 @@ class HybridTrnModel(StrategyChooserModel):
         start_mode: StartMode,
         prediction_mode_id: int,
         t_out: int,
-        t_in: int
+        t_in: int,
     ):
         super().__init__(t_out=t_out,prediction_mode_id=prediction_mode_id)
         self.feature_dim = feature_dim
@@ -40,7 +40,7 @@ class HybridTrnModel(StrategyChooserModel):
         self.dropout = dropout
         self.start_mode = start_mode
         self.t_in = t_in
-        
+
         # Projections (continuous features -> dim_model)
         # needed because the internal rappresentations of transformer
         # work with dim_model as third dimension and not feature_dim
@@ -142,7 +142,7 @@ class HybridTrnModel(StrategyChooserModel):
         # mask.shape(1,t,t)
         return mask[tf.newaxis, :, :] 
 
-    def _encode(self, X: tf.Tensor, *, training: bool) -> tf.Tensor:
+    def _encode(self, X: tf.Tensor, *, training: bool, return_attns : bool = False ) -> tf.Tensor:
         
         # X.shape(batch_size, input_seq_len, feature_dim)
         # X: (batch_size,input_seq_len,feature_dim) -> memory: (batch_size,input_seq_len,dim_model)
@@ -170,7 +170,7 @@ class HybridTrnModel(StrategyChooserModel):
         # at the beginning, x is the projected input + positional + dropout
         # when an encoder block return x, the next will use the returned x to update it in a more refined way
         for blk in self.enc_blocks: 
-            x = blk(x, training=training)
+            x = blk(x, training=training, return_attns = return_attns)
 
         x = tf.ensure_shape(x, [None, None, self.dim_model])
         return x
@@ -198,7 +198,7 @@ class HybridTrnModel(StrategyChooserModel):
         # returns an array with shape(batch_size, 1 , feature_dim) all filled with zeros
         return tf.zeros(tf.stack([batch_size, 1, feature_dim]), dtype=X.dtype)
 
-    def _decode_prefix(self, dec_prefix: tf.Tensor, memory: tf.Tensor, *, training: bool) -> tf.Tensor:
+    def _decode_prefix(self, dec_prefix: tf.Tensor, memory: tf.Tensor, *, training: bool, return_attn : bool = False) -> tf.Tensor:
        
         # encoder ouput => memory.shape(batch_size, input_seq_len, dim_model)
 
@@ -238,7 +238,7 @@ class HybridTrnModel(StrategyChooserModel):
 
         # when an decoder block return y, the next will use the returned y to update it in a more refined way
         for blk in self.dec_blocks:
-            y = blk(y, memory=memory, causal_mask=causal, training=training)
+            y = blk(y, memory=memory, causal_mask=causal, training=training, return_attn = return_attn)
 
         # y.shape(batch_size, L, dim_model)
 
@@ -248,6 +248,36 @@ class HybridTrnModel(StrategyChooserModel):
         y_pred = self.out_dense(y)  
 
         return y_pred
+
+    def forward_with_attn(self, X: tf.Tensor, Y: tf.Tensor, *, training: bool = False):
+        
+        # ! important to compute the attention maps we use the teacher forcing
+        
+        # use 1 sample 
+        # X : (batch_size = 1, input_seq_len, feature_dim)
+        # Y : (batch_size = 1, output_seq_len, feature_dim)
+        attn_maps: dict[str, tf.Tensor] = {}
+
+        memory = self._encode(X, training=training, return_attns=True)
+        dec0 = self._init_dec0(X)
+
+        self.rt.phase_id.assign(0) # teacher forcing
+        dec_in = self.apply_strategy_full_seq(Y, dec0=dec0)
+
+        y_pred = self._decode_prefix(dec_in, memory, training=training, return_attn=True)
+
+        for i, blk in enumerate(self.enc_blocks):
+            if blk.last_attn_scores is not None:
+                attn_maps[f"enc/l{i}/self"] = blk.last_attn_scores
+
+        for i, blk in enumerate(self.dec_blocks):
+            if blk.last_self_scores is not None:
+                attn_maps[f"dec/l{i}/self"] = blk.last_self_scores
+            if blk.last_cross_scores is not None:
+                attn_maps[f"dec/l{i}/cross"] = blk.last_cross_scores
+
+        return y_pred, attn_maps
+    
 
     @property
     def metrics(self):

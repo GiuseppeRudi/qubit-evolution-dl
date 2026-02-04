@@ -53,6 +53,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
 
     name = m[MODEL_NAME]
     save_model = m[SAVE_MODEL]
+    return_attentions = m.get(RETURN_ATTENTIONS,False)
     model_type = ModelType(m[MODEL_TYPE])
     variant = ModelVariant(m[VARIANT])
     decoder_mode = DecoderMode(m[DECODER_MODE])
@@ -91,6 +92,7 @@ def load_model_config(m: Dict[str, Any]) -> ModelConfig:
         compile = compile_cfg,
         inference = inference_cfg,
         params = params,
+        return_attentions = return_attentions
     )
 
 def load_run_config(yaml_name: str) -> dict:

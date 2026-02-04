@@ -6,7 +6,7 @@ from ..enums.split_name import SplitName
 from ..utils.config_values import END_OF_PHASE, OUT_STEPS_SPEC
 
 EveryEpochs  = Union[int, END_OF_PHASE]
-OutStepsSpec = Union[tuple[int], OUT_STEPS_SPEC]
+OutStepsSpec = Union[tuple[float], OUT_STEPS_SPEC]
 
 @dataclass(frozen=True)
 class FrEvalProbeConfig:

@@ -52,47 +52,8 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [0.2,1,0.3,1,0.1,0.05]
+  curriculum: [0.2]
   phases:
-    - name: masked_modeling
-      epochs: 5
-      mask_prob: 0.20
-      learning_rate: 0.0005
-      clip_norm: 0.7
-      mask_scope: time        # time | element | feature
-      mask_mode: constant         # zero | constant | noise
-      mask_value: 0.2         # solo se constant
-      noise_sigma: 0.1        # solo se noise
-      noise_replace: false # true: mask replacing the original value with noise
-                          # false: mask adding noise to the original value
-
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: true
-      learning_rate: 0.0003
-      clip_norm: 0.5
-
-    - name: teacher_forcing
-      epochs: 10 
-    
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: false
-      learning_rate: 0.0005
-      clip_norm: 0.5
-
-    - name: scheduled_sampling
-      epochs: 8
-      tf_ratio_start: 1.0
-      tf_ratio_end: 0.5
-      learning_rate: 0.0003
-      clip_norm: 0.5
-      ratio_mode: sigmoid  # linear , cosine , sigmoid, power 
-      mid_point: 0.6  # only for sigmoid 
-      sharpness: 10.0 # only for sigmoid
-      power_value: 2.0 # only per power 
-      per_feature: true # true , false # if per_feature = false so per_timestep= True
-      stop_grad_pred: true # true, false
     
     - name: full_autoregressive
       epochs: 5

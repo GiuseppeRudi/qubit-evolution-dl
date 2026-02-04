@@ -68,6 +68,7 @@ def save_outputs(
     out_dir: str,
     mean : np.ndarray,
     std : np.ndarray,
+    attn : dict[str, np.ndarray] | None,
     model = None,
 ) -> Path:
     
@@ -86,6 +87,13 @@ def save_outputs(
     if history is not None and save_plots:
         output_seq_len = splits.Y_test.shape[1]
         save_loss_plots_keras(run_dir, history, training_cfg, output_seq_len)
+
+    if attn is not None:
+        np.savez_compressed(
+            file=run_dir / "attn_maps.npz",
+            allow_pickle=True,
+            **attn,
+        )
 
     if save_artifacts:
         np.savez_compressed(

@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import tensorflow as tf
 import keras
 from keras import layers
@@ -7,6 +8,8 @@ from ...utils.layers_names import _LN1, _LN2, _DROP1, _DROP2, _MHA, _FFN
 class EncoderTRNBlock(layers.Layer):
     def __init__(self, *, dim_model: int, num_heads: int, ff_dim: int, dropout: float, name: str):
         super().__init__(name=name)
+
+        self.last_attn_scores: tf.Tensor | None = None
 
         # normalize each element v(batch_size, input_seq_len, :) => v.shape(dim_model,)
         # each timestep of each element in the batch is normalized independently
@@ -78,7 +81,7 @@ class EncoderTRNBlock(layers.Layer):
         )
         self.drop2 = layers.Dropout(dropout, name=f"{name}{_DROP2}")
 
-    def call(self, x: tf.Tensor, *, training: bool) -> tf.Tensor:
+    def call(self, x: tf.Tensor, *, training: bool, return_attns : bool) -> tf.Tensor:
         # x is already well structured => (dense, positional embedding, pre-dropout)
         # x.shape(batch_size, input_seq_len, dim_model)
         
@@ -92,14 +95,27 @@ class EncoderTRNBlock(layers.Layer):
         # since query = key = value => self-attention 
         # each timestep (each piece of sequence) can look all other timestep of the same sequence 
 
-        attn = self.mha(query=y, value=y, key=y, training=training) 
-        # attn.shape(batch_size, input_seq_len, dim_model)
+        if return_attns:
+            attn_out, attn_scores = self.mha(
+                query=y, value=y, key=y,
+                return_attention_scores=True,
+                training=training,
+            )
+            self.last_attn_scores = attn_scores   
+            # attn_scores(batch_size, num_heads, input_seq_len, input_seq_len)
+
+        else:
+            attn_out = self.mha(query=y, value=y, key=y, training=training)
+            self.last_attn_scores = None
+        
+        # attn_out.shape(batch_size, input_seq_len, dim_model)
+        # attn_scores(batch_size, num_heads, input_seq_len, input_seq_len)
 
         # Residual Stream
         
         # x (new representation) =  x (current representation) + attn (update)
         # x (batch_size, input_seq_len, dim_model) = x (batch_size,input_len,dim_model) + attn(batch_size, input_seq_len, dim_model)
-        x = x + self.drop1(attn, training=training)
+        x = x + self.drop1(attn_out, training=training)
 
         # PreNorm FFN
         y = self.ln2(x)
@@ -111,5 +127,6 @@ class EncoderTRNBlock(layers.Layer):
         # x (new representation) =  x (current representation) + f (update)
         # x (batch_size, input_seq_len, dim_model) = x(batch_size,input_len,dim_model) + f(batch_size, input_seq_len, dim_model)
         x = x + self.drop2(f, training=training)
+        
         return x
 

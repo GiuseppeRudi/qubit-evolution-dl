@@ -38,6 +38,7 @@ TEST_RATIO = "test_ratio"
 # -------------------------
 MODEL_NAME = "name" ########
 SAVE_MODEL = "save_model" ########
+RETURN_ATTENTIONS = "return_attentions"
 MODEL_TYPE = "type" ########
 VARIANT = "variant" ########
 DECODER_MODE = "decoder_mode" ########

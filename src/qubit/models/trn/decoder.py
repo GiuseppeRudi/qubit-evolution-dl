@@ -1,3 +1,4 @@
+from typing import Optional, Tuple
 import tensorflow as tf
 import keras
 from keras import layers
@@ -7,6 +8,9 @@ from ...utils.layers_names import _LN1, _LN2, _LN3, _DROP1, _DROP2, _DROP3, _SEL
 class DecoderTRNBlock(layers.Layer):
     def __init__(self, *, dim_model: int, num_heads: int, ff_dim: int, dropout: float, name: str):
         super().__init__(name=name)
+
+        self.last_cross_scores: tf.Tensor | None = None
+        self.last_self_scores: tf.Tensor | None = None
 
         self.ln1 = layers.LayerNormalization(epsilon=1e-6, name=f"{name}{_LN1}")
         
@@ -82,6 +86,7 @@ class DecoderTRNBlock(layers.Layer):
         memory: tf.Tensor,
         causal_mask: tf.Tensor,
         training: bool,
+        return_attn : bool
     ) -> tf.Tensor:
         
         # - FULL_SEQ: T = output_seq_len (t_out)
@@ -105,16 +110,29 @@ class DecoderTRNBlock(layers.Layer):
         
         # since query = key = value => self-attention 
         # each timestep (each piece of sequence) can look only past + current timesteps on the same sequence 
-        attn1 = self.self_mha(query=y, value=y, key=y, attention_mask=causal_mask, training=training)
-        # attn1.shape(batch_size, T, dim_model)
+        if return_attn:
+            attn1_out, attn1_scores = self.self_mha(
+                query=y, value=y, key=y,
+                attention_mask=causal_mask,
+                return_attention_scores=True,
+                training=training,
+            )
+            self.last_self_scores = attn1_scores  
+            # attn1_scores.shape(batch_size, num_heads, output_seq_len, output_seq_len)
+        else:
+            attn1_out = self.self_mha(query=y, value=y, key=y, attention_mask=causal_mask, training=training)
+            self.last_self_scores = None
+
+        # attn1_out.shape(batch_size, T, dim_model)
+        # attn1_scores.shape(batch_size, num_heads, output_seq_len, output_seq_len)
 
         # Residual connection:
-        # attn1 contains information aggregated from past+current decoder positions (due to the causal mask).
+        # attn1_out contains information aggregated from past+current decoder positions (due to the causal mask).
         # We add it back to the current representation to preserve the original signal and improve gradient flow.
         
-        # x (new representation) =  x (current representation) + attn1(update => from decoder history)
-        # x (batch_size, T, dim_model) = x (batch_size,T,dim_model) + attn1(batch_size, T, dim_model)
-        x = x + self.drop1(attn1, training=training)
+        # x (new representation) =  x (current representation) + attn1_out(update => from decoder history)
+        # x (batch_size, T, dim_model) = x (batch_size,T,dim_model) + attn1_out(batch_size, T, dim_model)
+        x = x + self.drop1(attn1_out, training=training)
 
         y = self.ln2(x)
         # y.shape(batch_size, T, dim_model)
@@ -122,12 +140,23 @@ class DecoderTRNBlock(layers.Layer):
         # cross-attn (decoder queries -> encoder memory)
         # cross because the decoder looks at the encoder so it crosses two different sequences 
 
-        attn2 = self.cross_mha(query=y, value=memory, key=memory, training=training)
-        # attn2.shape(batch_size, T, dim_model)
+        if return_attn:
+            attn2_out, attn2_scores = self.cross_mha(
+                query=y, value=memory, key=memory,
+                return_attention_scores=True,
+                training=training,
+            )
+            self.last_cross_scores = attn2_scores 
+            # attn2_scores.shape(batch_size, num_heads, input_seq_len, output_seq_len)
+        else:
+            attn2_out = self.cross_mha(query=y, value=memory, key=memory, training=training)
+            self.last_cross_scores = None
 
-        # x (new representation) =  x (current representation) + attn2(update => from encoder memory)
-        # x (batch_size, T, dim_model) = x (batch_size,T,dim_model) + attn2(batch_size, T, dim_model)
-        x = x + self.drop2(attn2, training=training)
+        # attn2_out.shape(batch_size, T, dim_model)
+
+        # x (new representation) =  x (current representation) + attn2_out(update => from encoder memory)
+        # x (batch_size, T, dim_model) = x (batch_size,T,dim_model) + attn2_out(batch_size, T, dim_model)
+        x = x + self.drop2(attn2_out, training=training)
 
         # FFN
         y = self.ln3(x)
@@ -139,4 +168,5 @@ class DecoderTRNBlock(layers.Layer):
         # x (new representation) =  x (current representation) + f (update)
         # x (batch_size, T, dim_model) = x(batch_size,T,dim_model) + f(batch_size, T, dim_model)
         x = x + self.drop3(f, training=training)
+
         return x

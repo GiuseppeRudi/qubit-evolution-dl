@@ -139,7 +139,7 @@ def main():
                 do_predict=False,
             )
 
-            score = compute_score(metrics, base_cfg)
+            score = compute_score(metrics, base_cfg,override, level)
 
             return score
 

@@ -9,7 +9,8 @@ tuning:
   base_name: debug_fracris
   
   monitors:
-    - "_fr_phase_loss_"
+  #  - "_fr_phase_loss_"
+     - "val_loss"
 
   output:
     root_dir: runs/tuning

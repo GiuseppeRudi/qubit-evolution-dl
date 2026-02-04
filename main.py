@@ -73,6 +73,14 @@ def run_experiment(
     print(f"--- Number of Windows for Train = {splits.X_train.shape[0]}")
     print(f"--- Number of Windows for Val = {splits.X_val.shape[0]}")
     print(f"--- Number of Windows for Test = {splits.X_test.shape[0]}")
+    print(f"--- Curriculum = {[round(float(x) * data_cfg.windowing.output_seq_len) for x in training_cfg.curriculum]}")
+    if training_cfg.fr_eval.enabled:
+        for p in training_cfg.fr_eval.probes:
+            if p.name == "fr_curve":
+                curve_steps = [round(float(x) * data_cfg.windowing.output_seq_len) for x in p.out_steps]
+        print(f"--- fr_curve.outsteps = {curve_steps}")
+    
+    # TODO put ifs for the prints (if superesolution, if fr_eval etc.)
 
     if training:  
         print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}/{model_cfg.decoder_mode.value}]  ---")
@@ -80,6 +88,8 @@ def run_experiment(
         history_dict = history.history
         print(f"Final loss: {history.history['loss'][-1]:.4f}")
 
+    if model_cfg.return_attentions: 
+        _, attn = trainer.extract_attention_maps(splits, sample_index=plot_cfg.sample_index[0])
 
     if do_predict:
         sample_x, sample_y, pred = trainer.predict_all_test(splits.X_test, splits.Y_test)
@@ -89,7 +99,7 @@ def run_experiment(
                      history, plot_cfg, 
                      training_cfg, logger, 
                      yaml_name, out_dir, 
-                     mean, std, model)  
+                     mean, std, attn or None, model)  
    
     return history_dict
     
@@ -106,7 +116,5 @@ if __name__ == "__main__":
     main()
 
 # TODO check in all model if the flag training is correctly used 
-
-# TODO change the horizon list not with fixed value but with a percentage of output_seq_len
 
 # TODO try comparison between models

@@ -102,7 +102,7 @@ def build_transformer_hybrid_model(
         start_mode = model_cfg.inference.start_mode,
         prediction_mode_id = prediction_mode_id[prediction_mode],
         t_out = t_out,
-        t_in = t_in
+        t_in = t_in,
     )
 
     model.build(tf.TensorShape([None, t_in, feature_dim]))

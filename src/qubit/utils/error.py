@@ -77,7 +77,7 @@ def check_fc_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, d
             
     fr_curve_probe = next(p for p in training_cfg.fr_eval.probes if p.name == "fr_curve")
     for h in fr_curve_probe.out_steps:
-        if isinstance(h,int):
+        if isinstance(h,float):
             # if h > data_cfg.windowing.output_seq_len or h <= 0:
             #     raise ValueError(f"Can't set as horizon of fr_curve a number greater than output_seq_len ({data_cfg.windowing.output_seq_len}), equal to 0 or less than -1")
             if h <= 0 or h > 1:

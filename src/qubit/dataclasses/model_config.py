@@ -14,9 +14,10 @@ from ..enums.decoder_mode import DecoderMode
 class ModelConfig:
     name: str 
     save_model: bool
+    return_attentions: bool
     type: ModelType             
     variant: ModelVariant
     decoder_mode: DecoderMode
     compile: CompileConfig 
     inference: InferenceConfig
-    params: Union[RNNConfig, TransformerConfig] 
+    params: Union[RNNConfig, TransformerConfig]

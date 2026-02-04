@@ -90,7 +90,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
             # probe.out_steps => list or string
             outsteps = self._outsteps(probe.out_steps, self.Y_eval.shape[1])
-            print(outsteps)
+            # print(outsteps)
 
             for step in outsteps : 
                 # prefix => test or val 
@@ -180,7 +180,7 @@ class FreeRunningEvalCallback(keras.callbacks.Callback):
 
     def _outsteps(self, spec: OutStepsSpec, output_seq_len: int) -> list[int]:
         
-        if isinstance(spec, list): return [round(x * output_seq_len) for x in spec] # return spec
+        if isinstance(spec, list): return [round(float(x) * output_seq_len) for x in spec] # return spec
 
         # Phase horizon
         elif spec == "phase":
