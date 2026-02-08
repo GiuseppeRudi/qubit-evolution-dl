@@ -58,7 +58,7 @@ def run_experiment(
 
     check_correctness(model_cfg,training_cfg,data_cfg)
 
-    splits, feat_names,mean, std = prepare_dataset(data_cfg, sr_cfg)
+    splits, feat_names, mean, std = prepare_dataset(data_cfg, sr_cfg)
 
     logger = start_log() 
     builder = get_builder(model_cfg.type, model_cfg.variant, model_cfg.decoder_mode)

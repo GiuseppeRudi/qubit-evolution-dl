@@ -51,7 +51,7 @@ def _pick_fr_phase(metrics: dict, split: str, last_curriculum : int) -> float :
                 v = vals[i]
                 break
 
-    print(f"fr_phase_loss = {v}")
+    # print(f"fr_phase_loss = {v}")
 
     if v is None or not math.isfinite(v):
         raise ValueError(f"The value of {fr_phase_key} cannot be None or infinite")
@@ -71,8 +71,13 @@ def compute_score(metrics: dict[str, Any], base_cfg: dict, override: dict, level
     
     # level = 1 we take output_seq_len from the base_cfg yaml because optuna don't change it 
     # instead if we are in level = 2 we choose the ouput_seq_len from override
-    out_seq_len = override[DATA][WINDOWING][OUTPUT_SEQ_LEN] or base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
-    print(out_seq_len)
+    
+    if level == 1 :
+        out_seq_len = base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
+    else :
+        out_seq_len = override[DATA][WINDOWING][OUTPUT_SEQ_LEN] 
+
+    # print(out_seq_len)
     
     split = base_cfg[TRAINING][FR_EVAL][FR_EVAL_SPLIT] 
     fr_target = _pick_fr_target(metrics, split, out_seq_len)
@@ -91,7 +96,8 @@ def compute_score(metrics: dict[str, Any], base_cfg: dict, override: dict, level
         if p[PROBE_NAME] == "fr_curve":
             curve_steps = [round(x * out_seq_len) for x in p[OUT_STEPS]]
                                 
-    last_curriculum = base_cfg[TRAINING][CURRICULUM][-1] * out_seq_len
+    last_curriculum = int(base_cfg[TRAINING][CURRICULUM][-1] * out_seq_len)
+    # print(last_curriculum)
 
     fr_curve  = _pick_fr_curve(metrics, split=split, curve_steps=curve_steps)
     fr_phase  = _pick_fr_phase(metrics, split=split,last_curriculum=last_curriculum)

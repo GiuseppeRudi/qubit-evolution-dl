@@ -1,0 +1,153 @@
+data:
+  dataset:
+    csv_path: data/trajectories.csv # fixed (path from where we take the dataset)
+    total_qubits: 10 # fixed   (taken from dataset)
+    used_qubits: 10 # number of qubit that we want to use, [1,total_qubits]
+    time_steps: 1001 # fixed    (taken from dataset)
+    n_traj: 400 # fixed   (taken from dataset)
+    traj_fraction: 1 # % of trajectories to use, taken from n_traj (total trajectories) - (0,1] 
+
+  windowing: 
+    input_seq_len: 400 # timesteps given in input to the model 
+    output_seq_len: 50 # timesteps predicted by model
+                       # - SR: must be the result of (input_seq_len * SR_stride)
+                       # - FC: decide which one you want
+    stride: 20 # distance in steps between windows 
+               # increasing the stride decreases the number of windows 
+
+  split: # we have three different split category (TRAIN, VAL, TEST)
+    seed: 42  # IMPORTANT for replications
+    val_ratio: 0.2 # % of trajectories to use for building the validation split
+    test_ratio: 0.15 # % of trajectories to use for building the test split
+
+
+# UNCOMMENT ONLY IF model.type == TRN and also model.variant == SR
+# sr:  # SUPER RESOLUTION CONFIG
+#   stride: 2 # increasing the stride increases the super resolution factor (stride = output_seq_len / input_seq_len)
+#   offset: 0 # from which point of the input sequence the super resolution prediction start
+#   mask_value: 0.0 # value to use for the missing steps
+#   loss_on: missing # missing | all
+#   observed_weight: 0.1 # weight for the observed steps (only if loss_on=all)
+
+model:
+  name: "prova1" # name of the experiment
+  save_model: true # choose to save model weights after training 
+  type: "LSTM" # LSTM | TRN
+  variant: "FC" # FC = Forecasting | SR = SuperResolution   (SR only if type == TRN) 
+  decoder_mode: "HYBRID" # FULL_SEQ | STEP_WISE | HYBRID | ENCODER_ONLY (only if variant == SR)
+
+  params: # different params based on model types (LSTM | TRN)
+    latent_dim: 128 # (only if model.type == LSTM)
+    dropout: 0.1 # common value for both model types 
+    # dim_model: 64  # UNCOMMENT ONLY IF model.type == TRN 
+    # num_heads: 4
+    # ff_dim: 512
+    # num_layers: 2
+
+
+  compile:
+    optimizer: "adam" # chooses different optimizer from this list {adam, sgd, rmsprop}
+    loss: "mse" # chooses type of loss function such us mse, mae, etc.
+    metrics: ["mae"] # insert additional metrics such as mae, mse, mape, etc.
+    run_eagerly: false # IMPORTANT choose if we want to perform the model execution in graph_mode (recommended) or eagerly (for debug)
+    learning_rate: 1e-3 # this is the global one but we can override this value for each phase
+    clip_norm: 1.0 # this is the global one but we can override this value for each phase
+
+  inference:
+    mode: "free_running" # teacher_forcing | free_running
+    start_mode: "zeros" # zeros | last_x
+    verbose: 0  # 0, 1, 2
+
+# IMPORTANT: for SR => curriculum, phases and fr_eval are NOT USED
+training:
+  prediction_mode: "all" # all | horizon 
+                         # all => predicts always up to output_seq_len and calculate loss with sliding up to horizon
+                         # horizon => predicts up to horizon and calculate loss up to horizon
+
+                         # all     => PRO: stable graph (no retracing)   CON: slower computation
+                         # horizon => PRO: faster prediction             CON: lots of retracing if the horizon changes often
+  verbose: 1
+  batch_size: 64
+  curriculum: [0.2,1] # LIST of % of HORIZON related to prediction_mode 
+                      # IMPORTANT: size of this list must be equal to the number of phases
+                      # For each phase we choose a % of output_seq_len (horizon)
+                      # Based on prediction_mode, we calculate the loss up to horizon
+                      # It is used to teach the model to generalize on custom sequences, 
+                      # starting with smaller ones and then arriving at the output_seq_len sequence.  
+  
+  # IMPORTANT the number of TOTAL EPOCH are automatically calculated from the sum of each epoch phase
+  phases:
+
+    - name: teacher_forcing
+      epochs: 10
+    
+    # MUST BE COMMENTED if model.decoder_mode == FULL_SEQ because it doesn't work on it
+    - name: full_autoregressive
+      epochs: 5
+      gradient_through_time: false
+      learning_rate: 0.0005 # custom lr for this strategy (overrides global lr)
+      clip_norm: 0.5 # custom clip_norm for this strategy (overrides clip_norm)
+
+    - name: masked_modeling
+      epochs: 5
+      mask_prob: 0.20
+      learning_rate: 5e-4 # custom lr for this strategy (overrides global lr)
+      clip_norm: 0.7 # custom clip_norm for this strategy (overrides clip_norm)
+      mask_scope: time # time | element | feature
+      mask_mode: constant # zero | constant | noise
+      mask_value: 0.2 # only if mask_mode = constant
+      noise_sigma: 0.1 # only if mask_mode = noise
+
+      noise_replace: false # true: masks replacing the original value with noise
+                           # false: masks adding noise to the original value
+    
+    # MUST BE COMMENTED if model.decoder_mode == FULL_SEQ because it doesn't work on it
+    - name: scheduled_sampling
+      epochs: 8
+      tf_ratio_start: 1.0
+      tf_ratio_end: 0.5
+      learning_rate: 0.0003
+      clip_norm: 0.5
+      ratio_mode: sigmoid  # linear | cosine | sigmoid | power 
+      mid_point: 0.6  # only if ratio_mode = sigmoid 
+      sharpness: 10.0 # only if ratio_mode = sigmoid
+      power_value: 2.0 # only if ratio_mode = power 
+      per_feature: true # true | false 
+                        # true = different choice for each feature
+                        # false = same choice for all the features
+      stop_grad_pred: true # true | false
+    
+
+  # free-running evaluation
+  # We decide if every n epochs we perform a free_running evaluation, using a inference_model,
+  # useful to visualize during the training the loss metrics based on the performance of the model without help
+  fr_eval:
+    enabled: true
+    split: val # val | test 
+    batch_size: 32
+    
+    # p_eval => % of the (val or test) split
+    # out_steps can be 
+    # - phase: does predictions up to the horizon connected to the used strategy
+    # - global: does predictions up to output_seq_len
+    # - [0.1,0.25,0.6,1]: a list of % of horizon inserted by the programmer 
+    probes:
+      - name: fr_phase 
+        out_steps: phase  
+        every_epochs: 2
+        p_eval: 0.8    
+
+      - name: fr_target
+        out_steps: global
+        p_eval: 0.3
+        every_epochs: end_of_phase
+
+      - name: fr_curve
+        out_steps: [0.2,0.4,0.6] 
+        p_eval: 0.2
+        every_epochs: end_of_phase
+
+plot:
+  sample_index: [0,2,4] # a list of indexes from which we choose what to plot 
+  save_plots: true # if we want to plot the loss metrics 
+  save_artifacts: true # if we want to save the meta.json and *.npz files predicted and used from the model

@@ -51,13 +51,13 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
             p25, med, p75, n = self._step_stats(epoch)
 
             if med is None:
-                print(f"[Optuna] trial={self.trial.number} epoch={epoch} {key}={value:.6g} | no history yet")
+                print(f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} | no history yet")
             else:
                 delta = value - med
                 pct = (delta / med * 100.0) if med != 0 else float("inf")
 
                 print(
-                    f"[Optuna] trial={self.trial.number} epoch={epoch} {key}={value:.6g} "
+                    f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} "
                     f"| median={med:.6g} (n={n}, p25={p25:.6g}, p75={p75:.6g}) "
                     f"| margin={delta:+.6g} ({pct:+.2f}%)"
                 )
@@ -68,12 +68,12 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
             if self.debug:
                 p25, med, p75, n = self._step_stats(epoch)
                 if med is None:
-                    print(f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch} ({key}={value:.6g})")
+                    print(f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch + 1} ({key}={value:.6g})")
                 else:
                     delta = value - med
                     pct = (delta / med * 100.0) if med != 0 else float("inf")
                     print(
-                        f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch} "
+                        f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch + 1} "
                         f"{key}={value:.6g} > median={med:.6g} "
                         f"by {delta:+.6g} ({pct:+.2f}%)"
                     )

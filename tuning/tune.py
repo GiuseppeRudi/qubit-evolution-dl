@@ -136,7 +136,7 @@ def main():
                 override=override,
                 out_dir=f"tuning/{study_name}/trial_{trial.number:04d}",
                 optuna_callback=callbacks,
-                do_predict=False,
+                do_predict=True,
             )
 
             score = compute_score(metrics, base_cfg,override, level)

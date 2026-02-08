@@ -1,78 +1,125 @@
-# Qubit Evolution DL: Neural Modeling of Multi-Qubit Dynamics
 
-Qubit Evolution DL is a research-oriented project that uses **deep learning**
-(RNNs and Transformers) to model the **time evolution of multi-qubit systems**.
+# Qubit Evolution DL
 
-The main goal is to learn how the state (or measurement statistics) of a
-quantum system changes as we:
+Qubit Evolution  is a research-oriented project that uses deep learning (LSTM and Transformer architectures) to model the **time evolution of multi-qubit systems** as a **sequence modeling** problem.
 
-- increase the **number of timesteps** (deeper circuits / longer evolution),
-- increase the **number of qubits** (larger quantum registers).
-
-The project is meant as a bridge between **quantum computing** and **sequence
-modeling**: we treat the evolution of a quantum circuit as a sequence and use
-sequence models to reconstruct and predict qubit behavior.
+Given a past window of a quantum trajectory, the models can **predict future dynamics (Forecasting)** or **reconstruct missing timesteps (Super-Resolution)**.
 
 ---
 
-## Objectives
+## What this repository provides
 
-- Represent **quantum circuits** and **qubit states** in a form suitable for
-  deep learning (e.g. time series of measurement outcomes, amplitudes,
-  expectation values, etc.).
-- Train:
-  - a **Recurrent Neural Network (RNN)** baseline, and  
-  - a **Transformer-based model**  
-  to predict future qubit behavior from past timesteps.
-- Study how model performance scales with:
-  - number of qubits (2, 4, 8, ...),
-  - number of timesteps (circuit depth / sequence length).
-- Compare architectures in terms of:
-  - prediction accuracy,
-  - generalization across different quantum circuits,
-  - robustness to noise (optional / future work).
- 
-## Quick Start
+- A complete **training pipeline** driven by a **single YAML configuration file**.
+- Two model types:
+    - **LSTM** baselines (Full-Seq, Step-Wise, Hybrid decoding)
+    - **Transformer (TRN)** models (Hybrid encoder–decoder and Super-Resolution variant)
+- A consistent **inference layer** via *adapters* (teacher forcing and free-running) to evaluate models in a comparable way.
+- Tools for:
+    - dataset split + windowing (forecasting and super-resolution)
+    - saving training artifacts (predictions, splits, metadata)
+    - generating plots (predictions + attention maps)
 
-### Local (Conda)
+---
+
+## Project structure
+
+- `main.py` — project start point (loads YAML, builds model, trains, saves artifacts)
+- `configs/` — experiment configuration files (LSTM/TRN, forecasting/SR, debug)
+- `src/qubit/` — core package (data, models, strategies, training, inference, callbacks)
+- `scripts/` — post-run plotting utilities:
+    - `plot_from_data.py` (prediction plots from saved artifacts)
+    - `plot_attention_maps.py` (attention heatmaps from saved attention maps)
+- `tuning/` — hyperparameter tuning pipeline with Optuna
+- `docs/` — documentation (setup, configuration, tuning, plotting)
+- `data/trajectories.csv` — dataset
+
+---
+
+## Quick start
+
+### 1) Local installation (Conda)
 
 ```bash
-conda env create -f environment.yml
+condaenv create -f environment.yml
 conda activate qubit
 
-conda activate qubit
-
-conda env config vars set TF_CPP_MIN_LOG_LEVEL=3
-conda env config vars set ABSL_LOGGING_LEVEL=ERROR
+# optional: reduce TensorFlow logs
+condaenv config varsset TF_CPP_MIN_LOG_LEVEL=3
+condaenv config varsset ABSL_LOGGING_LEVEL=ERROR
 
 python install_tf.py
-python main.py
-Docker (recommended)
-bash
-Copia codice
+```
+
+### 2) Run an experiment
+
+Choose a YAML file  from `configs/` and run:
+
+```bash
+python main.py --run-cfg trn_hybrid
+```
+
+Switch model/variant/training by changing the config file name (e.g. `lstm_step_wise`, `trn_sr`, etc.).
+
+---
+
+## Outputs & artifacts
+
+After training, the program creates a run directory that contains (depending on the config):
+
+- `model.keras` (or equivalent) — saved model
+- `data_splits.npz` — saved test split (and optionally mean/std for inverse standardization)
+- `predictions.npz` — predictions
+- `meta.json` — run metadata (feature names, shapes, config recap, etc.)
+- `loss_plots/` — curve losses (if enabled)
+- `attn_maps.npz` + attention plots (if enabled for Transformer runs)
+
+The exact folder name includes the model type/variant/decoder_mode/experiment_name and a timestamp to keep runs isolated and reproducible.
+
+---
+
+## Where to read next
+
+This README is intentionally short. Detailed usage is split into focused documents:
+
+- `docs/setup.md`
+    
+    Installation instructions and environment notes (local + Docker).
+    
+- `docs/example.yaml`
+    
+    Full explanation of the main **experiment YAML**: dataset, windowing, model parameters, training phases, inference, and saving artifacts.
+    
+- `docs/tuning.md`
+    
+    How to run Optuna and how the dedicated tuning YAML (`configs/optuna.yaml`) controls the search space and scoring.
+    
+- `docs/plotting.md`
+    
+    How to use the plotting scripts:
+    
+    - prediction plots (`scripts/plot_from_data.py`)
+    - attention heatmaps (`scripts/plot_attention_maps.py`)
+
+- `reports/` — final PDF report and slides
+
+---
+
+## Docker (optional)
+
+If you prefer Docker:
+
+```bash
 # RTX 50 image
 docker build -t tf-app-rtx50 --build-arg TF_VARIANT=rtx50 .
 docker run --gpus all -it tf-app-rtx50
+```
 
+or:
+
+```bash
 # Official TF image
 docker build -t tf-app-official --build-arg TF_VARIANT=official .
 docker run --gpus all -it tf-app-official
 ```
 
-# Docker (recommended)
-###  RTX 50 image
-```bash
-docker build -t tf-app-rtx50 --build-arg TF_VARIANT=rtx50 .
-docker run --gpus all -it tf-app-rtx50
-```
-
-### Official TF image
-```bash
-docker build -t tf-app-official --build-arg TF_VARIANT=official .
-docker run --gpus all -it tf-app-official
-```
-
-# Documentation
-
-- `docs/SETUP.md` → detailed setup and configuration
-- `docs/report.tex` + `docs/report.pdf` → full technical report
+##

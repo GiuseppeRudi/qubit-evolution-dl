@@ -1,16 +1,16 @@
 tuning:
   seed: 42
   study_name: study_lstm_prova
-  n_trials: 40
-  level: 2
+  n_trials: 1
+  level: 1
 
   # Base config filename
   # Ex: load_yaml("lstm_step_wise") -> takes configs/lstm_step_wise.yaml
-  base_name: debug_fracris
+  base_name: lstm_full_seq
   
   monitors:
-  #  - "_fr_phase_loss_"
-     - "val_loss"
+     - "_fr_phase_loss_" # level 1
+     # - "val_loss" # level 2 
 
   output:
     root_dir: runs/tuning
