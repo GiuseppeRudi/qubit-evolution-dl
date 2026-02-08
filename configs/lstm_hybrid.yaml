@@ -26,6 +26,7 @@ model:
 
   params:
     latent_dim: 128
+    dropout: 0.1
 
   compile:
     optimizer: "adam"
@@ -47,7 +48,7 @@ training:
                           # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
   verbose: 1
   batch_size: 64
-  curriculum: [20,-1,30,-1,10,5]
+  curriculum: [0.2,1,0.3,1,0.1,0.05]
   phases:
     - name: masked_modeling
       epochs: 5
@@ -118,7 +119,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [2,4,6] 
+        out_steps: [0.02,0.04,0.06] 
         p_eval: 0.2
         every_epochs: end_of_phase
 

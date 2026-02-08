@@ -11,25 +11,31 @@ from ..strategy_chooser import StrategyChooserModel
 
 from .lstm2_layer_state import LSTM2LayerTFState
 
-from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_DENSE
+from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_HEAD
 
 class StepWiseLstmModel(StrategyChooserModel):
-    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode, prediction_mode_id: int, t_out : int):
+    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode, prediction_mode_id: int, t_out : int, dropout : float ):
         super().__init__(t_out=t_out, prediction_mode_id=prediction_mode_id)
         
         self.feature_dim = feature_dim
         self.latent_dim = latent_dim  # dimensions of hidden states and cell states 
         self.start_mode = start_mode  # Zeros or last_x
+        self.dropout = dropout
 
         # encoder  (2 stacked LSTM)
-        self.enc_lstm_1 = layers.LSTM(latent_dim, return_state=True,return_sequences=True, name=ENC_LSTM_1)
-        self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True, name=ENC_LSTM_2)
+        self.enc_lstm_1 = layers.LSTM(latent_dim, return_state=True,return_sequences=True, dropout= self.dropout,name=ENC_LSTM_1)
+        self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True,dropout= self.dropout, name=ENC_LSTM_2)
 
         # decoder (step-by-step, input (batch_size,1,feature_dim)
-        self.dec_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_1)
-        self.dec_lstm_2 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_2)
+        self.dec_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, dropout= self.dropout, name=DEC_LSTM_1)
+        self.dec_lstm_2 = layers.LSTM(latent_dim, return_sequences=True, return_state=True,dropout= self.dropout,  name=DEC_LSTM_2)
 
-        self.out_dense = layers.Dense(feature_dim, name=OUT_DENSE)
+        self.out_head = keras.Sequential([
+            layers.Dense(128, activation="relu"),
+            layers.Dropout(self.dropout),
+            layers.Dense(feature_dim),
+        ], name=OUT_HEAD)
+
 
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
 
@@ -70,7 +76,7 @@ class StepWiseLstmModel(StrategyChooserModel):
 
         # input => (batch_size, 1, latent_dim)
         # output => (batch_size, 1, feature_dim)
-        self.out_dense.build((None, 1, self.latent_dim))
+        self.out_head.build((None, 1, self.latent_dim))
 
         super().build(input_shape)
 
@@ -111,7 +117,7 @@ class StepWiseLstmModel(StrategyChooserModel):
         
         # input => dec_seq2.shape(batch_size, 1, latent_dim)
         # output => y_pred_t.shape(batch_size, 1, feature_dim)
-        y_pred_t = self.out_dense(dec_seq2) 
+        y_pred_t = self.out_head(dec_seq2) 
         
         return y_pred_t, LSTM2LayerTFState(h1=h1_out, c1=c1_out, h2=h2_out, c2=c2_out)
 

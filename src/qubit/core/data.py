@@ -122,7 +122,7 @@ def correlation_columns(corr_start: int, used_qubits: int, total_qubits: int) ->
     return corr_cols
 
 def prepare_dataset(data_cfg: DataConfig, sr_cfg: SuperResolutionConfig | None 
- ) ->Tuple[DatasetSplits, list[str], np.ndarray, np.ndarray]:
+ ) -> Tuple[DatasetSplits, list[str], np.ndarray, np.ndarray]:
 
     seed = data_cfg.split.seed
     set_seed(seed, deterministic=True)

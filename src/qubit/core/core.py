@@ -11,5 +11,8 @@ def build_optimizer(name: str, lr: float, clip_norm: Optional[float] = None):
         kwargs["global_clipnorm"] = clip_norm  
 
     if name == "adam": return tf.keras.optimizers.Adam(**kwargs)
-    elif name == "adamw": return tf.keras.optimizers.AdamW(**kwargs)
+    elif name == "sgd":
+        return tf.keras.optimizers.SGD(**kwargs)
+    elif name == "rmsprop":
+        return tf.keras.optimizers.RMSprop(**kwargs)
     else: raise ValueError(f"Unknown optimizer: {name}")

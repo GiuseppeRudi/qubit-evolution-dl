@@ -9,7 +9,7 @@ from ..models.rnn.lstm2_layer_state import LSTM2LayerTFState
 from ..enums.inference_mode import InferenceMode
 from ..enums.verbose_mode import VerboseMode
 
-from ..utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_DENSE
+from ..utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_HEAD
 
 # return functional API model for inference because we don't need very complex logic here instead of subclassing full_seq trained_model
 def build_inference_models(trained_model: keras.Model) -> tuple[keras.Model, keras.Model, int, int]:
@@ -31,7 +31,7 @@ def build_inference_models(trained_model: keras.Model) -> tuple[keras.Model, ker
     enc_lstm_2 = trained_model.get_layer(ENC_LSTM_2)
     dec_lstm_1 = trained_model.get_layer(DEC_LSTM_1)
     dec_lstm_2 = trained_model.get_layer(DEC_LSTM_2)
-    out_dense = trained_model.get_layer(OUT_DENSE)
+    out_dense = trained_model.get_layer(OUT_HEAD)
 
     # ! dec_lstm_2 must return_state for step-by-step decoding
     if not dec_lstm_2.return_state:

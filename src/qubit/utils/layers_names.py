@@ -9,6 +9,7 @@ DEC_LSTM_2 = "dec_lstm_2"
 
 # Output head
 OUT_DENSE = "out_dense"
+OUT_HEAD = "out_head"
 
 # TRN 
 # Encoder

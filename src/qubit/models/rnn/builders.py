@@ -52,11 +52,12 @@ def build_lstm_full_seq_custom_model(
     t_in = x_train.shape[1]
 
     model = FullSeqLstmModel(
-        feature_dim=feature_dim,
-        latent_dim=latent_dim,
-        start_mode=model_cfg.inference.start_mode, 
-        prediction_mode_id=prediction_mode_id[prediction_mode],
-        t_out=t_out,
+        feature_dim = feature_dim,
+        latent_dim = latent_dim,
+        start_mode = model_cfg.inference.start_mode, 
+        prediction_mode_id = prediction_mode_id[prediction_mode],
+        t_out = t_out,
+        dropout = model_cfg.params.dropout
     )
 
     optimizer = build_optimizer(
@@ -66,9 +67,9 @@ def build_lstm_full_seq_custom_model(
 
     model.compile(
         loss = model_cfg.compile.loss,
-        metrics= model_cfg.compile.metrics,
-        optimizer=optimizer,
-        run_eagerly=model_cfg.compile.run_eagerly,
+        metrics = model_cfg.compile.metrics,
+        optimizer = optimizer,
+        run_eagerly = model_cfg.compile.run_eagerly,
     )
 
     model.build(tf.TensorShape([None, t_in, feature_dim]))
@@ -98,11 +99,12 @@ def build_lstm_step_wise_model(
     t_in = x_train.shape[1]
     
     model = StepWiseLstmModel(
-        feature_dim=feature_dim,
-        latent_dim=latent_dim,
-        start_mode=model_cfg.inference.start_mode,
-        prediction_mode_id=prediction_mode_id[prediction_mode],
-        t_out = t_out
+        feature_dim = feature_dim,
+        latent_dim = latent_dim,
+        start_mode = model_cfg.inference.start_mode,
+        prediction_mode_id = prediction_mode_id[prediction_mode],
+        t_out = t_out,
+        dropout = model_cfg.params.dropout
     )
 
     model.build(tf.TensorShape([None, t_in, feature_dim]))
@@ -148,7 +150,8 @@ def build_lstm_hybrid_model(
         latent_dim=latent_dim,
         start_mode=model_cfg.inference.start_mode,
         prediction_mode_id=prediction_mode_id[prediction_mode],
-        t_out = t_out
+        t_out = t_out,
+        dropout = model_cfg.params.dropout
     )
 
     model.build(tf.TensorShape([None, t_in, feature_dim]))

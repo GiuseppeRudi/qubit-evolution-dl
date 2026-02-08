@@ -73,12 +73,14 @@ def run_experiment(
     print(f"--- Number of Windows for Train = {splits.X_train.shape[0]}")
     print(f"--- Number of Windows for Val = {splits.X_val.shape[0]}")
     print(f"--- Number of Windows for Test = {splits.X_test.shape[0]}")
-    print(f"--- Curriculum = {[round(float(x) * data_cfg.windowing.output_seq_len) for x in training_cfg.curriculum]}")
+    if model_cfg.variant != ModelVariant.SUPER_RESOLUTION:
+        print(f"--- Curriculum = {[round(float(x) * data_cfg.windowing.output_seq_len) for x in training_cfg.curriculum]}")
+    
     if training_cfg.fr_eval.enabled:
         for p in training_cfg.fr_eval.probes:
             if p.name == "fr_curve":
                 curve_steps = [round(float(x) * data_cfg.windowing.output_seq_len) for x in p.out_steps]
-        print(f"--- fr_curve.outsteps = {curve_steps}")
+        print(f"--- fr_curve Outsteps = {curve_steps}")
     
     # TODO put ifs for the prints (if superesolution, if fr_eval etc.)
 
@@ -88,6 +90,7 @@ def run_experiment(
         history_dict = history.history
         print(f"Final loss: {history.history['loss'][-1]:.4f}")
 
+    attn = None
     if model_cfg.return_attentions: 
         _, attn = trainer.extract_attention_maps(splits, sample_index=plot_cfg.sample_index[0])
 
@@ -99,7 +102,7 @@ def run_experiment(
                      history, plot_cfg, 
                      training_cfg, logger, 
                      yaml_name, out_dir, 
-                     mean, std, attn or None, model)  
+                     mean, std, attn, model)  
    
     return history_dict
     

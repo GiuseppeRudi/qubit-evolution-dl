@@ -8,27 +8,32 @@ from ...enums.start_mode import StartMode
 from ..strategy_chooser import StrategyChooserModel
 from .lstm2_layer_state import LSTM2LayerTFState
 
-from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_DENSE
+from ...utils.layers_names import ENC_LSTM_1, ENC_LSTM_2, DEC_LSTM_1, DEC_LSTM_2, OUT_HEAD
 
 class FullSeqLstmModel(StrategyChooserModel):
 
-    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode, t_out: int, prediction_mode_id : int):
+    def __init__(self, *, feature_dim: int, latent_dim: int, start_mode: StartMode, t_out: int, prediction_mode_id : int, dropout : float):
         super().__init__(t_out = t_out, prediction_mode_id = prediction_mode_id)
         self.feature_dim = feature_dim
         self.latent_dim = latent_dim # dimension of hidden states and cell states 
         self.start_mode = start_mode # inizialize the encoder with last_x or zeros 
+        self.dropout = dropout
 
         # Inizialize the layers of Model 
 
         # encoder (2 stacked LSTM)
-        self.enc_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=ENC_LSTM_1)
-        self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True, name=ENC_LSTM_2)
+        self.enc_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, dropout= self.dropout,name=ENC_LSTM_1)
+        self.enc_lstm_2 = layers.LSTM(latent_dim, return_state=True, dropout= self.dropout, name=ENC_LSTM_2)
 
         # decoder full-seq (input: (B, T_out, D))
-        self.dec_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_1)
-        self.dec_lstm_2 = layers.LSTM(latent_dim, return_sequences=True, return_state=True, name=DEC_LSTM_2)
+        self.dec_lstm_1 = layers.LSTM(latent_dim, return_sequences=True, dropout= self.dropout, return_state=True, name=DEC_LSTM_1)
+        self.dec_lstm_2 = layers.LSTM(latent_dim, return_sequences=True, dropout= self.dropout,  return_state=True, name=DEC_LSTM_2)
 
-        self.out_dense = layers.Dense(feature_dim, name=OUT_DENSE)
+        self.out_head = keras.Sequential([
+            layers.Dense(128, activation="relu"),
+            layers.Dropout(self.dropout),
+            layers.Dense(feature_dim),
+        ], name=OUT_HEAD)
 
         self.loss_tracker = tf.keras.metrics.Mean(name="loss")
 
@@ -61,7 +66,7 @@ class FullSeqLstmModel(StrategyChooserModel):
         self.dec_lstm_2.build((None, None, self.latent_dim))   
 
         # dec_lstm_2 output sequence of dimension (batch_size, t_out, latent_dim)
-        self.out_dense.build((None, None, self.latent_dim))     # (batch_size, t_out, feature_dim)
+        self.out_head.build((None, None, self.latent_dim))     # (batch_size, t_out, feature_dim)
 
         super().build(input_shape)
 
@@ -115,7 +120,7 @@ class FullSeqLstmModel(StrategyChooserModel):
 
         # needed to change the third dimensions 
         # latent_dim => feature_dim
-        y_pred = self.out_dense(dec_seq_2)  
+        y_pred = self.out_head(dec_seq_2)  
         
         # y_pred.shape(batch_size, t = T_out || T_hor, feature_dim)
         return y_pred
