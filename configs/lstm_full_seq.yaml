@@ -45,22 +45,74 @@ training:
   prediction_mode: "all"
   verbose: 1
   batch_size: 64
-  curriculum: [0.3, 0.7]
+  curriculum: [0.1,0.1,0.25 ,0.25,0.35,0.35,0.50,0.50,0.75,0.75,1,1]
 
   phases:
     - name: teacher_forcing
       epochs: 2
 
     - name: masked_modeling
-      epochs: 2
-      mask_prob: 0.20
-      learning_rate: 5e-4
-      clip_norm: 0.9
+      epochs: 3
+      mask_prob: 0.10
       mask_scope: time
       mask_mode: constant
       mask_value: 0.2
+      noise_replace: false
+
+    - name: teacher_forcing
+      epochs: 2
+
+    - name: masked_modeling
+      epochs: 3
+      mask_prob: 0.15
+      mask_scope: time
+      mask_mode: constant
+      mask_value: 0.2
+      noise_replace: false
+
+    - name: teacher_forcing
+      epochs: 2
+
+    - name: masked_modeling
+      epochs: 3
+      mask_prob: 0.20
+      mask_scope: time
+      mask_mode: constant
+      mask_value: 0.2
+      noise_replace: false
+
+    - name: teacher_forcing
+      epochs: 2
+
+    - name: masked_modeling
+      epochs: 3
+      mask_prob: 0.20
+      mask_scope: time
+      mask_mode: noise
       noise_sigma: 0.1
       noise_replace: false
+
+    - name: teacher_forcing
+      epochs: 2
+
+    - name: masked_modeling
+      epochs: 3
+      mask_prob: 0.25
+      mask_scope: time
+      mask_mode: noise
+      noise_sigma: 0.1
+      noise_replace: false
+
+    - name: teacher_forcing
+      epochs: 2
+
+    - name: masked_modeling
+      epochs: 3
+      mask_prob: 0.25
+      mask_scope: time
+      mask_mode: noise
+      noise_sigma: 0.1
+      noise_replace: true
 
 
   fr_eval:

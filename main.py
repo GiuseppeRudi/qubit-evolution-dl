@@ -98,7 +98,7 @@ def run_experiment(
         sample_x, sample_y, pred = trainer.predict_all_test(splits.X_test, splits.Y_test)
         trainer.report_sample(sample_x, sample_y, pred)
 
-        save_outputs(splits, pred, model_cfg, feat_names, 
+        save_outputs(splits, run_cfg, pred, model_cfg, feat_names, 
                      history, plot_cfg, 
                      training_cfg, logger, 
                      yaml_name, out_dir, 

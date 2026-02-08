@@ -1,9 +1,9 @@
 from pathlib import Path
 from datetime import datetime
-import shutil
 from xml.parsers.expat import model
 import numpy as np
 import json
+import yaml
 
 from .plot import save_loss_plots_keras
 
@@ -17,7 +17,7 @@ from ..dataclasses.training_config import TrainingConfig
 from ..dataclasses.sr_config import SuperResolutionConfig
 
 from ..utils.config_values import PREDICTION_PATH, RUN_PATH
-from ..utils.utils import BufferedLogger, finish_log
+from ..utils.utils import BufferedLogger, finish_log, save_yaml
 
 
 def make_run_output_dir(model_cfg : ModelConfig, out_dir: str) -> Path:
@@ -44,19 +44,9 @@ def make_run_output_dir(model_cfg : ModelConfig, out_dir: str) -> Path:
     return run_dir
 
 
-def copy_yaml(yaml_name: str, run_dir: Path):
-
-    src = Path("configs/" + yaml_name + ".yaml").expanduser().resolve()
-
-    if not src.exists():
-        raise FileNotFoundError(f"YAML not found: {src}")
-
-    dst = run_dir / src.name
-
-    shutil.copy2(src, dst)
-
 def save_outputs(
     splits,
+    run_cfg : dict,
     pred, # shape(num_windows, output_seq_len, feature_dim)
     model_cfg: ModelConfig,
     feat_names,
@@ -128,7 +118,7 @@ def save_outputs(
 
         print(f"Saved artifacts to: {run_dir}")
 
-    copy_yaml(yaml_name, run_dir)
+    save_yaml(run_cfg, run_dir)
     finish_log(bufferedLogger,run_dir)
         
     return run_dir

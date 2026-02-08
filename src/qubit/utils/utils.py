@@ -1,3 +1,4 @@
+import yaml
 import tensorflow as tf
 import argparse
 import sys
@@ -129,3 +130,9 @@ def finish_log(logger: BufferedLogger, run_dir: Path):
     # restore
     sys.stdout = sys.__stdout__
     # sys.stderr = sys.__stderr__
+
+def save_yaml(run_cfg: dict, run_dir: Path, filename: str = "config.yaml"):
+    dst = run_dir / filename
+
+    with open(dst, "w", encoding="utf-8") as f:
+        yaml.safe_dump(run_cfg, f, sort_keys=False)
