@@ -31,11 +31,7 @@ The script converts one attention map into a 2D matrix `(Tq, Tk)` by:
 - selecting one `sample` inside the batch (`-sample`)
 - selecting one head (`-head`) or averaging all heads (`-head -1`)
 
-Then it saves a `.jpg` heatmap at **300 dpi**.
-
-### 
-
-By default, it writes into:
+Then it is saved in:
 
 - `run_dir/attn_plots/`
 
@@ -101,7 +97,7 @@ The plot shows:
 ### Super-resolution mode
 
 - `X_test.shape = (num_windows, window_len, feature_dim + 1)`
-    - last channel is the **mask channel**
+    - the +1 is for the **mask channel**
 - `Y_test.shape = (num_windows, window_len, feature_dim)`
 
 The plot shows:

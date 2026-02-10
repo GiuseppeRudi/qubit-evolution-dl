@@ -78,9 +78,13 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             m.rt.mask_prob.assign(cast(MaskedModelingPhase, phase).mask_prob)
             m.rt.mask_mode_id.assign(mask_mode_to_id)
             m.rt.mask_scope_id.assign(mask_scope_to_id)
-            m.rt.mask_value.assign(cast(MaskedModelingPhase, phase).mask_value)
-            m.rt.noise_sigma.assign(cast(MaskedModelingPhase, phase).noise_sigma)
-            m.rt.noise_replace.assign(cast(MaskedModelingPhase, phase).noise_replace)
+            
+            if mask_mode_to_id == 1 : # COSTANT 
+                m.rt.mask_value.assign(cast(MaskedModelingPhase, phase).mask_value)
+            
+            if mask_mode_to_id == 2 : # NOISE 
+                m.rt.noise_sigma.assign(cast(MaskedModelingPhase, phase).noise_sigma)
+                m.rt.noise_replace.assign(cast(MaskedModelingPhase, phase).noise_replace)
 
         if pid == 2:  # Scheduled Sampling 
             ratio_mode_to_id = {RatioMode.LINEAR.value: 0, RatioMode.COSINE.value: 1, RatioMode.SIGMOID.value: 2, RatioMode.POWER.value: 3}[cast(ScheduledSamplingPhase, phase).ratio_mode]
@@ -89,20 +93,37 @@ class PhaseSchedulerCallback(tf.keras.callbacks.Callback):
             m.rt.tf_ratio_end.assign(cast(ScheduledSamplingPhase, phase).tf_ratio_end)
             m.rt.per_feature.assign(cast(ScheduledSamplingPhase, phase).per_feature)
             m.rt.stop_grad_pred.assign(cast(ScheduledSamplingPhase, phase).stop_grad_pred)
+            
             m.rt.ratio_mode.assign(ratio_mode_to_id)
-            m.rt.mid_point.assign(cast(ScheduledSamplingPhase, phase).mid_point)
-            m.rt.sharpness.assign(cast(ScheduledSamplingPhase, phase).sharpness)
-            m.rt.power_value.assign(cast(ScheduledSamplingPhase, phase).power_value)
+            
+            if ratio_mode_to_id == 2 : # SIGMOID 
+                m.rt.mid_point.assign(cast(ScheduledSamplingPhase, phase).mid_point)
+                m.rt.sharpness.assign(cast(ScheduledSamplingPhase, phase).sharpness)
+            
+            if ratio_mode_to_id == 3 : # POWER 
+                m.rt.power_value.assign(cast(ScheduledSamplingPhase, phase).power_value)
         
         if pid == 3:  # FullAutoregressive
             m.rt.gradient_through_time.assign(cast(FullAutoregressivePhase, phase).gradient_through_time)
 
         # if a specific phase don't have the private values of learning rate and clip_norm 
         # we set the global one
-        lr = self.lr_global if phase.learning_rate is None else phase.learning_rate
-        clip = self.clip_global if phase.clip_norm is None else phase.clip_norm
+
+        lr_global = float(self.lr_global)
+        clip_global = float(self.clip_global)
+
+        lr = (
+            lr_global
+            if phase.learning_rate is None
+            else lr_global * float(phase.learning_rate)
+        )
+
+        clip = (
+            clip_global
+            if phase.clip_norm is None
+            else clip_global * float(phase.clip_norm)
+        )
         
-        lr = float(lr)
         if m.optimizer is not None: m.optimizer.learning_rate.assign(lr)
         m.current_clip_norm = clip
 

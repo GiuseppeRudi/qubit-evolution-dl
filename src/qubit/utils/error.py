@@ -37,6 +37,7 @@ def check_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data
     else:
         raise ValueError(f"Unknown model variant: {model_cfg.variant}")
     
+    
 # super_resolution
 def check_sr_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, data_cfg: DataConfig):
 
@@ -65,6 +66,10 @@ def check_fc_correctness(model_cfg: ModelConfig, training_cfg: TrainingConfig, d
 
 
     for p in training_cfg.phases:
+        if p.learning_rate is not None and p.learning_rate <= 0:
+            raise ValueError("Can't set as learning rate multi of a phase a number less or equal than 0")
+        if p.clip_norm is not None and p.clip_norm <= 0:
+            raise ValueError("Can't set as clip norm multi of a phase a number less or equal than 0")
         if p.name == PhaseName.MASKED_MODELING:
             if p.mask_prob <= 0 or p.mask_prob >= 1:
                 raise ValueError("Can't set as mask_prob a number less or equal than 0 or greater or equal than 1")

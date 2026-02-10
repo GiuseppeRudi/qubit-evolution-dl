@@ -1,6 +1,6 @@
-# Optuna - Hyperparameter Tuning
+# Optuna – Hyperparameter Tuning
 
-This project includes an **Optuna-based tuning pipeline** inside the `tuning/` package.
+This project includes an **tuning pipeline with Optuna** inside the `tuning/` package.
 
 It automatically runs multiple training trials, changes selected parameters, and saves:
 
@@ -10,11 +10,15 @@ It automatically runs multiple training trials, changes selected parameters, and
 
 You launch tuning with:
 
-`PYTHONPATH=src python -m tuning.tune`
+```bash
+PYTHONPATH=src python -m tuning.tune
+```
 
-The tuning behavior is controlled by a YAML configuration file located in:
+The tuning behaviour is controlled by:
 
-`configs/optuna.yaml`
+```
+configs/optuna.yaml
+```
 
 ---
 
@@ -22,130 +26,115 @@ The tuning behavior is controlled by a YAML configuration file located in:
 
 1. You choose a **base config** (example: `configs/lstm_full_seq.yaml`)
 2. Optuna samples new hyperparameters using the **search space** in `tuning/search_space.py`
-3. For each trial, the code builds an `override` dictionary and calls
+3. For each trial, the code builds an `override` dictionary and calls `run_experiment(...)`
 4. The model trains normally (like `main.py`), but each trial has different parameters.
 5. The trial is evaluated using a **score function** (`tuning/score.py`).
-6. If the trial is performing badly, Optuna can **prune** it early (stop training).
+6. If the trial is performing badly, Optuna can **prune** it early, stopping the training.
 
 ---
 
-## The tuning configuration file: `configs/optuna.yaml`
+## Search Space Levels
 
-This YAML controls the Optuna study:
+The search space is defined in `tuning/search_space.py` as:
 
-`tuning.seed`               ⇒  Controls reproducibility for the sampler.
-
-`tuning.study_name`   ⇒  Name of the Optuna study. It also becomes the name of the output folder.
-
-`tuning.n_trials`       ⇒  How many trials Optuna will run.
+- `level1`: model/optimizer/training hyperparameters (LR, clip norm, batch size, dims, etc.)
+- `level2`: windowing hyperparameters (`input_seq_len`, `output_seq_len`, `stride`)
+- `level3`: WIP
 
 ---
 
-`tuning.level`             ⇒  Selects which group of parameters Optuna is allowed to modify.
+## Level 1 – Single objective (minimize)
 
-Your code uses:
+### Objective (score)
 
-- `level1`, `level2`, `level3` inside `SEARCH_SPACE` (in `tuning/search_space.py`)
+Level 1 uses a scalar score based on free-running evaluation:
 
-Example:
+$$
+\textbf{score}_{L1} =
+0.70 \cdot fr\_target +
+0.25 \cdot fr\_curve +
+0.05 \cdot fr\_phase
+$$
 
-- `level: 1` → tune only basic training/model hyperparameters
-- `level: 2` → tune window lengths and stride
-- `level: 3` → WIP (strategies, curriculum)
+Optuna **minimizes** this score.
 
----
+### lr scaling with batch size
 
-### `tuning.base_name`
+When Level 1 tunes both `batch_size` and `learning_rate`, it is common to avoid "wasted" trials by connecting lr to batch size.
 
-The base YAML experiment configuration to start from.
+Instead of directly using the sampled LR, Optuna samples a **reference lr** (`lr_ref`) and you compute the **effective lr** used in training:
 
-Important:
+$$
+lr_{eff} = lr_{ref}\cdot\left(\frac{batch}{B_0}\right)^{\alpha}
+$$
 
-- You write the name **without `.yaml`**
-- The loader resolves it as: `configs/<base_name>.yaml`
+Default:
 
-Example:
-
-- `base_name: lstm_full_seq` → uses `configs/lstm_full_seq.yaml`
-
-This base config defines the dataset, model type, training phases, etc.
-
-Optuna only changes what is defined in the selected search space level.
-
----
-
-### `tuning.monitors`
-
-Defines which metric names the pruning callback should look at.
-
-Typical usage:
-
-- **Level 1**: prune based on free-running phase metrics `"_fr_phase_loss_"`
-- **Level 2**: prune based on `val_loss` (because output length changes and FR curve is not comparable)
+- $B_0 = 64$
+- $\alpha = 0.5$
 
 ---
 
-### `tuning.sampler`
+## Level 2 – Multi objective
 
-Selects how Optuna chooses the next hyperparameters.
+Level 2 tunes windowing hyperparameters:
 
-Your code supports:
+- `input_seq_len`
+- `output_seq_len`
+- `stride`
 
-- `type: tpe`
+But since longer `output_seq_len` is naturally more difficult, comparing trials using a single scalar loss will systematically prefer short horizons.
 
-TPE is a Bayesian sampler and usually works well for neural networks.
+### Multi-objective formulation
 
----
+Level 2 is handled as a **multi-objective optimization**:
 
-### `tuning.pruner`
+- **Objective 1 (minimize)**: a scalar score (see below)
+- **Objective 2 (maximize)**: `output_seq_len`
 
-Controls early stopping of bad trials.
+Optuna returns a **Pareto front** (set of non-dominated trials). There is no single best trial by definition—each Pareto point is a trade-off between error and horizon (point of maximum efficiency).
 
-Your code supports:
+### Score (Objective 1)
 
-- `type: median`
+For Level 2, the scalar score is: 
 
-Parameters:
+$$
+\textbf{score}_{L2} =
+0.80 \cdot fr\_target +
+0.20 \cdot val\_loss
+$$
 
-- `n_startup_trials`: number of completed trials before pruning starts
-- `n_warmup_steps`: number of epochs before pruning is allowed inside one trial
-
----
-
-## Output structure
-
-After tuning finishes, you will find:
-
-**1) Study outputs**
-
-- `runs/tuning/<study_name>/optuna.db`
-    
-    (Optuna database: all trial history)
-    
-- `runs/tuning/<study_name>/report.csv`
-    
-    (table with trial number, score, parameters, duration, prune info)
-    
-
-**2) Per-trial experiment folders**
-
-Each trial is executed like a normal experiment, and results are saved in:
-
-- `tuning/<study_name>/trial_XXXX/`
-
-This includes logs and (depending on your settings) saved artifacts.
+We avoid `fr_curve` and `fr_phase` at Level 2 because `output_seq_len` changes and those metrics become non-comparable across trials.
 
 ---
 
-## Score formula
+## Level 2: Minimal re-tuning of lr and clip norm
 
-- **Level 1**: weighted combination of free-running metrics
-    
-    (fr_target + fr_curve + fr_phase)
-    
-- **Level 2**: fr_target + val_loss
-    
-    (because output length changes, comparisons must stay fair)
-    
+Level 2 **re-tune** `learning_rate` and `clip_norm` in a **minimal interval** around the best Level 1 solution.
 
-Optuna minimizes this score.
+Level 2 takes from level 1 the best `lr` and `clip norm` and samples:
+
+$$
+lr \in [lr_{best}(1-\delta),\; lr_{best}(1+\delta)]
+$$
+
+$$
+clip \in [clip_{best}(1-\delta),\; clip_{best}(1+\delta)]
+$$
+
+where $\delta$ = `tuning.level1_ref.interval` (e.g. `0.30` for $\pm$ 30%).
+
+- `lr_best` refer to the **effective lr** (`lr_eff`) actually used during training.
+
+---
+
+## Pruning
+
+Pruning is still based on a **single monitored metric** (even in multi-objective mode).
+
+Recommended monitors:
+
+- **Level 1**: prune using free-running phase loss
+    - `"_fr_phase_loss_"`
+- **Level 2**: prune using a comparable scalar metric:
+    - `"val_loss"`

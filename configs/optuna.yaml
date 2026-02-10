@@ -1,28 +1,28 @@
 tuning:
   seed: 42
-  study_name: study_lstm_prova
+  study_name: study_lstm_lvl1
   n_trials: 1
   level: 1
 
-  # Base config filename
-  # Ex: load_yaml("lstm_step_wise") -> takes configs/lstm_step_wise.yaml
-  base_name: lstm_full_seq
-  
+  base_name: lstm_step_wise
+
+  # ONLY IF LEVEL 2
+  # level1_ref:
+  #   study_name: study_lstm_lvl1 # which Level-1 study to anchor LR/clip to
+  #   interval: 0.3 # +-30% interval for lvl2 tuning around Level-1 best
+
   monitors:
-     - "_fr_phase_loss_" # level 1
-     # - "val_loss" # level 2 
+    - "_fr_phase_loss_" # level 1
+    # - "val_loss" # level 2
 
   output:
-    root_dir: runs/tuning
-    storage_filename: optuna.db
     report_filename: report.csv
 
   sampler:
-    type: tpe
+    type: tpe # level 1
+    # type: nsga2 # level 2 (multi-objective)
 
   pruner:
     type: median
     n_startup_trials: 5
     n_warmup_steps: 3
-
-

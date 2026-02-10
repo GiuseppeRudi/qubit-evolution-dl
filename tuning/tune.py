@@ -17,14 +17,19 @@ from qubit.utils.config_loader import load_yaml
 
 
 
-def build_sampler(cfg: dict[str, Any], seed: int) -> optuna.samplers.BaseSampler:
+def build_sampler(cfg: dict[str, Any], seed: int, level: int) -> optuna.samplers.BaseSampler:
     sampler_cfg = cfg[SAMPLER]
     sampler_type = sampler_cfg[SAMPLER_TYPE]
 
-    if sampler_type != "tpe":
-        raise ValueError(f"Unsupported sampler.type='{sampler_type}'. Allowed: 'tpe'")
+    if level == 1:
+        if sampler_type != "tpe":
+            raise ValueError("Level1 supports sampler.type='tpe' only (for now)")
+        return optuna.samplers.TPESampler(seed=seed)
 
-    return optuna.samplers.TPESampler(seed=seed)
+    if sampler_type in ("nsga2"):
+        return optuna.samplers.NSGAIISampler(seed=seed)
+
+    raise ValueError("Level2 supports sampler.type='nsga2' only (for now)")
 
 
 def build_pruner(cfg: dict[str, Any]) -> optuna.pruners.BasePruner:
@@ -48,13 +53,13 @@ def build_pruner(cfg: dict[str, Any]) -> optuna.pruners.BasePruner:
         n_warmup_steps=n_warmup_steps,
     )
 
-# def checkHorizon(out_seq_override: int, curriculum: list[int]) -> list[int]:
-#     for i, h in enumerate(curriculum):
-#         if h > out_seq_override:
-#             curriculum[i] = out_seq_override
-#             print("ho cambiato")
-#     return curriculum
 
+def load_level1_best_params(*, storage: str, study_name: str) -> dict[str, float]:
+    """
+    Returns dict with keys like 'lr' and 'clip_norm' if present in best trial params.
+    """
+    s = optuna.load_study(storage=storage, study_name=study_name)
+    return dict(s.best_trial.params)
 
 def main():
 
@@ -76,11 +81,11 @@ def main():
     monitors = t[MONITORS]
 
     # path of the experiments results
-    out_root = Path(t[OUTPUT][ROOT_DIR]) / study_name
+    out_root = Path("runs/tuning") / study_name
     out_root.mkdir(parents=True, exist_ok=True)
 
     # save the current state of study 
-    storage = f"sqlite:///{(out_root / t[OUTPUT][STORAGE_FILENAME]).as_posix()}"
+    storage = f"sqlite:///{(out_root / "optuna.db").as_posix()}"
 
     report_name = t[OUTPUT][REPORT_FILENAME]
 
@@ -89,7 +94,7 @@ def main():
     
     # samplers tell us which type of parameter to try for the next trial 
     # bayesian approach
-    sampler = build_sampler(t, seed)
+    sampler = build_sampler(t, seed, level)
 
     # pruners decide to interrupt a trial if is going badly
     
@@ -101,19 +106,37 @@ def main():
     pruner = build_pruner(t)
 
     # container object
-    study = optuna.create_study(
-        study_name=study_name,
-        direction="minimize",
-        sampler=sampler,
-        pruner=pruner,
-        storage=storage,
-        load_if_exists=True,
-    )
+    level1_best = None
+    interval = None
+    
+    if level == 1:
+        study = optuna.create_study(
+            study_name=study_name,
+            direction="minimize",
+            sampler=sampler,
+            pruner=pruner,
+            storage=storage,
+            load_if_exists=True,
+        )
+    elif level == 2:
+        study = optuna.create_study(
+            study_name=study_name,
+            directions=["minimize", "maximize"],  # (loss, output_seq_len)
+            sampler=sampler,
+            pruner=pruner, 
+            storage=storage,
+            load_if_exists=True,
+        )
+        ref = t["level1_ref"]
+        if ref:
+            ref_storage = f"sqlite:///{(Path("runs/tuning") / ref['study_name'] / "optuna.db").as_posix()}"
+            level1_best = load_level1_best_params(storage=ref_storage, study_name=ref["study_name"])
+            interval = ref["interval"]
+
 
     # main configuration 
     base_cfg = load_yaml(base_name)
 
-    curriculum = base_cfg[TRAINING][CURRICULUM]
 
     def objective(trial):
         tf.keras.backend.clear_session()
@@ -121,14 +144,8 @@ def main():
 
         try:
             model_type = base_cfg[MODEL][MODEL_TYPE]
-            override = suggest_level(trial, model_type=model_type, level=level)
-            # out_seq_override = override[DATA][WINDOWING][OUTPUT_SEQ_LEN]
+            override = suggest_level(trial, model_type = model_type, level = level, level1_best = level1_best, interval = interval)
 
-            # new_curriculum : list[int] = checkHorizon(out_seq_override,curriculum)
-
-            # override.setdefault("training", {})["curriculum"] = new_curriculum
-
-            
             callbacks : list[Callback] = [OptunaPruningCallback(trial, monitors)]
 
             metrics = run_experiment(

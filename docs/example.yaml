@@ -85,14 +85,14 @@ training:
     - name: full_autoregressive
       epochs: 5
       gradient_through_time: false
-      learning_rate: 0.0005 # custom lr for this strategy (overrides global lr)
-      clip_norm: 0.5 # custom clip_norm for this strategy (overrides clip_norm)
+      learning_rate: 0.5 # for custom lr insert in this section a multiplier to get the lr_phase = lr_global * multiplier 
+      clip_norm: 0.5 # for custom clip_norm insert in this section a multiplier to get the clip_norm_phase = clip_norm * multiplier
 
     - name: masked_modeling
       epochs: 5
       mask_prob: 0.20
-      learning_rate: 5e-4 # custom lr for this strategy (overrides global lr)
-      clip_norm: 0.7 # custom clip_norm for this strategy (overrides clip_norm)
+      learning_rate: 0.5 # for custom lr insert in this section a multiplier to get the lr_phase = lr_global * multiplier 
+      clip_norm: 0.5 # for custom clip_norm insert in this section a multiplier to get the clip_norm_phase = clip_norm * multiplier
       mask_scope: time # time | element | feature
       mask_mode: constant # zero | constant | noise
       mask_value: 0.2 # only if mask_mode = constant
@@ -106,7 +106,7 @@ training:
       epochs: 8
       tf_ratio_start: 1.0
       tf_ratio_end: 0.5
-      learning_rate: 0.0003
+      learning_rate: 0.3
       clip_norm: 0.5
       ratio_mode: sigmoid  # linear | cosine | sigmoid | power 
       mid_point: 0.6  # only if ratio_mode = sigmoid 

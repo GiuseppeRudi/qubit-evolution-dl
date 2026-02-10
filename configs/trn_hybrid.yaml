@@ -1,14 +1,14 @@
 data:
   dataset:
     csv_path: data/trajectories.csv
-    total_qubits: 10 # fixed values 
+    total_qubits: 10 # fixed  
     used_qubits: 8
     time_steps: 1001 # fixed 
     n_traj: 400 # fixed 
-    traj_fraction: 0.025
+    traj_fraction: 1
 
   windowing:
-    input_seq_len: 400
+    input_seq_len: 200
     output_seq_len: 50
     stride: 20
 
@@ -20,8 +20,8 @@ data:
 model:
   name: "prova1"
   type: "TRN"
-  variant: "FC" # SR or FC
-  decoder_mode: "HYBRID"  # "FULL_SEQ"  ,  "STEP_WISE" # "HYBRID"
+  variant: "FC"
+  decoder_mode: "HYBRID"  
   save_model: true
   return_attentions: true
 
@@ -37,80 +37,76 @@ model:
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 0.001
+    learning_rate: 5e-4
     clip_norm: 1.0
 
   inference:
-    mode: "free_running"   # "teacher_forcing" | "free_running"
-    start_mode: "last_x"    # "zeros" | "last_x"
-    verbose: 0  # 0,1,2
+    mode: "free_running"   
+    start_mode: "last_x"    
+    verbose: 0  
 
 training:
-  prediction_mode: "all" # all | horizon => all predice sempre su outpu_seq_len e calcola la loss facendo slide su :horizon 
-                          # horizon => predice solo fino :horizon 
-                          # ALL => PRO : stabilita di grafo e non tracing CONTRO : lentezza computazionale
-                          # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
+  prediction_mode: "all" 
   verbose: 1
   batch_size: 64
-  curriculum: [0.2,1,0.3,1,0.1,0.05]
+  curriculum: [0.2, 0.3, 0.5, 0.7, 0.9, 1.0]
+  
   phases:
-    - name: masked_modeling
-      epochs: 5
-      mask_prob: 0.20
-      learning_rate: 0.0005
-      clip_norm: 0.7
-      mask_scope: time        # time | element | feature
-      mask_mode: constant         # zero | constant | noise
-      mask_value: 0.2         # solo se constant
-      noise_sigma: 0.1        # solo se noise
-      noise_replace: false # true: mask replacing the original value with noise
-                          # false: mask adding noise to the original value
-
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: true
-      learning_rate: 0.0003
-      clip_norm: 0.5
-
     - name: teacher_forcing
-      epochs: 10 
-    
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: false
-      learning_rate: 0.0005
-      clip_norm: 0.5
+      epochs: 6
+      learning_rate: 1.00
+      clip_norm: 1.00
+
+    - name: masked_modeling
+      epochs: 6
+      mask_prob: 0.15
+      learning_rate: 0.80
+      clip_norm: 0.90
+      mask_scope: time
+      mask_mode: constant
+      mask_value: 0.2
+      noise_replace: false
 
     - name: scheduled_sampling
       epochs: 8
       tf_ratio_start: 1.0
-      tf_ratio_end: 0.5
-      learning_rate: 0.0003
-      clip_norm: 0.5
-      ratio_mode: sigmoid  # linear , cosine , sigmoid, power 
-      mid_point: 0.6  # only for sigmoid 
-      sharpness: 10.0 # only for sigmoid
-      power_value: 2.0 # only per power 
-      per_feature: true # true , false # if per_feature = false so per_timestep= True
-      stop_grad_pred: true # true, false
-    
-    - name: full_autoregressive
-      epochs: 5
-      gradient_through_time: true
-      learning_rate: 0.0001
-      clip_norm: 0.3
+      tf_ratio_end: 0.35
+      learning_rate: 0.70
+      clip_norm: 0.85
+      ratio_mode: sigmoid
+      mid_point: 0.6
+      sharpness: 10.0
+      power_value: 2.0
+      per_feature: true
+      stop_grad_pred: true
 
-  # free-running evaluation
+    - name: masked_modeling
+      epochs: 4
+      mask_prob: 0.20
+      learning_rate: 0.60
+      clip_norm: 0.80
+      mask_scope: time
+      mask_mode: noise
+      noise_sigma: 0.1
+      noise_replace: false
+
+    - name: full_autoregressive
+      epochs: 4
+      gradient_through_time: false
+      learning_rate: 0.50
+      clip_norm: 0.75
+
+    - name: full_autoregressive
+      epochs: 2
+      gradient_through_time: true
+      learning_rate: 0.30
+      clip_norm: 0.60
+
   fr_eval:
     enabled: true
-    split: val   # val || test 
+    split: val   
     batch_size: 32
     
-    # p_eval => percentuage of the (val or test) split
-    # out_steps can be 
-    # out_steps => phase  where phase take horizon prediction determinated by a used strategy
-    # out_steps => global where the horizon prediction are taken by output_seq_len
-    # out_steps => [10,25,60,100] a list of horizon values insert by the programmer 
     probes:
       - name: fr_phase 
         out_steps: phase  
@@ -128,6 +124,6 @@ training:
         every_epochs: end_of_phase
 
 plot:
-  sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
+  sample_index: [0,2,4]  
   save_plots: true
   save_artifacts: true

@@ -1,7 +1,7 @@
 data:
   dataset:
     csv_path: data/trajectories.csv
-    total_qubits: 10 # fixed values 
+    total_qubits: 10 # fixed  
     used_qubits: 8
     time_steps: 1001 # fixed 
     n_traj: 400 # fixed 
@@ -22,10 +22,11 @@ model:
   save_model: true
   type: "LSTM"
   variant: "FC"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE"
+  decoder_mode: "FULL_SEQ"  
 
   params:
     latent_dim: 128
+    dropout: 0.1
 
   compile:
     optimizer: "adam"
@@ -36,15 +37,12 @@ model:
     clip_norm: 1.0
 
   inference:
-    mode: "free_running"   # "teacher_forcing" | "free_running"
-    start_mode: "zeros"    # "zeros" | "last_x"
-    verbose: 0  # 0,1,2
+    mode: "free_running" 
+    start_mode: "zeros"   
+    verbose: 0  
 
 training:
-  prediction_mode: "all" # all | horizon => all predice sempre su outpu_seq_len e calcola la loss facendo slide su :horizon 
-                          # horizon => predice solo fino :horizon 
-                          # ALL => PRO : stabilita di grafo e non tracing CONTRO : lentezza computazionale
-                          # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
+  prediction_mode: "all" 
   verbose: 1
   batch_size: 64
   curriculum: [0.3,1]
@@ -52,14 +50,14 @@ training:
     - name: masked_modeling
       epochs: 5
       mask_prob: 0.20
-      learning_rate: 5e-4
+      learning_rate: 0.5
       clip_norm: 0.7
       mask_scope: time        # time | element | feature
       mask_mode: constant         # zero | constant | noise
       mask_value: 0.2         # solo se constant
       noise_sigma: 0.1        # solo se noise
       noise_replace: false # true: mask replacing the original value with noise
-                          # false: mask adding noise to the original value
+                           # false: mask adding noise to the original value
     
     - name: teacher_forcing
       epochs: 5
