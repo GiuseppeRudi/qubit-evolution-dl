@@ -5,11 +5,11 @@ data:
     used_qubits: 8
     time_steps: 1001
     n_traj: 400
-    traj_fraction: 1
+    traj_fraction: 0.5
 
   windowing:
-    input_seq_len: 200
-    output_seq_len: 400
+    input_seq_len: 100
+    output_seq_len: 200
     stride: 2
 
   split:
@@ -27,15 +27,16 @@ sr:
 model:
   name: "sr1_opt"
   save_model: true
+  return_attentions: false
   type: "TRN"
   variant: "SR"
   decoder_mode: "ENCODER_ONLY"
 
   params:
-    dim_model: 128         
+    dim_model: 64
     num_heads: 4
-    ff_dim: 1024             
-    num_layers: 3
+    ff_dim: 256
+    num_layers: 2
     dropout: 0.1
 
   compile:

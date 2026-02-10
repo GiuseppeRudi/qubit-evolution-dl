@@ -111,7 +111,7 @@ class SrTrnModel(keras.Model):
         x = self.enc_drop(x, training=training)
 
         for blk in self.enc_blocks:
-            x = blk(x, training=training)
+            x = blk(x, training=training,return_attns = False)
 
         # layers.Dense 
         # input => y.shape (batch_size,window_size,dim_model)
