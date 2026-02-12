@@ -29,7 +29,7 @@ dist/
 *.swo
 
 # Log / temp
-*.log
+# *.log
 logs/
 tmp/
 temp/

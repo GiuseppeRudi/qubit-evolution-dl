@@ -30,7 +30,7 @@ dist/
 
 # Logs / temp
 logs/
-*.log
+# *.log
 tmp/
 temp/
 *.tmp
