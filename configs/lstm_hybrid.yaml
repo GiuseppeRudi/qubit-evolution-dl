@@ -63,7 +63,7 @@ training:
       noise_replace: false
 
     - name: scheduled_sampling
-      epochs: 8
+      epochs: 2
       tf_ratio_start: 1.0
       tf_ratio_end: 0.35
       learning_rate: 0.70
@@ -86,16 +86,10 @@ training:
       noise_replace: false
 
     - name: full_autoregressive
-      epochs: 4
+      epochs: 2
       gradient_through_time: false
       learning_rate: 0.50
       clip_norm: 0.75
-
-    - name: full_autoregressive
-      epochs: 2
-      gradient_through_time: true
-      learning_rate: 0.30
-      clip_norm: 0.60
 
   fr_eval:
     enabled: true

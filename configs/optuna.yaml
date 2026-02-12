@@ -1,10 +1,10 @@
 tuning:
   seed: 42
-  study_name: study_lstm_lvl1
-  n_trials: 30
+  study_name: full_seq_lstm_lvl1
+  n_trials: 20
   level: 1
 
-  base_name: lstm_hybrid
+  base_name: lstm_full_seq
 
   # ONLY IF LEVEL 2
   # level1_ref:
