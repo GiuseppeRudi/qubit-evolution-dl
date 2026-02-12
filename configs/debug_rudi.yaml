@@ -1,16 +1,16 @@
 data:
   dataset:
     csv_path: data/trajectories.csv
-    total_qubits: 10 # fixed values 
+    total_qubits: 10 # fixed 
     used_qubits: 8
     time_steps: 1001 # fixed 
     n_traj: 400 # fixed 
-    traj_fraction: 0.8
+    traj_fraction: 0.1
 
   windowing:
     input_seq_len: 200
     output_seq_len: 50
-    stride: 40
+    stride: 20
 
   split:
     seed: 42
@@ -21,70 +21,44 @@ model:
   name: "prova1"
   save_model: true
   type: "LSTM"
-  variant: "SEQ2SEQ"
-  decoder_mode: "FULL_SEQ"  # "FULL_SEQ"  ,  "STEP_WISE", # HYBRID
+  variant: "FC"
+  decoder_mode: "HYBRID"  
 
   params:
     latent_dim: 128
+    dropout: 0.1
 
   compile:
     optimizer: "adam"
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 0.001
+    learning_rate: 5e-4
     clip_norm: 1.0
 
   inference:
-    mode: "free_running"   # "teacher_forcing" | "free_running"
-    start_mode: "last_x"    # "zeros" | "last_x"
-    verbose: 0  # 0,1,2
+    mode: "free_running"   
+    start_mode: "last_x"  
+    verbose: 0  
 
 training:
-  prediction_mode: "all" # all | horizon => all predice sempre su outpu_seq_len e calcola la loss facendo slide su :horizon 
-                          # horizon => predice solo fino :horizon 
-                          # ALL => PRO : stabilita di grafo e non tracing CONTRO : lentezza computazionale
-                          # HORIZON => PRO : velocita di predizione CONTRO : molto tracing se horizon cambia spesso 
+  prediction_mode: "all" 
   verbose: 1
   batch_size: 64
-  curriculum: [15,20, 25,-1]
+  curriculum: [0.3]
   phases:
-    - name: masked_modeling
-      epochs: 5
-      mask_prob: 0.20
-      mask_scope: time        # time | element | feature
-      mask_mode: constant         # zero | constant | noise
-      mask_value: 0.2         # solo se constant
-      noise_sigma: 0.1        # solo se noise
-      noise_replace: false # true: mask replacing the original value with noise
-                          # false: mask adding noise to the original value
-    - name: teacher_forcing
-      epochs: 10
-    
-    - name: masked_modeling
-      epochs: 5
-      mask_prob: 0.20
-      mask_scope: feature        # time | element | feature
-      mask_mode: noise         # zero | constant | noise
-      mask_value: 0.2         # solo se constant
-      noise_sigma: 0.1        # solo se noise
-      noise_replace: false # true: mask replacing the original value with noise
-                          # false: mask adding noise to the original value
 
     - name: teacher_forcing
-      epochs: 10
+      epochs: 6
+      learning_rate: 1.00
+      clip_norm: 1.00
 
-  # free-running evaluation
+
   fr_eval:
     enabled: true
-    split: val   # val || test 
+    split: val   
     batch_size: 32
     
-    # p_eval => percentuage of the (val or test) split
-    # out_steps can be 
-    # out_steps => phase  where phase take horizon prediction determinated by a used strategy
-    # out_steps => global where the horizon prediction are taken by output_seq_len
-    # out_steps => [10,25,60,100] a list of horizon values insert by the programmer 
     probes:
       - name: fr_phase 
         out_steps: phase  
@@ -97,11 +71,11 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [20,30,40] 
+        out_steps: [0.02,0.04,0.06] 
         p_eval: 0.2
         every_epochs: end_of_phase
 
 plot:
-  sample_index: [0,2,4]  # None = 0 , oppure una cosi = 1 oppure lista cosi []
+  sample_index: [0,2,4] 
   save_plots: true
   save_artifacts: true

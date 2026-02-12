@@ -77,12 +77,12 @@ def load_run_artifacts(run_str: str, destandardize: bool):
 
         feature_dim = mean.shape[-1]
 
-        # for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
-        # print()
+        for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
+        print()
 
         Y_test = inverse_standardizer(Y_test, mean, std)
-        # for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
-        # print()
+        for i in range(Y_test.shape[0]): print(Y_test[i,0,0],end=" ")
+        print()
         pred = inverse_standardizer(pred, mean, std)
 
         if X_test.shape[-1] == feature_dim:

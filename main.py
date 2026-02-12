@@ -118,8 +118,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-# TODO check in all model if the flag training is correctly used 
-
 # TODO try comparison between models
 
 # TODO attention the pretrained model weights now doesnt't work, check it 
+
+# TODO check if we can remove standardization (stdz is greater than non_stdz)
