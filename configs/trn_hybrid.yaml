@@ -53,7 +53,7 @@ training:
   
   phases:
     - name: teacher_forcing
-      epochs: 6
+      epochs: 4
       learning_rate: 1.00
       clip_norm: 1.00
 
@@ -81,7 +81,7 @@ training:
       stop_grad_pred: true
 
     - name: masked_modeling
-      epochs: 4
+      epochs: 2
       mask_prob: 0.20
       learning_rate: 0.60
       clip_norm: 0.80
@@ -97,7 +97,7 @@ training:
       clip_norm: 0.75
 
     - name: masked_modeling
-      epochs: 4
+      epochs: 2
       mask_prob: 0.20
       learning_rate: 0.80
       clip_norm: 0.80
@@ -123,7 +123,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [0.02,0.04,0.06] 
+        out_steps: [0.3,0.6,0.9] 
         p_eval: 0.2
         every_epochs: end_of_phase
 
