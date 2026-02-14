@@ -45,7 +45,11 @@ training:
   prediction_mode: "all" 
   verbose: 1
   batch_size: 64
+<<<<<<< HEAD
   curriculum: [0.3, 0.4, 0.5, 0.7, 0.9, 1.0]
+=======
+  curriculum: [0.2, 0.3, 0.4, 0.5, 0.7, 0.9]
+>>>>>>> 7079eae (completed tuning  level 1 for full_seq_lstm and step_wise_lstm models)
   
   phases:
     - name: teacher_forcing
@@ -72,7 +76,7 @@ training:
       noise_replace: false
 
     - name: scheduled_sampling
-      epochs: 3
+      epochs: 2
       tf_ratio_start: 1.0
       tf_ratio_end: 0.4
       learning_rate: 0.70

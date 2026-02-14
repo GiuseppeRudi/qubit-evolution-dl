@@ -1,0 +1,118 @@
+data:
+  dataset:
+    csv_path: data/trajectories.csv
+    total_qubits: 10
+    used_qubits: 10
+    time_steps: 1001
+    n_traj: 400
+    traj_fraction: 1
+  windowing:
+    input_seq_len: 200
+    output_seq_len: 50
+    stride: 20
+  split:
+    seed: 42
+    val_ratio: 0.2
+    test_ratio: 0.15
+model:
+  name: prova1
+  save_model: true
+  type: LSTM
+  variant: FC
+  decoder_mode: STEP_WISE
+  params:
+    latent_dim: 128
+    dropout: 0.1
+  compile:
+    optimizer: adam
+    loss: mse
+    metrics:
+    - mae
+    run_eagerly: false
+    learning_rate: 5.987786286703925e-05
+    clip_norm: 1.7254716573280358
+  inference:
+    mode: free_running
+    start_mode: last_x
+    verbose: 0
+training:
+  prediction_mode: all
+  verbose: 1
+  batch_size: 32
+  curriculum:
+  - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.7
+  - 0.9
+  phases:
+  - name: teacher_forcing
+    epochs: 6
+  - name: masked_modeling
+    epochs: 4
+    mask_prob: 0.15
+    learning_rate: 0.8
+    clip_norm: 0.9
+    mask_scope: time
+    mask_mode: constant
+    mask_value: 0.2
+    noise_replace: false
+  - name: masked_modeling
+    epochs: 4
+    mask_prob: 0.2
+    learning_rate: 0.6
+    clip_norm: 0.8
+    mask_scope: time
+    mask_mode: noise
+    noise_sigma: 0.1
+    noise_replace: false
+  - name: scheduled_sampling
+    epochs: 3
+    tf_ratio_start: 1.0
+    tf_ratio_end: 0.4
+    learning_rate: 0.7
+    clip_norm: 0.8
+    ratio_mode: sigmoid
+    mid_point: 0.6
+    sharpness: 10.0
+    power_value: 2.0
+    per_feature: true
+    stop_grad_pred: true
+  - name: full_autoregressive
+    epochs: 2
+    gradient_through_time: false
+    learning_rate: 0.5
+    clip_norm: 0.7
+  - name: full_autoregressive
+    epochs: 1
+    gradient_through_time: true
+    learning_rate: 0.3
+    clip_norm: 0.6
+  fr_eval:
+    enabled: true
+    split: val
+    batch_size: 32
+    probes:
+    - name: fr_phase
+      out_steps: phase
+      every_epochs: 2
+      p_eval: 0.8
+    - name: fr_target
+      out_steps: global
+      p_eval: 0.3
+      every_epochs: end_of_phase
+    - name: fr_curve
+      out_steps:
+      - 0.2
+      - 0.4
+      - 0.6
+      p_eval: 0.2
+      every_epochs: end_of_phase
+plot:
+  sample_index:
+  - 0
+  - 2
+  - 4
+  save_plots: true
+  save_artifacts: true
