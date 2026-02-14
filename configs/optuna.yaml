@@ -1,26 +1,26 @@
 tuning:
   seed: 42
-  study_name: full_seq_lstm_lvl1
+  study_name: step_wise_lstm_lvl2
   n_trials: 20
   level: 1
 
-  base_name: lstm_full_seq
+  base_name: lstm_hybrid
 
-  # ONLY IF LEVEL 2
-  # level1_ref:
-  #   study_name: study_lstm_lvl1 # which Level-1 study to anchor LR/clip to
-  #   interval: 0.3 # +-30% interval for lvl2 tuning around Level-1 best
+  #ONLY IF LEVEL 2
+  level1_ref:
+    study_name: study_lstm_lvl1 # which Level-1 study to anchor LR/clip to
+    interval: 0.3 # +-30% interval for lvl2 tuning around Level-1 best
 
   monitors:
-    - "_fr_phase_loss_" # level 1
-    # - "val_loss" # level 2
+    #- "_fr_phase_loss_" # level 1
+    - "val_loss" # level 2
 
   output:
     report_filename: report.csv
 
   sampler:
-    type: tpe # level 1
-    # type: nsga2 # level 2 (multi-objective)
+    # type: tpe # level 1
+    type: nsga2 # level 2 (multi-objective)
 
   pruner:
     type: median

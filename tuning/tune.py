@@ -54,12 +54,17 @@ def build_pruner(cfg: dict[str, Any]) -> optuna.pruners.BasePruner:
     )
 
 
-def load_level1_best_params(*, storage: str, study_name: str) -> dict[str, float]:
+def load_level1_best_params(*, storage: str, study_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Returns dict with keys like 'lr' and 'clip_norm' if present in best trial params.
     """
     s = optuna.load_study(storage=storage, study_name=study_name)
-    return dict(s.best_trial.params)
+    t = s.best_trial
+    return dict(t.params), dict(t.user_attrs)
+
+def count_finished_trials(study: optuna.Study) -> int:
+    # finished = COMPLETE / FAIL / PRUNED
+    return sum(t.state.is_finished() for t in study.trials)
 
 def main():
 
@@ -91,10 +96,7 @@ def main():
 
 
     # ? we can also try different samplers and pruners
-    
-    # samplers tell us which type of parameter to try for the next trial 
-    # bayesian approach
-    sampler = build_sampler(t, seed, level)
+
 
     # pruners decide to interrupt a trial if is going badly
     
@@ -106,14 +108,19 @@ def main():
     pruner = build_pruner(t)
 
     # container object
-    level1_best = None
+    best_params_lvl1 = None
+    best_user_attr_lvl1 = None
     interval = None
     
+    # samplers tell us which type of parameter to try for the next trial 
+    # bayesian approach
+    sampler0 = build_sampler(t, seed, level)
+
     if level == 1:
         study = optuna.create_study(
             study_name=study_name,
             direction="minimize",
-            sampler=sampler,
+            sampler=sampler0,
             pruner=pruner,
             storage=storage,
             load_if_exists=True,
@@ -121,16 +128,17 @@ def main():
     elif level == 2:
         study = optuna.create_study(
             study_name=study_name,
-            directions=["minimize", "maximize"],  # (loss, output_seq_len)
-            sampler=sampler,
-            pruner=pruner, 
+            directions=["minimize", "maximize"],
+            sampler=sampler0,
+            pruner=optuna.pruners.NopPruner(),
             storage=storage,
             load_if_exists=True,
         )
+        study.set_metric_names(["score", "out_seq_len"])
         ref = t["level1_ref"]
         if ref:
             ref_storage = f"sqlite:///{(Path("runs/tuning") / ref['study_name'] / "optuna.db").as_posix()}"
-            level1_best = load_level1_best_params(storage=ref_storage, study_name=ref["study_name"])
+            best_params_lvl1, best_user_attr_lvl1 = load_level1_best_params(storage=ref_storage, study_name=ref["study_name"])
             interval = ref["interval"]
 
 
@@ -144,7 +152,7 @@ def main():
 
         try:
             model_type = base_cfg[MODEL][MODEL_TYPE]
-            override = suggest_level(trial, model_type = model_type, level = level, level1_best = level1_best, interval = interval)
+            override = suggest_level(trial, model_type = model_type, level = level, best_params_lvl1 = best_params_lvl1, best_user_attr_lvl1 = best_user_attr_lvl1, interval = interval)
 
             callbacks : list[Callback] = [OptunaPruningCallback(trial, monitors)]
 
@@ -157,6 +165,11 @@ def main():
             )
 
             score = compute_score(metrics, base_cfg,override, level)
+
+            if level == 2:
+                out_seq_len = int(override[DATA][WINDOWING][OUTPUT_SEQ_LEN])
+                # return (minimize score, maximize out_seq_len)
+                return (score, out_seq_len)
 
             return score
 
@@ -172,13 +185,30 @@ def main():
             tf.keras.backend.clear_session()
             gc.collect()
 
+    finished = count_finished_trials(study)
+    remaining = max(0, n_trials - finished)
 
-    study.optimize(objective, n_trials=n_trials)
+    if finished > 0:
+        study.sampler = build_sampler(t, seed + finished, level)
+        if hasattr(study.sampler, "reseed_rng"):
+            study.sampler.reseed_rng()
+
+    study.optimize(objective, n_trials=remaining)
+
+    pareto = study.best_trials if level == 2 else [study.best_trial]
+    print(f"Pareto trials ({len(pareto)}):")
+    for t in pareto[:20]:
+        print(f"  trial={t.number} values={t.values} params={t.params}")
 
     df = study.trials_dataframe(("number", "value", "duration", "params", "user_attrs", "system_attrs", "state"))
     df.to_csv(out_root / report_name, index=False)
 
-    print("Best trial:", study.best_trial.number, "score:", study.best_value)
+    if level == 1:
+        print("Best trial:", study.best_trial.number, "score:", study.best_value)
+    else:
+        chosen = min(study.best_trials, key=lambda t: (t.values[0], -t.values[1]))
+        print("Chosen pareto trial:", chosen.number, "values:", chosen.values)
+
 
 if __name__ == "__main__":
     main()

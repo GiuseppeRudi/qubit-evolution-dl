@@ -7,11 +7,16 @@ import re
 
 class OptunaPruningCallback(tf.keras.callbacks.Callback):
 
-    def __init__(self, trial: optuna.Trial, monitors: list[str],   
+    def __init__(
+        self,
+        trial: optuna.Trial,
+        monitors: list[str],   
         debug: bool = True,
         print_every: int = 1,
         history_limit: int = 200,  # quanti trial passati usare per stats
-        use_completed_only: bool = True,):
+        use_completed_only: bool = True
+    ):
+        
         super().__init__()
 
         self.print_every = print_every
@@ -21,16 +26,17 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
         
         self.trial = trial
 
-        self.regex: list[re.Pattern[str]] = []
-        
-        for monitor in monitors:
-            self.regex.append(re.compile(rf"{monitor}"))
-            
+        self.regex: list[re.Pattern[str]] = [re.compile(rf"{m}") for m in monitors]
+
+    def _is_multi_objective(self) -> bool:
+        dirs = getattr(self.trial.study, "directions", None)
+        return bool(dirs) and len(dirs) > 1
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
 
         # check if the metrics that we use for pruning is present in the logs in that epoch
+        key = None
         for r in self.regex:
             key = next((k for k in logs.keys() if r.search(k)), None)
             if key is not None: break
@@ -40,44 +46,54 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
         # if it is present we use this value 
         value = float(logs[key])
         
-        # if value if NaN (placeholder)
+        # if value is NaN (placeholder)
         if not math.isfinite(value): return
 
-        # add to the report 
-        self.trial.report(value, step=epoch)
+        is_mo = self._is_multi_objective()
 
-        # Debug: stampa mediana e margine
-        if self.debug and (epoch % self.print_every == 0):
-            p25, med, p75, n = self._step_stats(epoch)
+        # customised report: save the best so far
+        # (leggero: salva solo l’ultimo valore e il best)
+        best_key = f"best_{key}"
+        prev_best = self.trial.user_attrs.get(best_key)
 
-            if med is None:
-                print(f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} | no history yet")
+        # regola best: loss -> min, altri -> max (adatta se vuoi)
+        improved = False
+        if prev_best is None:
+            improved = True
+        else:
+            if "loss" in key:
+                improved = value < float(prev_best)
             else:
-                delta = value - med
-                pct = (delta / med * 100.0) if med != 0 else float("inf")
+                improved = value > float(prev_best)
 
-                print(
-                    f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} "
-                    f"| median={med:.6g} (n={n}, p25={p25:.6g}, p75={p75:.6g}) "
-                    f"| margin={delta:+.6g} ({pct:+.2f}%)"
-                )
+        if improved:
+            self.trial.set_user_attr(best_key, float(value))
+            self.trial.set_user_attr(f"{best_key}_epoch", int(epoch))
 
-        # Prune decision
-        if self.trial.should_prune():
-            # stampa anche motivo/margine al pruning
-            if self.debug:
+        # Debug print
+        if self.debug and (epoch % self.print_every == 0):
+            if is_mo:
+                print(f"[Optuna-MO] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g}")
+            else:
                 p25, med, p75, n = self._step_stats(epoch)
                 if med is None:
-                    print(f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch + 1} ({key}={value:.6g})")
+                    print(f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} | no history yet")
                 else:
                     delta = value - med
                     pct = (delta / med * 100.0) if med != 0 else float("inf")
                     print(
-                        f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch + 1} "
-                        f"{key}={value:.6g} > median={med:.6g} "
-                        f"by {delta:+.6g} ({pct:+.2f}%)"
+                        f"[Optuna] trial={self.trial.number} epoch={epoch + 1} {key}={value:.6g} "
+                        f"| median={med:.6g} (n={n}, p25={p25:.6g}, p75={p75:.6g}) "
+                        f"| margin={delta:+.6g} ({pct:+.2f}%)"
                     )
-            raise optuna.TrialPruned()
+
+        # pruning SOLO se single-objective
+        if not is_mo:
+            self.trial.report(value, step=epoch)
+            if self.trial.should_prune():
+                if self.debug:
+                    print(f"[Optuna] PRUNED trial={self.trial.number} epoch={epoch + 1} ({key}={value:.6g})")
+                raise optuna.TrialPruned()
         
 
 
@@ -102,7 +118,10 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
                 return None, None, None, 0
 
             arr = np.asarray(vals, dtype=np.float64)
-            p25 = float(np.percentile(arr, 25))
-            med = float(np.percentile(arr, 50))
-            p75 = float(np.percentile(arr, 75))
-            return p25, med, p75, len(vals)
+            
+            return (
+                float(np.percentile(arr, 25)),
+                float(np.percentile(arr, 50)),
+                float(np.percentile(arr, 75)),
+                len(vals),
+            )

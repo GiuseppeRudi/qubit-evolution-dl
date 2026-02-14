@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 import optuna
 
+from qubit.enums.model_type import ModelType
+
 from .search_space import SEARCH_SPACE, ParamSpec
 from qubit.utils.config_keys import BATCH_SIZE, TRAINING, MODEL , COMPILE , LEARNING_RATE
 
@@ -46,7 +48,8 @@ def suggest_level(
     *,
     model_type: str,
     level: int,
-    level1_best: dict[str, Any] | None,  
+    best_params_lvl1: dict[str, Any] | None,
+    best_user_attr_lvl1: dict[str, Any] | None,  
     interval: float | None,
 ) -> dict[str, Any]:
 
@@ -58,32 +61,30 @@ def suggest_level(
 
     specs = list(SEARCH_SPACE[model_type][lvl])
 
-    if level == 2 and level1_best and interval:
-        if "lr" in level1_best:
-            lr0 = float(level1_best["lr_eff"])
-            specs.append(
-                ParamSpec(
-                    name="lr",
-                    path="model.compile.learning_rate",
-                    type="float",
-                    low=lr0 * (1.0 - interval),
-                    high=lr0 * (1.0 + interval),
-                    log=True,
-                )
+    if level == 2 and best_params_lvl1 and best_user_attr_lvl1 and interval:
+        lr0 = float(best_user_attr_lvl1["lr_eff"])
+        specs.append(
+            ParamSpec(
+                name="lr",
+                path="model.compile.learning_rate",
+                type="float",
+                low=lr0 * (1.0 - interval),
+                high=lr0 * (1.0 + interval),
+                log=True,
             )
+        )
 
-        if "clip_norm" in level1_best:
-            c0 = float(level1_best["clip_norm"])
-            specs.append(
-                ParamSpec(
-                    name="clip_norm",
-                    path="model.compile.clip_norm",
-                    type="float",
-                    low=c0 * (1.0 - interval),
-                    high=c0 * (1.0 + interval),
-                    log=True,  
-                )
+        c0 = float(best_params_lvl1["clip_norm"])
+        specs.append(
+            ParamSpec(
+                name="clip_norm",
+                path="model.compile.clip_norm",
+                type="float",
+                low=c0 * (1.0 - interval),
+                high=c0 * (1.0 + interval),
+                log=True,  
             )
+        )
 
     for spec in specs:
         v = _suggest_one(trial, spec)
@@ -104,5 +105,23 @@ def suggest_level(
         trial.set_user_attr("lr_ref", float(lr_ref))
         trial.set_user_attr("lr_eff", float(lr_eff))
         trial.set_user_attr("lr_alpha", alpha)
+
+    elif level == 2 and best_params_lvl1:
+        print(f"batch_size: {best_params_lvl1["batch_size"]}, ",end="")
+        _set_nested(override, "model.training.batch_size", best_params_lvl1["batch_size"])
+        if model_type == ModelType.LSTM:
+            print(f"latent_dim: {best_params_lvl1["latent_dim"]}")
+            _set_nested(override, "model.params.latent_dim", best_params_lvl1["latent_dim"])
+        elif model_type == ModelType.TRN:
+            print(f"num_heads: {best_params_lvl1["num_heads"]}, ",end="")
+            _set_nested(override, "model.params.num_heads", best_params_lvl1["num_heads"])
+            print(f"dim_model: {best_params_lvl1["dim_model"]}, ",end="")
+            _set_nested(override, "model.params.dim_model", best_params_lvl1["dim_model"])
+            print(f"ff_dim: {best_params_lvl1["ff_dim"]}, ",end="")
+            _set_nested(override, "model.params.ff_dim", best_params_lvl1["ff_dim"])
+            print(f"num_layers: {best_params_lvl1["num_layers"]}, ",end="")
+            _set_nested(override, "model.params.num_layers", best_params_lvl1["num_layers"])
+            print(f"dropout: {best_params_lvl1["dropout"]}")
+            _set_nested(override, "model.params.dropout", float(best_params_lvl1["dropout"]))
 
     return override
