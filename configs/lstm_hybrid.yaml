@@ -45,7 +45,7 @@ training:
   prediction_mode: "all" 
   verbose: 1
   batch_size: 64
-  curriculum: [0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
+  curriculum: [0.2, 0.3, 0.4, 0.7, 1.0]
   phases:
     - name: teacher_forcing
       epochs: 6
@@ -108,7 +108,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [0.02,0.04,0.06] 
+        out_steps: [0.2,0.4,0.6] 
         p_eval: 0.2
         every_epochs: end_of_phase
 

@@ -30,10 +30,6 @@ dist/
 
 # Logs / temp
 logs/
-<<<<<<< HEAD
-# *.log
-=======
->>>>>>> 7079eae (completed tuning  level 1 for full_seq_lstm and step_wise_lstm models)
 tmp/
 temp/
 *.tmp
@@ -52,7 +48,7 @@ Thumbs.db
 
 # Large data / training artifacts
 data/
-runs/predictions/
+runs/
 
 # Docker stuff (keep Dockerfile, ignore extra local files)
 docker-compose.override.yml

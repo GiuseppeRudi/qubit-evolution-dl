@@ -2,7 +2,7 @@ import optuna
 import pandas as pd
 from pathlib import Path
 
-study_name = "study_lstm_lvl1"
+study_name = "hybrud_lstm_lvl1"
 out_root = Path("runs/tuning") / study_name
 storage = f"sqlite:///{(out_root / 'optuna.db').as_posix()}"
 

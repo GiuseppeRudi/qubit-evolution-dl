@@ -1,12 +1,12 @@
 tuning:
   seed: 42
-  study_name: step_wise_lstm_lvl2
+  study_name: hybrid_lstm_lvl2
   n_trials: 20
-  level: 1
+  level: 2
 
   base_name: lstm_hybrid
 
-  #ONLY IF LEVEL 2
+  # ONLY IF LEVEL 2
   level1_ref:
     study_name: study_lstm_lvl1 # which Level-1 study to anchor LR/clip to
     interval: 0.3 # +-30% interval for lvl2 tuning around Level-1 best
