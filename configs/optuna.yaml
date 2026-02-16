@@ -4,7 +4,7 @@ tuning:
   n_trials: 20
   level: 2
 
-  base_name: lstm_hybrid
+  base_name: trn_sr
 
   # ONLY IF LEVEL 2
   level1_ref:

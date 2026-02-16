@@ -49,7 +49,7 @@ model:
 
 training:
   verbose: 1
-  epochs: 30               
+  epochs: 20               
   batch_size: 64
 
 plot:
