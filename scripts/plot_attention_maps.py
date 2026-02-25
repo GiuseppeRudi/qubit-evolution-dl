@@ -10,7 +10,6 @@ from qubit.utils.config_values import PREDICTION_PATH
 
 RUN_RE = re.compile(r"_(\d{8})_(\d{6})$")
 
-
 def find_latest_run_dir() -> str:
     base_dir = Path("runs/" + PREDICTION_PATH)
     if not base_dir.exists():

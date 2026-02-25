@@ -4,8 +4,6 @@ import math
 import numpy as np
 from qubit.utils.config_keys import FR_EVAL, OUTPUT_SEQ_LEN, FR_EVAL_SPLIT, OUT_STEPS, PROBE_NAME, PROBES, TRAINING, DATA,WINDOWING,CURRICULUM
 
-
-
 def _pick_fr_target(metrics: dict, split: str, output_seq_len: int) -> float:
     fr_target_key = f"{split}_fr_target_loss_{output_seq_len}"
 
@@ -82,14 +80,6 @@ def compute_score(metrics: dict[str, Any], base_cfg: dict, override: dict, level
     split = base_cfg[TRAINING][FR_EVAL][FR_EVAL_SPLIT] 
     fr_target = _pick_fr_target(metrics, split, out_seq_len)
 
-
-    if level == 2: 
-        score = 0.80 * fr_target
-        score += 0.20 * metrics["val_loss"][-1]
-
-        return score 
-
-    # other levels 
     curve_steps = []
     probes = base_cfg[TRAINING][FR_EVAL][PROBES]
     for p in probes:

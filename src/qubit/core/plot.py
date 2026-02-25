@@ -14,6 +14,8 @@ phase_colors = {
     "FullAutoregressivePhase": "yellow"
 }
 
+HORIZON_TEXT_COLOR = "purple"
+
 phase_labels = {
     "TeacherForcingPhase": "Teacher Forcing",
     "MaskedModelingPhase": "Masked Modeling",
@@ -46,12 +48,33 @@ def save_loss_plots_keras(
     val = h.get(val_key + prefix, None)
     fr_target = h.get(target, None)
 
+    # fr_phase
     phase_re = re.compile(phase)
-    fr_phase = list(chain.from_iterable(
-        h[k] for k in h.keys()
-        if phase_re.search(k) and isinstance(h[k], list)
-    ))
+    phase_keys = sorted([k for k in h.keys() if phase_re.search(k) and isinstance(h[k], list)])
+    
+    fr_phase_data = []
+    phase_horizons = {}
+    
+    epoch_offset = 0
+    for k in phase_keys:
+        horizon_match = re.search(r'_(\d+)$', k)
+        horizon = int(horizon_match.group(1)) if horizon_match else None
+        values = h[k]
+        
+        for i, v in enumerate(values):
+            if not np.isnan(v):
+                global_epoch = epoch_offset + i
+                fr_phase_data.append((global_epoch + 1, v, horizon))
+                phase_horizons[global_epoch] = horizon
+        
+        epoch_offset += len(values)
+    
+    max_epoch = max((e for e, _, _ in fr_phase_data), default=0)
+    fr_phase = [np.nan] * max_epoch
+    for epoch_1based, v, _ in fr_phase_data:
+        fr_phase[epoch_1based - 1] = v
 
+    # fr_curve
     curve_re = re.compile(curve)
     curve_keys = [k for k in h.keys() if curve_re.search(k)]
 
@@ -65,9 +88,12 @@ def save_loss_plots_keras(
         phase_intervals.append((start, end, ph.__class__.__name__))
         epoch_start = end
 
-    # legend for each phases 
+    # legend for each phases
     legend_patches = [mpatches.Patch(color=phase_colors[ph_type], alpha=0.1, label=phase_labels[ph_type])
         for ph_type in {ph_type for _, _, ph_type in phase_intervals}]
+    
+    # legend for each phases + Horizons indicator
+    combined_legend_patches = legend_patches + [mpatches.Patch(color=HORIZON_TEXT_COLOR, alpha=0.3, label="Phase horizons")]
 
     # --- Train plot ---
     if train is not None and len(train) > 0:
@@ -209,6 +235,13 @@ def save_loss_plots_keras(
         # background for phase
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
+            
+            horizons = [phase_horizons.get(e) for e in range(start, end) if e in phase_horizons]
+            if horizons:
+                h_val = max(set(horizons), key=horizons.count)  # moda
+                mid = (start + end) / 2
+                plt.text(mid, 0.02, str(h_val), transform=plt.gca().get_xaxis_transform(),
+                        ha='center', fontsize=9, color=HORIZON_TEXT_COLOR, fontweight='bold')
 
         # plot train/val/fr
         if train is not None and len(train) > 0:
@@ -229,7 +262,7 @@ def save_loss_plots_keras(
         for _, end, _ in phase_intervals:
             plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
 
-        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + legend_patches, fontsize=7)
+        plt.legend(handles=plt.gca().get_legend_handles_labels()[0] + combined_legend_patches, fontsize=7)
 
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -238,4 +271,56 @@ def save_loss_plots_keras(
 
         all_path = run_dir / f"{prefix}_all.jpg"
         plt.savefig(all_path, dpi=300, bbox_inches="tight")
+        plt.close()
+    
+    # --- Combined curve + target plot ---
+    has_curve_target = (
+        (fr_target is not None and any(not np.isnan(v) for v in fr_target)) or
+        (fr_curve is not None and len(fr_curve) != 0)
+    )
+    
+    if has_curve_target:
+        plt.figure(figsize=(8, 5))
+
+        # background for phase
+        for start, end, ph_type in phase_intervals:
+            plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
+            
+            horizons = [phase_horizons.get(e) for e in range(start, end) if e in phase_horizons]
+            if horizons:
+                h_val = max(set(horizons), key=horizons.count)
+                mid = (start + end) / 2
+                plt.text(mid, 0.02, str(h_val), transform=plt.gca().get_xaxis_transform(),
+                        ha='center', fontsize=9, color=HORIZON_TEXT_COLOR, fontweight='bold')
+
+        # Plot fr_curve with label "N horizons"
+        if fr_curve is not None and len(fr_curve) != 0:
+            for k, c in fr_curve:
+                if c is not None and any(not np.isnan(v) for v in c):
+                    x = [epoch + 1 for epoch, v in enumerate(c) if not np.isnan(v)]
+                    y = [v for v in c if not np.isnan(v)]
+                    plt.plot(x, y, label=f"{k} horizons")
+
+        # Plot fr_target with label "N horizons"
+        if fr_target is not None and any(not np.isnan(v) for v in fr_target):
+            x = [epoch + 1 for epoch, v in enumerate(fr_target) if not np.isnan(v)]
+            y = [v for v in fr_target if not np.isnan(v)]
+
+            target_horizon_match = re.search(r'_(\d+)$', target)
+            target_horizon = target_horizon_match.group(1) if target_horizon_match else str(output_seq_len)
+            plt.plot(x, y, label=f"{target_horizon} horizons", linewidth=2, linestyle='--')
+
+        for _, end, _ in phase_intervals:
+            plt.axvline(end, color='k', linestyle='--', linewidth=0.8)
+
+        handles, _ = plt.gca().get_legend_handles_labels()
+        plt.legend(handles=handles + combined_legend_patches, fontsize=7)
+
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title(f"Free-running {curve} + {target}")
+        plt.grid(True)
+
+        curve_target_path = run_dir / f"{curve}_{target}_combined.jpg"
+        plt.savefig(curve_target_path, dpi=300, bbox_inches="tight")
         plt.close()

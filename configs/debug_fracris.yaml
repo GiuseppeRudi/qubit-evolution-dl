@@ -22,7 +22,7 @@ model:
   save_model: true
   type: "LSTM"
   variant: "FC"
-  decoder_mode: "HYBRID"  
+  decoder_mode: "FULL_SEQ"  
 
   params:
     latent_dim: 128
@@ -45,7 +45,7 @@ training:
   prediction_mode: "all" 
   verbose: 1
   batch_size: 64
-  curriculum: [0.3, 0.4, 0.6, 0.8, 1.0]
+  curriculum: [0.3, 0.4, 0.7, 1.0]
   phases:
     - name: masked_modeling
       epochs: 6
@@ -63,34 +63,21 @@ training:
       learning_rate: 1.00
       clip_norm: 1.00
 
-    - name: scheduled_sampling
-      epochs: 2
-      tf_ratio_start: 1.0
-      tf_ratio_end: 0.35
-      learning_rate: 0.70
-      clip_norm: 0.85
-      ratio_mode: sigmoid
-      mid_point: 0.6
-      sharpness: 10.0
-      power_value: 2.0
-      per_feature: true
-      stop_grad_pred: false
-
     - name: masked_modeling
-      epochs: 4
-      mask_prob: 0.20
-      learning_rate: 0.60
-      clip_norm: 0.80
-      mask_scope: time
+      epochs: 6
+      mask_prob: 0.15
+      learning_rate: 0.80
+      clip_norm: 0.90
+      mask_scope: feature
       mask_mode: noise
+      mask_value: 0.2
       noise_sigma: 0.1
-      noise_replace: false
-
-    - name: full_autoregressive
-      epochs: 2
-      gradient_through_time: false
-      learning_rate: 0.50
-      clip_norm: 0.75
+      noise_replace: true
+    
+    - name: teacher_forcing
+      epochs: 6
+      learning_rate: 1.00
+      clip_norm: 1.00
 
   fr_eval:
     enabled: true

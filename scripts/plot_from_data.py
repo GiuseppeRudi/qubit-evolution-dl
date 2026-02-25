@@ -105,16 +105,15 @@ def load_run_artifacts(run_str: str, destandardize: bool):
     return splits, pred, meta
 
 def generate_plot_for_feature(
-    feature_names,
-    splits,
-    pred_a,
-    sample_index,
-    feature_index,
-    pred_b=None,
-    label_a="Model A",
-    label_b="Model B",
-    out_dir: str | Path = PREDICTION_PATH,
+        feature_names,
+        splits,
+        pred,
+        sample_index,
+        feature_index,
+        label="Model",
+        out_dir: str | Path = PREDICTION_PATH,
     ):
+    
     X_test = splits.X_test
     Y_test = splits.Y_test
 
@@ -166,17 +165,14 @@ def generate_plot_for_feature(
         # return an numpy array with values from 0 to full_seq-1
         time_axis = np.arange(full_len)
         
-        out_a = pred_a[sample_index, :, feature_index]
-        if out_a.shape[0] != out_len:
-            raise ValueError(f"pred_a length {out_a.shape[0]} != out_len {out_len}")
+        out = pred[sample_index, :, feature_index]
+        if out.shape[0] != out_len:
+            raise ValueError(f"predlength {out.shape[0]} != out_len {out_len}")
     
         pred_time_axis = np.arange(input_len, input_len + out_len)
 
         plt.plot(time_axis, full_true, label="Ground Truth", linewidth=2)
-        plt.plot(pred_time_axis, out_a, label=label_a)
-        if pred_b is not None:
-            out_b = pred_b[sample_index, :, feature_index]
-            plt.plot(pred_time_axis, out_b, label=label_b)
+        plt.plot(pred_time_axis, out, label=label)
 
         plt.axvline(x=input_len - 1, linestyle=":", label="End of Input")
         plt.xlabel(f"Time (Input 0-{input_len-1}, Output {input_len}-{input_len+out_len-1})")
@@ -186,20 +182,19 @@ def generate_plot_for_feature(
         L = Y_test.shape[1]
         t = np.arange(L)
 
-        out_a = pred_a[sample_index, :, feature_index]      # (L,)
-        if out_a.shape[0] != L:
-            raise ValueError(f"pred_a length {out_a.shape[0]} != window {L}")
+        out = pred[sample_index, :, feature_index] # (L,)
+        if out.shape[0] != L:
+            raise ValueError(f"pred length {out.shape[0]} != window {L}")
 
         # mask channel: 1 = observed, 0 = missing (to predict)
-        mask = X_test[sample_index, :, -1]                  # (L,)
+        mask = X_test[sample_index, :, -1] # (L,)
         miss_idx = np.where(mask < 0.5)[0]
 
         # Nice, readable palette (matplotlib "tab" colors)
-        c_gt   = "tab:gray"    # ground truth line
-        c_obs  = "tab:green"   # observed input points
-        c_a    = "tab:blue"    # model A predicted points
-        c_b    = "tab:purple"  # model B predicted points (optional)
-        c_err  = "tab:red"     # error connectors
+        c_gt = "tab:gray" # ground truth line
+        c_obs = "tab:green" # observed input points
+        c = "tab:blue" # model predicted points
+        c_err = "tab:red" # error connectors
 
         # Ground truth as a line (neutral color so it doesn't compete with predictions)
         plt.plot(t, y_true, color=c_gt, label="Ground Truth", linewidth=2.2, zorder=1)
@@ -213,40 +208,19 @@ def generate_plot_for_feature(
 
         # Predicted points ONLY where mask=0 (missing)
         plt.scatter(
-            miss_idx, out_a[miss_idx],
-            s=26, color=c_a, edgecolors="white", linewidths=0.6,
-            label=f"{label_a} preds (mask=0)", zorder=4
+            miss_idx, out[miss_idx],
+            s=26, color=c, edgecolors="white", linewidths=0.6,
+            label=f"{label} preds (mask=0)", zorder=4
         )
 
-        # Error connectors (GT ↔ prediction) for missing indices
+        # Error connectors (GT - prediction) for missing indices
         for j, i in enumerate(miss_idx):
             plt.plot(
-                [i, i], [y_true[i], out_a[i]],
+                [i, i], [y_true[i], out[i]],
                 color=c_err, linewidth=1.0, alpha=0.75,
-                label="Error (GT-pred)" if j == 0 else None,
+                label="Residual (GT-pred)" if j == 0 else None,
                 zorder=2
             )
-
-        if pred_b is not None:
-            out_b = pred_b[sample_index, :, feature_index]
-            if out_b.shape[0] != L:
-                raise ValueError(f"pred_b length {out_b.shape[0]} != window {L}")
-
-            # Model B predicted points (different color to avoid confusion with red error lines)
-            plt.scatter(
-                miss_idx, out_b[miss_idx],
-                s=26, color=c_b, edgecolors="white", linewidths=0.6,
-                label=f"{label_b} preds (mask=0)", zorder=4
-            )
-
-            # Error connectors for model B (dashed red to distinguish)
-            for j, i in enumerate(miss_idx):
-                plt.plot(
-                    [i, i], [y_true[i], out_b[i]],
-                    color=c_err, linestyle="--", linewidth=1.0, alpha=0.65,
-                    label="Error (GT-pred) [B]" if j == 0 else None,
-                    zorder=2
-                )
 
         plt.xlabel("Time (window)")
         plt.title(f"Super-Resolution: {fname}")
@@ -264,11 +238,9 @@ def generate_plot_for_feature(
 
 def generate_all_plots(
     splits,
-    pred_a,
+    pred,
     meta,
-    pred_b=None,
-    label_a="Model A",
-    label_b="Model B",
+    label="Model",
     out_dir: str = PREDICTION_PATH,
 ):
     paths = []
@@ -279,10 +251,8 @@ def generate_all_plots(
         for feature_index in range(feature_dim):
             p = generate_plot_for_feature(
                 splits=splits,
-                pred_a=pred_a,
-                pred_b=pred_b,
-                label_a=label_a,
-                label_b=label_b,
+                pred=pred,
+                label=label,
                 sample_index=s,
                 feature_names = meta.get("feature_names", []),
                 feature_index=feature_index,
@@ -297,12 +267,10 @@ def parse_args():
         description="Generate plots from saved raw artifacts (data_splits.npz + predictions.npz). "
                     "Supports single model or comparison between two runs."
     )
-    ap.add_argument("--run-a", default=None, help="Path to run directory A (contains data_splits.npz and predictions.npz)")
-    ap.add_argument("--run-b", default=None, help="Optional path to run directory B for comparison")
-    ap.add_argument("--label-a", default="Model A", help="Legend label for run A")
-    ap.add_argument("--label-b", default="Model B", help="Legend label for run B")
+    ap.add_argument("--run", default=None, help="Path to run directory (contains data_splits.npz and predictions.npz)")
+    ap.add_argument("--label", default="Model", help="Legend label for run")
     ap.add_argument("--feature", type=int, default=None, help="If set, plot only this feature index (0-based)")
-    ap.add_argument("--out-dir", default=None, help="Output directory for plots. Default: <run-a>/plots or compare dir")
+    ap.add_argument("--out-dir", default=None, help="Output directory for plots. Default: <run-a>/plots")
     return ap.parse_args()
 
 def main():
@@ -311,56 +279,37 @@ def main():
     # ! important must indicate if the X and Y are standardized or not 
     plot_in_original_units = True
 
-    if args.run_a is None and args.run_b is None:
-        args.run_a = find_latest_run_dir()
+    if args.run is None: args.run = find_latest_run_dir()
 
-    splits_a, pred_a, meta_a = load_run_artifacts(args.run_a,plot_in_original_units)
+    splits, pred, meta = load_run_artifacts(args.run,plot_in_original_units)
 
-    pred_b = None
-    if args.run_b is not None:
-        splits_b, pred_b, _ = load_run_artifacts(args.run_b,plot_in_original_units)
-
-        # safety check: to compare, X_test and Y_test should match
-        if splits_a.X_test.shape != splits_b.X_test.shape or splits_a.Y_test.shape != splits_b.Y_test.shape:
-            raise ValueError(
-                "Runs A and B have different X_test/Y_test shapes. "
-                f"A: X{splits_a.X_test.shape}, Y{splits_a.Y_test.shape} | "
-                f"B: X{splits_b.X_test.shape}, Y{splits_b.Y_test.shape}"
-            )
 
     # choose output dir
     if args.out_dir is not None:
         out_dir = Path(args.out_dir)
     else:
-        if args.run_b is None:
-            out_dir = Path(args.run_a) / "prediction_plots"
-        else:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            out_dir = Path("predictions") / "compare" / f"compare__{ts}"
+        out_dir = Path(args.run) / "prediction_plots"
+
     
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.feature is not None:
         p = generate_plot_for_feature(
-            splits=splits_a,
-            pred_a=pred_a,
-            pred_b=pred_b,
-            label_a=args.label_a,
-            label_b=args.label_b,
-            feature_names= meta_a.get("feature_names", []),
-            sample_index=meta_a.get("sample_index"),
+            splits=splits,
+            pred=pred,
+            label=args.label,
+            feature_names= meta.get("feature_names", []),
+            sample_index=meta.get("sample_index"),
             feature_index=args.feature,
             out_dir=str(out_dir),
         )
         print(f"Saved: {p}")
     else:
         paths = generate_all_plots(
-            splits=splits_a,
-            pred_a=pred_a,
-            pred_b=pred_b,
-            label_a=args.label_a,
-            label_b=args.label_b,
-            meta = meta_a,
+            splits=splits,
+            pred=pred,
+            label=args.label,
+            meta = meta,
             out_dir=str(out_dir),
         )
         print(f"Saved {len(paths)} plots in: {out_dir}")
