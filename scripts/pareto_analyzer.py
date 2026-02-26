@@ -29,14 +29,11 @@ def is_pareto_efficient(costs: np.ndarray, maximize_mask: np.ndarray | None = No
 
 
 def compute_pareto_front(df: pd.DataFrame) -> pd.DataFrame:
-
-    costs = df[['values_score', 'values_out_seq_len']].values
-    maximize_mask = np.array([False, True])
-
     df = df.copy()
-    df['is_pareto'] = is_pareto_efficient(costs, maximize_mask)
+    costs = df[["values_score", "values_out_seq_len"]].to_numpy(dtype=float)
+    maximize_mask = np.array([False, True])
+    df["is_pareto"] = is_pareto_efficient(costs, maximize_mask)
     return df
-
 
 Criteria = Literal["best_score", "max_output_len", "knee"]
 
@@ -69,25 +66,23 @@ def select_best_by_criteria(
         return df.nlargest(1, out_len_col).iloc[0]
 
     if criteria == "knee":
-        pareto_sorted = df.sort_values(score_col, ascending=True, kind="mergesort").reset_index(drop=True)
+        pareto = df.copy()
 
-        scores = pareto_sorted[score_col].to_numpy(dtype=float)
-        lengths = pareto_sorted[out_len_col].to_numpy(dtype=float)
+        scores = pareto[score_col].to_numpy(dtype=float)
+        lengths = pareto[out_len_col].to_numpy(dtype=float)
 
-        score_range = float(scores.max() - scores.min())
-        len_range = float(lengths.max() - lengths.min())
+        s_rng = scores.max() - scores.min()
+        l_rng = lengths.max() - lengths.min()
+        if s_rng == 0 or l_rng == 0:
+            return pareto.iloc[len(pareto)//2]
 
-        if score_range == 0.0 or len_range == 0.0:
-            return pareto_sorted.iloc[len(pareto_sorted) // 2]
-
-        norm_scores = (scores - scores.min()) / score_range
-        norm_lengths = (lengths - lengths.min()) / len_range
-
-        distances = (norm_lengths - norm_scores) / np.sqrt(2.0)
-        knee_idx = int(np.nanargmax(distances))
-
-        return pareto_sorted.iloc[knee_idx]
-
+        s = (scores - scores.min()) / s_rng         
+        l = (lengths - lengths.min()) / l_rng        
+        # distance to ideal (0,1)
+        d = np.sqrt(s**2 + (1.0 - l)**2)
+        knee_idx = int(np.argmin(d))
+        return pareto.iloc[knee_idx]
+    
     raise ValueError(f"Unknown criteria: {criteria}")
 
 def create_simple_pareto_plot(df: pd.DataFrame, best_trial: pd.Series | None = None,
@@ -109,14 +104,29 @@ def create_simple_pareto_plot(df: pd.DataFrame, best_trial: pd.Series | None = N
               edgecolors='darkred', linewidth=1.5, zorder=5)
 
     if best_trial is not None:
-        ax.scatter(best_trial['values_score'], best_trial['values_out_seq_len'], 
-                  c='gold', s=400, marker='*', label='Selected Best', # type: ignore
-                  edgecolors='orange', linewidth=3, zorder=10)
-        ax.annotate(f"BEST\nTrial #{int(best_trial['number'])}", 
-                   (best_trial['values_score'], best_trial['values_out_seq_len']),
-                   textcoords="offset points", xytext=(15, 15), 
-                   fontsize=11, fontweight='bold', color='darkorange',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+        x = float(best_trial["values_score"])
+        y = float(best_trial["values_out_seq_len"])
+        n = int(best_trial["number"])
+
+        ax.scatter(
+            x, y,
+            c="gold", s=260, marker="*", # type: ignore
+            edgecolors="black", linewidth=1.2,
+            zorder=10, label="Selected (knee)"
+        )
+
+        ax.annotate(
+            f"Knee point\nTrial #{n}",
+            xy=(x, y),
+            xytext=(30, 25),              
+            textcoords="offset points",
+            fontsize=10,
+            fontweight="bold",
+            color="black",
+            ha="left", va="bottom",
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="black", alpha=0.9),
+            zorder=11,
+        )
 
     for _, row in pareto.iterrows():
         ax.annotate(f"#{int(row['number'])}", 
@@ -127,14 +137,14 @@ def create_simple_pareto_plot(df: pd.DataFrame, best_trial: pd.Series | None = N
     ax.set_xlabel('Score (lower is better)', fontsize=12)
     ax.set_ylabel('Output Sequence Length (higher is better)', fontsize=12)
     ax.set_title('Pareto Front Analysis', fontsize=14, fontweight='bold')
-    ax.legend(loc='upper left', fontsize=10)
+    ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
     ax.invert_xaxis()
 
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Plot saved to: {save_path}")
 
     if show: plt.show()
@@ -147,12 +157,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('csv_file', type=str, help='Path to the Optuna report CSV file')
-    parser.add_argument('--criteria', type=str, default='best_score',
+    parser.add_argument('--criteria', type=str, default='knee',
                        choices=['best_score', 'max_output_len', 'knee'],
-                       help='Criteria for selecting the best trial (default: best_score)')
+                       help='Criteria for selecting the best trial (default: knee)')
 
-    parser.add_argument('--plot', type=str, nargs='?', const='pareto_plot.png', metavar='FILE',
-                       help='Generate plot (default: pareto_plot.png if no filename given)')
+    parser.add_argument('--plot', type=str, default='pareto_plot.jpg', 
+                       help='Generate plot (default: pareto_plot.jpg if no filename given)')
     
     parser.add_argument('--no-show', action='store_true',
                        help='Do not display plot (only save)')
@@ -165,6 +175,14 @@ def main():
         sys.exit(1)
 
     df = pd.read_csv(args.csv_file)
+    print(f"Loaded {len(df)} complete trials from {args.csv_file}")
+
+    df.columns = df.columns.str.strip()  
+
+    df["values_score"] = pd.to_numeric(df["values_score"].astype(str).str.strip(), errors="coerce")
+    df["values_out_seq_len"] = pd.to_numeric(df["values_out_seq_len"].astype(str).str.strip(), errors="coerce")
+
+    df = df.dropna(subset=["values_score", "values_out_seq_len"])
 
     # Validate required columns
     required_cols = ['values_score', 'values_out_seq_len', 'number']
@@ -174,10 +192,10 @@ def main():
         sys.exit(1)
 
     # Filter complete trials only
-    if 'state' in df.columns:
-        df = df[df['state'] == 'COMPLETE'].copy()
+    if "state" in df.columns:
+        df["state"] = df["state"].astype(str).str.strip()
+        df = df[df["state"] == "COMPLETE"].copy()
 
-    print(f"Loaded {len(df)} complete trials from {args.csv_file}")
 
     # Compute Pareto front
     df = compute_pareto_front(df)
@@ -191,6 +209,7 @@ def main():
     if args.plot:
         plot_path = args.plot 
         show_plot = not args.no_show
+        print(f"Selected best trial based on criteria '{args.criteria}': Trial #{int(best_trial['number'])} with score {best_trial['values_score']} and output length {best_trial['values_out_seq_len']}")
         create_simple_pareto_plot(df, best_trial, save_path=plot_path, show=show_plot)
 
 

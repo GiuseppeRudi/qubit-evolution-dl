@@ -2,7 +2,7 @@ data:
   dataset:
     csv_path: data/trajectories.csv
     total_qubits: 10 # fixed  
-    used_qubits: 8
+    used_qubits: 10
     time_steps: 1001 # fixed 
     n_traj: 400 # fixed 
     traj_fraction: 1
@@ -18,7 +18,7 @@ data:
     test_ratio: 0.15
 
 model:
-  name: "prova1"
+  name: "trn_hybrid_final"
   type: "TRN"
   variant: "FC"
   decoder_mode: "HYBRID"  
@@ -26,19 +26,19 @@ model:
   return_attentions: true
 
   params:
-    dim_model: 64
-    num_heads: 4
-    ff_dim: 512
+    dim_model: 128
+    num_heads: 2
+    ff_dim: 1536
     num_layers: 2
-    dropout: 0.1
+    dropout: 0.05545633665765811
 
   compile:
     optimizer: "adam"
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 5e-4
-    clip_norm: 1.0
+    learning_rate: 0.0006229612954841362
+    clip_norm: 0.18187859051288216
 
   inference:
     mode: "free_running"   
@@ -48,17 +48,17 @@ model:
 training:
   prediction_mode: "all" 
   verbose: 1
-  batch_size: 64
+  batch_size: 32
   curriculum: [0.2, 0.3, 0.5, 0.7, 0.9, 1.0]
   
   phases:
     - name: teacher_forcing
-      epochs: 4
+      epochs: 10
       learning_rate: 1.00
       clip_norm: 1.00
 
     - name: masked_modeling
-      epochs: 4
+      epochs: 10
       mask_prob: 0.15
       learning_rate: 0.80
       clip_norm: 0.90
@@ -68,7 +68,7 @@ training:
       noise_replace: false
 
     - name: scheduled_sampling
-      epochs: 6
+      epochs: 12
       tf_ratio_start: 1.0
       tf_ratio_end: 0.35
       learning_rate: 0.70
@@ -81,7 +81,7 @@ training:
       stop_grad_pred: true
 
     - name: masked_modeling
-      epochs: 2
+      epochs: 6
       mask_prob: 0.20
       learning_rate: 0.60
       clip_norm: 0.80
@@ -91,13 +91,13 @@ training:
       noise_replace: false
 
     - name: full_autoregressive
-      epochs: 2
+      epochs: 6
       gradient_through_time: false
       learning_rate: 0.50
       clip_norm: 0.75
 
     - name: masked_modeling
-      epochs: 2
+      epochs: 6
       mask_prob: 0.20
       learning_rate: 0.80
       clip_norm: 0.80
@@ -123,7 +123,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [0.3,0.6,0.9] 
+        out_steps: [0.2, 0.4, 0.6, 0.8] 
         p_eval: 0.2
         every_epochs: end_of_phase
 

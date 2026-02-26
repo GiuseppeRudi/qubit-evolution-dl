@@ -1,3 +1,4 @@
+from arrow import now
 import tensorflow as tf
 import os 
 
@@ -36,7 +37,8 @@ def run_experiment(
     out_dir: str,
     optuna_callback: list[tf.keras.callbacks.Callback] | None = None,
     do_predict: bool = True,
-    training: bool = True
+    training: bool = True,
+    model_path: str | None = None,
 ) -> dict :
 
     run_cfg = load_run_config(yaml_name)
@@ -63,7 +65,7 @@ def run_experiment(
     logger = start_log() 
     builder = get_builder(model_cfg.type, model_cfg.variant, model_cfg.decoder_mode)
 
-    model = builder(splits.X_train, splits.Y_train, model_cfg, sr_cfg or training_cfg.prediction_mode , model_path=None)
+    model = builder(splits.X_train, splits.Y_train, model_cfg, sr_cfg or training_cfg.prediction_mode , model_path=model_path)
 
     TrainerCls = get_trainer(model_cfg.type)
     trainer = TrainerCls(model, model_cfg, training_cfg)
@@ -113,13 +115,8 @@ def main():
 
     args = parse_args()
     out_dir = PREDICTION_PATH
-    run_experiment(args.run_cfg, do_predict=True, out_dir=out_dir, training=args.training)
+    run_experiment(args.run_cfg, do_predict=True, out_dir=out_dir, training=args.training, model_path= args.model)
 
 if __name__ == "__main__":
     main()
 
-# TODO try comparison between models
-
-# TODO attention the pretrained model weights now doesnt't work, check it 
-
-# TODO check if we can remove standardization (stdz is greater than non_stdz)

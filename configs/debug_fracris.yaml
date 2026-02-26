@@ -22,7 +22,7 @@ model:
   save_model: true
   type: "LSTM"
   variant: "FC"
-  decoder_mode: "FULL_SEQ"  
+  decoder_mode: "HYBRID"  
 
   params:
     latent_dim: 128
@@ -47,17 +47,6 @@ training:
   batch_size: 64
   curriculum: [0.3, 0.4, 0.7, 1.0]
   phases:
-    - name: masked_modeling
-      epochs: 6
-      mask_prob: 0.15
-      learning_rate: 0.80
-      clip_norm: 0.90
-      mask_scope: feature
-      mask_mode: noise
-      mask_value: 0.2
-      noise_sigma: 0.1
-      noise_replace: true
-    
     - name: teacher_forcing
       epochs: 6
       learning_rate: 1.00
@@ -78,6 +67,17 @@ training:
       epochs: 6
       learning_rate: 1.00
       clip_norm: 1.00
+    
+    - name: masked_modeling
+      epochs: 6
+      mask_prob: 0.15
+      learning_rate: 0.80
+      clip_norm: 0.90
+      mask_scope: feature
+      mask_mode: noise
+      mask_value: 0.2
+      noise_sigma: 0.1
+      noise_replace: true
 
   fr_eval:
     enabled: true

@@ -18,23 +18,23 @@ data:
     test_ratio: 0.15
 
 model:
-  name: "prova1"
+  name: "lstm_stepwise_final"
   save_model: true
   type: "LSTM"
   variant: "FC"
   decoder_mode: "STEP_WISE"  
 
   params:
-    latent_dim: 128
-    dropout: 0.1
+    latent_dim: 192
+    dropout: 0.2
 
   compile:
     optimizer: "adam"
     loss: "mse"
     metrics: ["mae"]
     run_eagerly: false
-    learning_rate: 5e-4
-    clip_norm: 1.0
+    learning_rate: 0.0007030236819598843
+    clip_norm: 0.815716833988456
 
   inference:
     mode: "free_running"  
@@ -44,15 +44,15 @@ model:
 training:
   prediction_mode: "all" 
   verbose: 1
-  batch_size: 64
+  batch_size: 32
   curriculum: [0.2, 0.3, 0.4, 0.5, 0.7, 0.9]
   
   phases:
     - name: teacher_forcing
-      epochs: 6
+      epochs: 14
 
     - name: masked_modeling
-      epochs: 4
+      epochs: 10
       mask_prob: 0.15
       learning_rate: 0.80
       clip_norm: 0.90
@@ -62,7 +62,7 @@ training:
       noise_replace: false
 
     - name: masked_modeling
-      epochs: 4
+      epochs: 10
       mask_prob: 0.20
       learning_rate: 0.60
       clip_norm: 0.80
@@ -72,7 +72,7 @@ training:
       noise_replace: false
 
     - name: scheduled_sampling
-      epochs: 2
+      epochs: 6
       tf_ratio_start: 1.0
       tf_ratio_end: 0.4
       learning_rate: 0.70
@@ -85,13 +85,13 @@ training:
       stop_grad_pred: true
 
     - name: full_autoregressive
-      epochs: 2
+      epochs: 6
       gradient_through_time: false
       learning_rate: 0.50
       clip_norm: 0.70
 
     - name: full_autoregressive
-      epochs: 1
+      epochs: 4
       gradient_through_time: true
       learning_rate: 0.30
       clip_norm: 0.60
@@ -113,7 +113,7 @@ training:
         every_epochs: end_of_phase
 
       - name: fr_curve
-        out_steps: [0.2,0.4,0.6] 
+        out_steps: [0.2, 0.4, 0.6, 0.8]
         p_eval: 0.2
         every_epochs: end_of_phase
 
