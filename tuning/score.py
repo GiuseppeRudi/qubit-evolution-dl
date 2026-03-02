@@ -60,22 +60,13 @@ def compute_score(metrics: dict[str, Any], base_cfg: dict, override: dict, level
 
     #  TODO in the future this case can be modify from yaml confi for optuna
     
-    # level 1 SCORE = 0.70 * fr_taget + 0.25 * fr_curve + 0.05 * fr_phase
-    
-    # level 2 SCORE = 0.80 * fr_target + 0.20 * val_loss
-    # Since in this level we tune the ouput_seq_len we can't calculate the score 
-    # using fr_curve and fr_phase because different trials can have different values and this is not FAIR
-    # so in this case the formula score changes
-    
-    # level = 1 we take output_seq_len from the base_cfg yaml because optuna don't change it 
-    # instead if we are in level = 2 we choose the ouput_seq_len from override
-    
+    # SCORE = 0.70 * fr_taget + 0.25 * fr_curve + 0.05 * fr_phase
+
     if level == 1 :
         out_seq_len = base_cfg[DATA][WINDOWING][OUTPUT_SEQ_LEN]
     else :
         out_seq_len = override[DATA][WINDOWING][OUTPUT_SEQ_LEN] 
 
-    # print(out_seq_len)
     
     split = base_cfg[TRAINING][FR_EVAL][FR_EVAL_SPLIT] 
     fr_target = _pick_fr_target(metrics, split, out_seq_len)

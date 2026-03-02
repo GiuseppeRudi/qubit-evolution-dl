@@ -220,12 +220,6 @@ if __name__ == '__main__':
 # Full analysis with 4-panel plot
 python pareto_analyzer.py report.csv --criteria best_score --plot analysis.png
 
-# Simple plot for presentations
-python pareto_analyzer.py report.csv --criteria knee --plot-type simple --plot simple.png
-
-# Balanced selection with visualization
-python pareto_analyzer.py report.csv --criteria balanced --weight 0.3 --plot balanced.png
-
-# Export and plot without displaying
-python pareto_analyzer.py report.csv --criteria max_output_len --plot output.png --no-show --export params.json
+# Plot without displaying
+python pareto_analyzer.py report.csv --criteria max_output_len --plot output.png --no-show
 """

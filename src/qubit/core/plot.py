@@ -50,7 +50,14 @@ def save_loss_plots_keras(
 
     # fr_phase
     phase_re = re.compile(phase)
-    phase_keys = sorted([k for k in h.keys() if phase_re.search(k) and isinstance(h[k], list)])
+    def horizon_of(k):
+        m = re.search(r'_(\d+)$', k)
+        return int(m.group(1)) if m else -1  # o 0/None come preferisci
+
+    phase_keys = sorted(
+        [k for k in h.keys() if phase_re.search(k) and isinstance(h[k], list)],
+        key=horizon_of
+    )
     
     fr_phase_data = []
     phase_horizons = {}
@@ -65,7 +72,7 @@ def save_loss_plots_keras(
             if not np.isnan(v):
                 global_epoch = epoch_offset + i
                 fr_phase_data.append((global_epoch + 1, v, horizon))
-                phase_horizons[global_epoch] = horizon
+                phase_horizons[global_epoch + 1] = horizon
         
         epoch_offset += len(values)
     
@@ -95,7 +102,7 @@ def save_loss_plots_keras(
     # legend for each phases + Horizons indicator
     combined_legend_patches = legend_patches + [mpatches.Patch(color=HORIZON_TEXT_COLOR, alpha=0.3, label="Phase horizons")]
 
-    # --- Train plot ---
+    # Train plot
     if train is not None and len(train) > 0:
         y = np.asarray(train, dtype=float)
         x = np.arange(1, len(y) + 1)
@@ -119,7 +126,7 @@ def save_loss_plots_keras(
         plt.savefig(train_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-    # --- Val plot ---
+    # Val plot
     if val is not None and len(val) > 0:
         y = np.asarray(val, dtype=float)
         x = np.arange(1, len(y) + 1)
@@ -144,7 +151,7 @@ def save_loss_plots_keras(
         plt.savefig(val_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-    # --- Free-running plot ---
+    # Free-running-phase plot
     if fr_phase is not None and any(not np.isnan(v) for v in fr_phase):
 
         x = [epoch + 1 for epoch, v in enumerate(fr_phase) if not np.isnan(v)]
@@ -169,6 +176,7 @@ def save_loss_plots_keras(
         plt.savefig(fr_path, dpi=300, bbox_inches="tight")
         plt.close()
     
+    # Free-running-target plot
     if fr_target is not None and any(not np.isnan(v) for v in fr_target):
 
         x = [epoch + 1 for epoch, v in enumerate(fr_target) if not np.isnan(v)]
@@ -193,7 +201,7 @@ def save_loss_plots_keras(
         plt.savefig(fr_path, dpi=300, bbox_inches="tight")
         plt.close()
     
-
+    # Free-running-curve plot
     if fr_curve is not None and len(fr_curve)!=0:
         plt.figure()
         for start, end, ph_type in phase_intervals:
@@ -223,7 +231,7 @@ def save_loss_plots_keras(
         plt.close()
                 
 
-    # --- Combined plot  ---
+    # train/val/fr plot combined
     has_any = (
         (train is not None and len(train) > 0) or
         (val is not None and len(val) > 0) or
@@ -232,7 +240,6 @@ def save_loss_plots_keras(
     if has_any:
         plt.figure(figsize=(8,5))
 
-        # background for phase
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
             
@@ -243,7 +250,6 @@ def save_loss_plots_keras(
                 plt.text(mid, 0.02, str(h_val), transform=plt.gca().get_xaxis_transform(),
                         ha='center', fontsize=9, color=HORIZON_TEXT_COLOR, fontweight='bold')
 
-        # plot train/val/fr
         if train is not None and len(train) > 0:
             y = np.asarray(train, dtype=float)
             x = np.arange(1, len(y) + 1)
@@ -273,7 +279,7 @@ def save_loss_plots_keras(
         plt.savefig(all_path, dpi=300, bbox_inches="tight")
         plt.close()
     
-    # --- Combined curve + target plot ---
+    # curve/target plot combined
     has_curve_target = (
         (fr_target is not None and any(not np.isnan(v) for v in fr_target)) or
         (fr_curve is not None and len(fr_curve) != 0)
@@ -282,7 +288,6 @@ def save_loss_plots_keras(
     if has_curve_target:
         plt.figure(figsize=(8, 5))
 
-        # background for phase
         for start, end, ph_type in phase_intervals:
             plt.axvspan(start, end, color=phase_colors[ph_type], alpha=0.1)
             
@@ -293,7 +298,6 @@ def save_loss_plots_keras(
                 plt.text(mid, 0.02, str(h_val), transform=plt.gca().get_xaxis_transform(),
                         ha='center', fontsize=9, color=HORIZON_TEXT_COLOR, fontweight='bold')
 
-        # Plot fr_curve with label "N horizons"
         if fr_curve is not None and len(fr_curve) != 0:
             for k, c in fr_curve:
                 if c is not None and any(not np.isnan(v) for v in c):
@@ -301,7 +305,6 @@ def save_loss_plots_keras(
                     y = [v for v in c if not np.isnan(v)]
                     plt.plot(x, y, label=f"{k} horizons")
 
-        # Plot fr_target with label "N horizons"
         if fr_target is not None and any(not np.isnan(v) for v in fr_target):
             x = [epoch + 1 for epoch, v in enumerate(fr_target) if not np.isnan(v)]
             y = [v for v in fr_target if not np.isnan(v)]

@@ -50,7 +50,14 @@ condaenv config varsset ABSL_LOGGING_LEVEL=ERROR
 python install_tf.py
 ```
 
-### 2) Run an experiment
+
+### 2) Download Dataset
+
+```bash
+python scripts/download_data.py
+```
+
+### 3) Run an experiment
 
 Choose a YAML file  from `configs/` and run:
 

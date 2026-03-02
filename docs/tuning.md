@@ -43,20 +43,21 @@ The search space is defined in `tuning/search_space.py` as:
 
 ---
 
-## Level 1 – Single objective (minimize)
+## Score
 
-### Objective (score)
-
-Level 1 uses a scalar score based on free-running evaluation:
 
 $$
-\textbf{score}_{L1} =
+\textbf{score} =
 0.70 \cdot fr\_target +
 0.25 \cdot fr\_curve +
 0.05 \cdot fr\_phase
 $$
 
 Optuna **minimizes** this score.
+
+---
+
+## Level 1 – Single objective (minimize)
 
 ### lr scaling with batch size
 
@@ -94,19 +95,6 @@ Level 2 is handled as a **multi-objective optimization**:
 
 Optuna returns a **Pareto front** (set of non-dominated trials). There is no single best trial by definition—each Pareto point is a trade-off between error and horizon (point of maximum efficiency).
 
-### Score (Objective 1)
-
-For Level 2, the scalar score is: 
-
-$$
-\textbf{score}_{L2} =
-0.80 \cdot fr\_target +
-0.20 \cdot val\_loss
-$$
-
-We avoid `fr_curve` and `fr_phase` at Level 2 because `output_seq_len` changes and those metrics become non-comparable across trials.
-
----
 
 ## Level 2: Minimal re-tuning of lr and clip norm
 
