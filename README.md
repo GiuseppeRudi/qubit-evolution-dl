@@ -1,132 +1,255 @@
-
 # Qubit Evolution DL
 
-Qubit Evolution  is a research-oriented project that uses deep learning (LSTM and Transformer architectures) to model the **time evolution of multi-qubit systems** as a **sequence modeling** problem.
+Qubit Evolution DL is a research-oriented project that uses deep learning models, including LSTM and Transformer architectures, to model the **time evolution of multi-qubit systems** as a **sequence modeling** problem.
 
-Given a past window of a quantum trajectory, the models can **predict future dynamics (Forecasting)** or **reconstruct missing timesteps (Super-Resolution)**.
+Given a past window of a quantum trajectory, the models can **predict future dynamics** through Forecasting or **reconstruct missing timesteps** through Super-Resolution.
 
 ---
 
 ## What this repository provides
 
 - A complete **training pipeline** driven by a **single YAML configuration file**.
-- Two model types:
-    - **LSTM** baselines (Full-Seq, Step-Wise, Hybrid decoding)
-    - **Transformer (TRN)** models (Hybrid encoder–decoder and Super-Resolution variant)
-- A consistent **inference layer** via *adapters* (teacher forcing and free-running) to evaluate models in a comparable way.
-- Tools for:
-    - dataset split + windowing (forecasting and super-resolution)
-    - saving training artifacts (predictions, splits, metadata)
-    - generating plots (predictions + attention maps)
+- Two model families:
+  - **LSTM** baselines: Full-Seq, Step-Wise, and Hybrid decoding.
+  - **Transformer (TRN)** models: Hybrid encoder-decoder and Super-Resolution variants.
+- A consistent **inference layer** based on adapters, supporting teacher forcing and free-running evaluation.
+- Utilities for:
+  - dataset splitting and windowing;
+  - forecasting and super-resolution experiments;
+  - saving training artifacts, predictions, splits, and metadata;
+  - generating prediction plots and attention heatmaps.
 
 ---
 
 ## Project structure
 
-- `main.py` — project start point (loads YAML, builds model, trains, saves artifacts)
-- `configs/` — experiment configuration files (LSTM/TRN, forecasting/SR, debug)
-- `src/qubit/` — core package (data, models, strategies, training, inference, callbacks)
-- `scripts/` — post-run plotting utilities:
-    - `plot_from_data.py` (prediction plots from saved artifacts)
-    - `plot_attention_maps.py` (attention heatmaps from saved attention maps)
-- `tuning/` — hyperparameter tuning pipeline with Optuna
-- `docs/` — documentation (setup, configuration, tuning, plotting)
-- `data/trajectories.csv` — dataset
+```text
+.
+├── main.py                     # Project entry point
+├── configs/                    # Experiment YAML configurations
+├── src/qubit/                  # Core package
+├── scripts/                    # Data download and plotting utilities
+├── tuning/                     # Optuna tuning pipeline
+├── docs/                       # Setup, configuration, tuning and plotting docs
+├── reports/                    # Final report and slides
+├── data/                       # Local dataset folder, not tracked by Git
+├── outputs/                    # Generated runs and artifacts
+├── Dockerfile                  # CPU-only Docker image
+├── docker-compose.yml          # CPU-only Docker Compose setup
+├── environment.yml             # Local Conda environment
+├── requirements.txt            # Base local requirements
+├── requirements-docker.txt     # Docker CPU requirements
+└── requirements-rtx50.txt      # Extra dependencies for RTX 50 local setup
+```
 
 ---
 
-## Quick start
+## Execution modes
 
-### 1) Local installation (Conda)
+The project supports two execution modes.
+
+### 1. Docker mode
+
+This is the recommended mode for **reproducibility** and for running the project on machines that do not have a configured NVIDIA GPU.
+
+Docker is intentionally CPU-only in this repository. 
+
+Use this mode when you want a clean and portable execution environment.
+
+### 2. Local GPU mode
+
+Use this mode if you want to train with GPU acceleration on a local **Linux** or **WSL Ubuntu** environment.
+
+GPU execution is handled outside Docker through Conda and `scripts/install_tf.py`, which installs either the official TensorFlow package or a custom TensorFlow build for RTX 50-series GPUs when needed.
+
+---
+
+## Quick start with Docker 
+
+Build the Docker image:
 
 ```bash
-condaenv create -f environment.yml
-conda activate qubit
-
-# optional: reduce TensorFlow logs
-condaenv config varsset TF_CPP_MIN_LOG_LEVEL=3
-condaenv config varsset ABSL_LOGGING_LEVEL=ERROR
-
-python install_tf.py
+docker compose build
 ```
 
+Start an interactive container:
 
-### 2) Download Dataset
+```bash
+docker compose run --rm app bash
+```
+
+Once inside the container, download the dataset:
 
 ```bash
 python scripts/download_data.py
 ```
 
-### 3) Run an experiment
-
-Choose a YAML file  from `configs/` and run:
+Then run an experiment:
 
 ```bash
 python main.py --run-cfg trn_hybrid
 ```
 
-Switch model/variant/training by changing the config file name (e.g. `lstm_step_wise`, `trn_sr`, etc.).
+You can replace `trn_hybrid` with any available configuration from `configs/`.
+
+Examples:
+
+```bash
+python main.py --run-cfg lstm_step_wise
+python main.py --run-cfg trn_sr
+```
+
+To exit the container:
+
+```bash
+exit
+```
 
 ---
 
-## Outputs & artifacts
+## Quick start with local Conda
 
-After training, the program creates a run directory that contains (depending on the config):
+Use this mode when running locally on WSL/Linux, especially if GPU acceleration is required.
 
-- `model.keras` (or equivalent) — saved model
-- `data_splits.npz` — saved test split (and optionally mean/std for inverse standardization)
-- `predictions.npz` — predictions
-- `meta.json` — run metadata (feature names, shapes, config recap, etc.)
-- `loss_plots/` — curve losses (if enabled)
-- `attn_maps.npz` + attention plots (if enabled for Transformer runs)
+Create the Conda environment:
 
-The exact folder name includes the model type/variant/decoder_mode/experiment_name and a timestamp to keep runs isolated and reproducible.
+```bash
+conda env create -f environment.yml
+conda activate qubit
+```
+
+Install TensorFlow:
+
+```bash
+python scripts/install_tf.py
+```
+
+The installation script checks the available NVIDIA GPU. If an RTX 50-series GPU is detected, it installs the dedicated TensorFlow build; otherwise, it installs the official TensorFlow package.
+
+Download the dataset:
+
+```bash
+python scripts/download_data.py
+```
+
+Run an experiment:
+
+```bash
+python main.py --run-cfg trn_hybrid
+```
+
+---
+
+## Dataset
+
+To download it, run:
+
+```bash
+python scripts/download_data.py
+```
+
+The dataset will be saved under:
+
+```text
+data/
+```
+
+
+---
+
+## Running experiments
+
+Experiments are selected through YAML configuration files stored in `configs/`.
+
+Basic command:
+
+```bash
+python main.py --run-cfg <config_name>
+```
+
+Example:
+
+```bash
+python main.py --run-cfg trn_hybrid
+```
+
+The configuration name should match a YAML file in `configs/`, without the `.yaml` extension.
+
+For example:
+
+```text
+configs/trn_hybrid.yaml      ->  --run-cfg trn_hybrid
+configs/lstm_step_wise.yaml  ->  --run-cfg lstm_step_wise
+configs/trn_sr.yaml          ->  --run-cfg trn_sr
+```
+
+---
+
+## Outputs and artifacts
+
+After training, the program creates a run directory containing the artifacts generated by the experiment.
+
+Depending on the configuration, this may include:
+
+- `model.keras` or an equivalent saved model file;
+- `data_splits.npz`;
+- `predictions.npz`;
+- `meta.json`;
+- loss curves;
+- attention maps for Transformer runs;
+- prediction plots.
+
+The output folder name includes information such as the model type, variant, decoder mode, experiment name, and timestamp. This keeps different runs isolated and reproducible.
+
+---
+
+## Plotting
+
+After an experiment has produced saved artifacts, plots can be generated with the scripts in `scripts/`.
+
+Prediction plots:
+
+```bash
+python scripts/plot_from_data.py
+```
+
+Attention heatmaps:
+
+```bash
+python scripts/plot_attention_maps.py
+```
+
+See `docs/plotting.md` for the detailed usage.
+
+---
+
+## Hyperparameter tuning
+
+The project includes an Optuna-based tuning pipeline.
+
+See:
+
+```text
+docs/tuning.md
+```
+
+for details about the tuning workflow, search space, scoring, and dedicated tuning configuration files.
 
 ---
 
 ## Where to read next
 
-This README is intentionally short. Detailed usage is split into focused documents:
+Detailed documentation is split into focused files:
 
-- `docs/setup.md`
-    
-    Installation instructions and environment notes (local + Docker).
-    
-- `docs/example.yaml`
-    
-    Full explanation of the main **experiment YAML**: dataset, windowing, model parameters, training phases, inference, and saving artifacts.
-    
-- `docs/tuning.md`
-    
-    How to run Optuna and how the dedicated tuning YAML (`configs/optuna.yaml`) controls the search space and scoring.
-    
-- `docs/plotting.md`
-    
-    How to use the plotting scripts:
-    
-    - prediction plots (`scripts/plot_from_data.py`)
-    - attention heatmaps (`scripts/plot_attention_maps.py`)
+- `docs/setup.md`  
+  Installation instructions and environment notes for local and Docker execution.
 
-- `reports/` — final PDF report and slides
+- `docs/example.yaml`  
+  Explanation of the main experiment YAML structure: dataset, windowing, model parameters, training phases, inference, and artifact saving.
 
----
+- `docs/tuning.md`  
+  How to run Optuna and how the dedicated tuning YAML controls the search space and scoring.
 
-## Docker (optional)
+- `docs/plotting.md`  
+  How to use the plotting scripts for predictions and attention maps.
 
-If you prefer Docker:
-
-```bash
-# RTX 50 image
-docker build -t tf-app-rtx50 --build-arg TF_VARIANT=rtx50 .
-docker run --gpus all -it tf-app-rtx50
-```
-
-or:
-
-```bash
-# Official TF image
-docker build -t tf-app-official --build-arg TF_VARIANT=official .
-docker run --gpus all -it tf-app-official
-```
-
-##
