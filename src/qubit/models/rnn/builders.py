@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional, cast
 import keras
 
-# to convert thre predictions enum into an integer index for graph mode 
+# to convert the predictions enum into an integer index for graph mode 
 prediction_mode_id = {
     PredictionMode.ALL.value: 0,
     PredictionMode.HORIZON.value: 1,
@@ -107,8 +107,6 @@ def build_lstm_step_wise_model(
         dropout = model_cfg.params.dropout
     )
 
-    model.build(tf.TensorShape([None, t_in, feature_dim]))
-
     optimizer = build_optimizer(
         model_cfg.compile.optimizer,
         model_cfg.compile.learning_rate,
@@ -120,6 +118,9 @@ def build_lstm_step_wise_model(
         optimizer=optimizer,
         run_eagerly=model_cfg.compile.run_eagerly
     )
+
+    model.build(tf.TensorShape([None, t_in, feature_dim]))
+
 
     if model_path is not None:
         model.load_weights(Path(model_path) / "model.weights.h5")
@@ -154,7 +155,6 @@ def build_lstm_hybrid_model(
         dropout = model_cfg.params.dropout
     )
 
-    model.build(tf.TensorShape([None, t_in, feature_dim]))
 
     optimizer = build_optimizer(
         model_cfg.compile.optimizer,
@@ -167,6 +167,8 @@ def build_lstm_hybrid_model(
         optimizer=optimizer,
         run_eagerly=model_cfg.compile.run_eagerly
     )
+
+    model.build(tf.TensorShape([None, t_in, feature_dim]))
 
     if model_path is not None:
         model.load_weights(Path(model_path) / "model.weights.h5")

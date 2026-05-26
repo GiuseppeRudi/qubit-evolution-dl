@@ -41,8 +41,10 @@ def run_experiment(
     model_path: str | None = None,
 ) -> dict :
 
+    # loads the run configuration checking if the mandatory keys are present 
     run_cfg = load_run_config(yaml_name)
 
+    # only for tuning 
     if override:
         print(override)
         run_cfg = deep_merge_dict(run_cfg, override)
@@ -79,13 +81,14 @@ def run_experiment(
         print(f"--- Curriculum = {[round(float(x) * data_cfg.windowing.output_seq_len) for x in training_cfg.curriculum]}")
     
     if training_cfg.fr_eval.enabled:
+        curve_steps = []
         for p in training_cfg.fr_eval.probes:
             if p.name == "fr_curve":
                 curve_steps = [round(float(x) * data_cfg.windowing.output_seq_len) for x in p.out_steps]
         print(f"--- fr_curve Outsteps = {curve_steps}")
     
     # TODO put ifs for the prints (if superesolution, if fr_eval etc.)
-
+    history = None
     if training:  
         print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}/{model_cfg.decoder_mode.value}]  ---")
         history = trainer.fit(splits, optuna_callback)

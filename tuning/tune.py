@@ -6,8 +6,6 @@ import optuna
 from qubit.utils.config_keys import BASE_NAME, LEVEL, MODEL, MODEL_TYPE, MONITORS, N_STARTUP_TRIALS, N_TRIALS, N_WARMUP_STEPS, OUTPUT, PRUNER, PRUNER_TYPE, ROOT_DIR, SAMPLER, SAMPLER_TYPE, SEED, STORAGE_FILENAME, STUDY_NAME, REPORT_FILENAME, OPTUNA_PATH, TUNING, TRAINING, CURRICULUM,DATA,WINDOWING,OUTPUT_SEQ_LEN
 import tensorflow as tf
 import gc
-import optuna
-import tensorflow as tf
 from .suggest import suggest_level
 from .score import compute_score
 from tensorflow.keras.callbacks import Callback

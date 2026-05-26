@@ -58,7 +58,7 @@ model:
     start_mode: "zeros" # zeros | last_x
     verbose: 0  # 0, 1, 2
 
-# IMPORTANT: for SR => curriculum, phases and fr_eval are NOT USED
+# NOTE: for SR => curriculum, phases and fr_eval are NOT USED
 training:
   prediction_mode: "all" # all | horizon 
                          # all => predicts always up to output_seq_len and calculate loss with sliding up to horizon
@@ -75,7 +75,7 @@ training:
                       # It is used to teach the model to generalize on custom sequences, 
                       # starting with smaller ones and then arriving at the output_seq_len sequence.  
   
-  # IMPORTANT the number of TOTAL EPOCH are automatically calculated from the sum of each epoch phase
+  # IMPORTANT: the number of TOTAL EPOCH are automatically calculated from the sum of each epoch phase
   phases:
 
     - name: teacher_forcing
@@ -130,7 +130,7 @@ training:
     # out_steps can be 
     # - phase: does predictions up to the horizon connected to the used strategy
     # - global: does predictions up to output_seq_len
-    # - [0.1,0.25,0.6,1]: a list of % of horizon inserted by the programmer 
+    # - [0.1,0.25,0.6,1]: a list of % of horizons inserted by the programmer 
     probes:
       - name: fr_phase 
         out_steps: phase  

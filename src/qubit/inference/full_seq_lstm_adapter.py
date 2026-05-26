@@ -48,7 +48,7 @@ def build_inference_models(trained_model: keras.Model) -> tuple[keras.Model, ker
     # h1 and c1.shape(batch_size , latent_dim)
     x, h1, c1= enc_lstm_1(enc_in)
 
-    # enc_lstm_2 return_state = True and return sequence = True
+    # enc_lstm_2 return_state = True and return sequence = False
     # h2 and c2 .shape(batch_size, latent_dim)
     _, h2, c2 = enc_lstm_2(x)
 
@@ -59,9 +59,9 @@ def build_inference_models(trained_model: keras.Model) -> tuple[keras.Model, ker
     # --- Decoder inference (one step)
 
     # in the trained_mode FULL SEQ the decoder input take this shape
-    # dec_in.shape(batch_size, t_out, feauture_dim) 
+    # dec_in.shape(batch_size, t_out, feature_dim) 
 
-    # the differnce from the training decoder FULL_SEQ  is here 
+    # the difference from the training decoder FULL_SEQ  is here 
     # we use the different input shape for one time step decoding not for all timesteps at once
 
     dec_in_t = keras.Input(shape=(1, feature_dim), name="dec_in_t")

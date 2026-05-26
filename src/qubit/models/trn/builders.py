@@ -56,7 +56,6 @@ def build_transformer_sr_model(
         sr_cfg=sr_cfg,
     )
 
-    model.build(tf.TensorShape([None, windows_len, input_feature_dim]))
 
     optimizer = build_optimizer(
         model_cfg.compile.optimizer, 
@@ -68,6 +67,8 @@ def build_transformer_sr_model(
         metrics=model_cfg.compile.metrics, 
         run_eagerly=model_cfg.compile.run_eagerly,
     )
+
+    model.build(tf.TensorShape([None, windows_len, input_feature_dim]))
 
     if model_path is not None:
         model.load_weights(Path(model_path) / "model.weights.h5")
@@ -105,7 +106,6 @@ def build_transformer_hybrid_model(
         t_in = t_in,
     )
 
-    model.build(tf.TensorShape([None, t_in, feature_dim]))
 
     optimizer = build_optimizer(
         model_cfg.compile.optimizer,
@@ -118,6 +118,8 @@ def build_transformer_hybrid_model(
         optimizer=optimizer,
         run_eagerly=model_cfg.compile.run_eagerly
     )
+
+    model.build(tf.TensorShape([None, t_in, feature_dim]))
 
     if model_path is not None:
         model.load_weights(Path(model_path) / "model.weights.h5")
