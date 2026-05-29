@@ -32,7 +32,7 @@ def load_raw_dataframe(csv: str) -> pd.DataFrame:
 
 def randomize_traj_to_use(n_traj, num_traj_to_use, time_steps):
     rows = []
-    # TODO verify if we want sorted or not 
+
     traj_selected = np.random.choice(n_traj, size=num_traj_to_use, replace=False).tolist()
     # traj_selected = np.sort(np.random.choice(n_traj, size=num_traj_to_use, replace=False)).tolist()
     for i in traj_selected:

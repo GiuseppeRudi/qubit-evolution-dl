@@ -57,8 +57,6 @@ def _pick_fr_phase(metrics: dict, split: str, last_curriculum : int) -> float :
     return v
 
 def compute_score(metrics: dict[str, Any], base_cfg: dict, override: dict, level: int) -> float:
-
-    #  TODO in the future this case can be modify from yaml confi for optuna
     
     # SCORE = 0.70 * fr_taget + 0.25 * fr_curve + 0.05 * fr_phase
 

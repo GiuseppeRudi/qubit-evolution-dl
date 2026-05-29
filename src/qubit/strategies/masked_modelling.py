@@ -1,10 +1,6 @@
 import tensorflow as tf
 
 
-# TODO possibility to change the step_wise to choose if we want to apply the mask also the dec0 
-# in full seq this change is easier 
-
-
 @tf.function
 def make_mask(
     dec_in: tf.Tensor, # (batch_size , t, feature_dim)

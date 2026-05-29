@@ -26,7 +26,6 @@ def find_latest_run_dir() -> str:
     for p in base_dir.rglob("*"):
         if not p.is_dir(): continue
         
-        # TODO when we change the name of dir and remove the datatime this function don't work
         # filter the dir that not contain the datatime
         m = RUN_RE.search(p.name)
         if not m: continue

@@ -86,8 +86,7 @@ def run_experiment(
             if p.name == "fr_curve":
                 curve_steps = [round(float(x) * data_cfg.windowing.output_seq_len) for x in p.out_steps]
         print(f"--- fr_curve Outsteps = {curve_steps}")
-    
-    # TODO put ifs for the prints (if superesolution, if fr_eval etc.)
+
     history = None
     if training:  
         print(f"\n--- Training: {model_cfg.name} [{model_cfg.type.value}/{model_cfg.variant.value}/{model_cfg.decoder_mode.value}]  ---")
