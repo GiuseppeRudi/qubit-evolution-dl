@@ -67,6 +67,7 @@ def apply_mask(
     
     def mode_noise():
         noise = tf.random.normal(tf.shape(dec_in), 0.0, noise_sigma, dtype=dec_in.dtype)
+        # tf.print(noise[0, :5, :5])
 
         def replace():
             # for each element where  m[i] == True so dec_in[i] =  noise
@@ -118,9 +119,8 @@ def masked_modeling_full_seq(
     dec_in = tf.concat([dec0, Y_truncated], 1) # (batch_size, t, feature_dim)
 
     m = make_mask(dec_in, mask_prob, mask_scope_id)
+    
     return apply_mask(dec_in, m, mask_mode_id, mask_value, noise_sigma,noise_replace)
-
-
 
 
 @tf.function

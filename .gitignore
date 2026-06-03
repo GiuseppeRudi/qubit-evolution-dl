@@ -67,3 +67,6 @@ docker-compose.override.yml
 runs/
 *.h5
 *.weights.h5
+
+
+configs/debug.yaml
