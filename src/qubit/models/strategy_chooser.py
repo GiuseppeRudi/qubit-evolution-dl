@@ -110,7 +110,7 @@ class StrategyChooserModel(keras.Model, abc.ABC):
             },
             default=teacher_forcing,
         )
-        # tf.print(dec_in[0, :5, :5])
+        # tf.print(dec_in[0, :5, :4])
 
         
         return dec_in

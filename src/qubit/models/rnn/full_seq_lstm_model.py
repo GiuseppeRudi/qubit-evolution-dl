@@ -185,7 +185,6 @@ class FullSeqLstmModel(StrategyChooserModel):
         # ! that the decoder must predict using ground truth (with the possibility of masking) 
 
         def run_all():
-            
             # decoder input  dec_in.shape(batch_size , T_out == output_seq_len, feature_dim)
             dec_in = self.apply_strategy_full_seq(Y, dec0=dec0)
 

@@ -166,7 +166,7 @@ def load_training_config(t: Dict[str, Any], variant: ModelVariant) -> TrainingCo
         fr_eval_raw = t[FR_EVAL]
         split = SplitName(fr_eval_raw[FR_EVAL_SPLIT]) 
         enabled = bool(fr_eval_raw[ENABLED])
-        batch_size = int(fr_eval_raw[FR_BATCH_SIZE])
+        fr_batch_size = int(fr_eval_raw[FR_BATCH_SIZE])
 
         probes_raw = fr_eval_raw[PROBES]
         if probes_raw is None:
@@ -180,7 +180,7 @@ def load_training_config(t: Dict[str, Any], variant: ModelVariant) -> TrainingCo
         fr_eval = FrEvalConfig(
             enabled=enabled,
             split=split,
-            batch_size=batch_size,
+            batch_size=fr_batch_size,
             probes=cast(tuple[FrEvalProbeConfig],probes),
         )
 
