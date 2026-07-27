@@ -128,8 +128,8 @@ class HybridTrnModel(StrategyChooserModel):
         ones = tf.ones((t, t), dtype=tf.float32)
         # one.shape(t,t)
         
-        # bottom the main diagonal and the main diagonal itself => values = 1 
-        # upper the main diagonal => values = 0  
+        # below the main diagonal and the main diagonal itself => values = 1 
+        # above the main diagonal => values = 0  
         # band.shape(t,t) 
         band = tf.linalg.band_part(ones, -1, 0) 
 

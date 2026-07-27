@@ -16,7 +16,7 @@ class StrategyChooserModel(keras.Model, abc.ABC):
 
     def apply_strategy_step_wise(self, 
                 y_true_t: tf.Tensor,  # y_true_t.shape(batch_size,1,feature_dim)
-                y_pred_t: tf.Tensor) -> tf.Tensor: # y_true_t.shape(batch_size,1,feature_dim)
+                y_pred_t: tf.Tensor) -> tf.Tensor: # y_pred_t.shape(batch_size,1,feature_dim)
 
         # index of strategy 
         phase_index = tf.convert_to_tensor(self.rt.phase_id)
@@ -66,6 +66,9 @@ class StrategyChooserModel(keras.Model, abc.ABC):
                 3: full_autoregressive
             }
         )
+
+        # tf.print(out[0, :5, :5])
+
         out = out[:, :1, :]
         out = tf.ensure_shape(out, [None, 1, self.feature_dim])
         return out
@@ -107,6 +110,7 @@ class StrategyChooserModel(keras.Model, abc.ABC):
             },
             default=teacher_forcing,
         )
+        # tf.print(dec_in[0, :5, :4])
 
         
         return dec_in

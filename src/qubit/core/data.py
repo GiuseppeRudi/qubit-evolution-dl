@@ -102,6 +102,8 @@ def build_trajectories(df: pd.DataFrame, data_cfg : DataConfig) -> Tuple[np.ndar
 
 def correlation_columns(corr_start: int, used_qubits: int, total_qubits: int) -> list[int]:
     
+    # t
+    # m1 m2 m3 m4 m5 m6 m7 m8 m9 m10
     # c12 c13 c14 c15 c16 c17 c18 c19 c1,10
     # c23 c24 c25 c26 c27 c28 c29 c2,10
     # c34 c35 c36 c37 c38 c39 c3,10

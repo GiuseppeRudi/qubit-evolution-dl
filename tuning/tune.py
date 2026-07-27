@@ -204,8 +204,7 @@ def main():
     if level == 1:
         print("Best trial:", study.best_trial.number, "score:", study.best_value)
     else:
-        chosen = min(study.best_trials, key=lambda t: (t.values[0], -t.values[1]))
-        print("Chosen pareto trial:", chosen.number, "values:", chosen.values)
+        print("Run pareto_analyzer.py to select the final trial.")
 
 
 if __name__ == "__main__":

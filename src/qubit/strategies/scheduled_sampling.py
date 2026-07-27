@@ -83,6 +83,8 @@ def scheduled_sampling_next(
     )
 
     use_teacher = tf.random.uniform(shape, 0.0, 1.0) < ratio
+    # tf.print(ratio)
+    # tf.print(use_teacher[0, :5, :5])
     return tf.where(use_teacher, y_true_t, y_pred_t)
 
 @tf.function

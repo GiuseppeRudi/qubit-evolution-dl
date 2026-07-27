@@ -234,8 +234,7 @@ class HybridLstmModel(StrategyChooserModel):
                     element_shape=tf.TensorShape([None, self.feature_dim]),
                 )
                 
-                # ta = shape (batch_size , T , feature_dim)
-                # print(ta.element_shape) = shape (batch_size, feature_dim) ,  ta.size() = T_out
+                # print(ta.element_shape) = shape (batch_size, feature_dim) ,  ta.size() = T
 
                 t0 = tf.constant(0, tf.int32)
 

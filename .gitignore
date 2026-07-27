@@ -60,20 +60,6 @@ outputs/
 *.keras
 *.h5
 *.weights.h5
-*.npz
-*.npy
-*.db
-*.sqlite
-*.sqlite3
 
-# Local-only experiment configuration
+
 configs/debug.yaml
-
-# Local Docker overrides
-docker-compose.override.yml
-*.local.yml
-
-# Platform-specific state
-.lightning_studio/
-.keras/
-.wget-hsts
