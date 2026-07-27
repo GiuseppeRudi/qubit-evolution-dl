@@ -290,8 +290,8 @@ def make_sr_windows_from_trajectories(
     obs_1d = ((idx - sr_cfg.offset) % sr_cfg.stride == 0).astype(np.float32) 
     # obs_1d.shape(windows_len)
 
-    # obs_1d[i] == 1 is the specific index == timestep è observed 
-    # obs_1d[i] == 0 is the specific index == timestep è missed (hole) 
+    # obs_1d[i] == 1 is the specific index == timestep is observed 
+    # obs_1d[i] == 0 is the specific index == timestep is missed (hole) 
 
     obs = obs_1d[:, None] 
     # obs.shape(winows_len, None)

@@ -1,0 +1,31 @@
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{l p{0.78\linewidth}}
+\hline
+\textbf{Phase} & \textbf{Custom options exposed in YAML} \\
+\hline
+\texttt{teacher\_forcing} &
+- \\
+\texttt{full\_autoregressive} &
+\texttt{gradient\_through\_time} $\in\{$\texttt{true}, \texttt{false}$\}$ \\
+\texttt{masked\_modeling} &
+\texttt{mask\_prob} $\in [0,1]$;\ 
+\texttt{mask\_scope} $\in\{$\texttt{time}, \texttt{element}, \texttt{feature}$\}$;\ 
+\texttt{mask\_mode} $\in\{$\texttt{zero}, \texttt{constant}, \texttt{noise}$\}$;\ 
+\texttt{noise\_replace} $\in\{$\texttt{true}, \texttt{false}$\}$ \\
+\texttt{scheduled\_sampling} &
+\texttt{ratio\_mode} $\in\{$\texttt{linear}, \texttt{cosine}, \texttt{sigmoid}, \texttt{power}$\}$;\ 
+\texttt{per\_feature} $\in\{$\texttt{true}, \texttt{false}$\}$;\ 
+\texttt{stop\_grad\_pred} $\in\{$\texttt{true}, \texttt{false}$\}$ \\
+\hline
+\end{tabular}
+\caption{Compact summary of discrete customization options exposed by our training YAML.}
+\label{tab:phases_yaml_options}
+\end{table}
+
+\noindent\textbf{Note.} The learning rate and clipping threshold are defined globally and can be enabled for each phase, but each phase can optionally apply a per-phase scaling factor (e.g., \texttt{lr\_multiplier} and \texttt{clip\_norm\_multiplier}) to obtain strategy-specific training dynamics:
+$\mathrm{lr}_{\mathrm{phase}}=\mathrm{lr}_{\mathrm{global}}\cdot \texttt{lr\_multiplier}$ and
+$\mathrm{clip}_{\mathrm{phase}}=\mathrm{clip}_{\mathrm{global}}\cdot \texttt{clip\_norm\_multiplier}$.

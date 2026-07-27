@@ -1,0 +1,26 @@
+\begin{figure}[H]
+\centering
+\captionsetup{font=footnotesize}
+\begin{subfigure}[t]{0.40\linewidth}
+  \includegraphics[width=\linewidth]{../figures/pred_plots/pred2_full_seq_lstm.jpg}
+  \caption*{LSTM Full-seq}
+\end{subfigure}\hspace{10mm}
+\begin{subfigure}[t]{0.40\linewidth}
+  \includegraphics[width=\linewidth]{../figures/pred_plots/pred2_step_wise_lstm.jpg}
+  \caption*{LSTM Step-wise}
+\end{subfigure}
+
+
+\begin{subfigure}[t]{0.40\linewidth}
+  \includegraphics[width=\linewidth]{../figures/pred_plots/pred2_hybrid_lstm.jpg}
+  \caption*{LSTM Hybrid}
+\end{subfigure}\hspace{10mm}
+\begin{subfigure}[t]{0.40\linewidth}
+  \includegraphics[width=\linewidth]{../figures/pred_plots/pred2_hybrid_trn.jpg}
+  \caption*{TRN Hybrid}
+\end{subfigure}
+
+\vspace{-2mm}
+\caption{Predictions for each model with $(Len_\text{in},Len_\text{out},s)=(200, 50, 20)$.}
+\label{fig:forecast_curves}
+\end{figure}

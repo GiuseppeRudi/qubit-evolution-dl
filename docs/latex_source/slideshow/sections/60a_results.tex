@@ -1,0 +1,83 @@
+\begin{frame}{Results — Forecasting}
+
+\vspace{-1em}
+
+\begin{center}
+  \textbf{Takeaway:} TRN follows the target longer\\[0.3em]
+  {\scriptsize Fixed windowing: $(L_{\text{in}},\,L_{\text{out}},\,s)=(200,50,20)$;\;
+  Level-1 best per model;\; 50 epochs on Tesla T4.}
+\end{center}
+
+\vspace{-1em}
+
+\captionsetup{font=scriptsize}
+\begin{columns}[T,onlytextwidth]
+  \column{0.5\textwidth}
+  \begin{figure}
+    \centering
+    \includegraphics[width=\linewidth, height=0.30\textheight, keepaspectratio]{../figures/pred2_hybrid_lstm.jpg}
+    \caption{LSTM Hybrid}
+  \end{figure}
+
+  \column{0.5\textwidth}
+  \begin{figure}
+    \centering
+    \includegraphics[width=\linewidth, height=0.30\textheight, keepaspectratio]{../figures/pred2_hybrid_trn.jpg}
+    \caption{TRN Hybrid}
+  \end{figure}
+\end{columns}
+
+\vspace{0.3em}
+{\centering\scriptsize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Model} & \textbf{FR\_target}~$\downarrow$ & \textbf{MSE}~$\downarrow$ \\
+\midrule
+LSTM Full-seq  & 0.7170 & 0.0081 \\
+LSTM Step-wise & 0.2266 & 0.1252 \\
+\textbf{LSTM Hybrid} & \textbf{0.2510} & \textbf{0.1720} \\
+\textbf{TRN Hybrid} & \textbf{0.2444} & \textbf{0.0145} \\
+\bottomrule
+\end{tabular}\par}
+
+\end{frame}
+
+\begin{frame}{Results — Transformer Attention Maps}
+
+
+\centering
+{\scriptsize
+TRN Hybrid knee-point configuration; decoder head 1.
+}
+
+\vspace{0.4em}
+
+\begin{columns}[T,onlytextwidth]
+
+  \column{0.5\textwidth}
+  \centering
+  \includegraphics[width=0.6\linewidth]{../figures/plot_attention/dec_l0_cross__head1__ds1.jpg}
+  
+  {\scriptsize \texttt{dec/l0/cross}}
+  
+  \vspace{0.4em}
+  
+  \includegraphics[width=0.6\linewidth]{../figures/plot_attention/dec_l1_cross__head1__ds1.jpg}
+  
+  {\scriptsize \texttt{dec/l1/cross}}
+
+  \column{0.5\textwidth}
+  \centering
+  \includegraphics[width=0.6\linewidth]{../figures/plot_attention/dec_l0_self__head1__ds1.jpg}
+  
+  {\scriptsize \texttt{dec/l0/self}}
+  
+  \vspace{0.4em}
+  
+  \includegraphics[width=0.6\linewidth]{../figures/plot_attention/dec_l1_self__head1__ds1.jpg}
+  
+  {\scriptsize \texttt{dec/l1/self}}
+
+\end{columns}
+
+\end{frame}

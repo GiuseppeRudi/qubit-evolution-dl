@@ -1,0 +1,85 @@
+\section{Results}
+\label{sec:results}
+
+For each model, we select the best Level-1 configuration in \Cref{tab:level1_hp_top3_all}. 
+For Level 2, we select the \textbf{knee point} on the Pareto front, like in \Cref{fig:pareto_5plots}, to obtain a good trade-off between output horizon and score. 
+Each selected configuration is then trained for 50 epochs on an NVIDIA TESLA T4 GPU. 
+Performance is monitored using the free-running probes described in \Cref{tab:fr_probes}. 
+In the following, we show loss and prediction plots, and attention maps when available.
+
+\subsection{Forecasting}
+\label{sec:results_forecasting}
+
+\paragraph{Training dynamics}
+Training and validation losses show that the system is working as expected, while free-running metrics, using an inference model, provide a more realistic behaviour without help.
+\vspace{1em}
+
+\textbf{Note}: each color corresponds to a different training phase with its own horizon.
+
+\input{tables/loss_train_val_phase}
+
+Train and validation loss (blue/orange) look very good most of the time, but, near the start of full autoregressive, often increase sharply, then gradually decrease again, since the model no longer receives ground truth help. Free-running loss is much higher and more unstable. This is true because, when the model must generate its own future steps, errors accumulate and the loss grows (exposure bias). When you switch the training phase, the losses often jump because the task distribution changes.
+
+\input{tables/loss_curve_target}
+
+As we can see, the model is tested with different horizons. As the horizon gets closer to the target \texttt{output\_seq\_len}, the error usually increases, because predictions with long horizons are harder. 
+
+\vspace{\baselineskip}
+
+During teacher forcing, the free-running loss increases because when you run it autoregressively, small mistakes become the next inputs.
+
+During scheduled sampling, some curves increase since the inputs become more self generated and noisier.
+When switching to full autoregressive training, losses often decrease. This behaviour is not always expected, and it can show known issues of scheduled sampling. We discuss these limitations in \nameref{sec:future} section.
+
+\paragraph{Predictions}
+We first visualize the predictions produced by each model at its knee point configuration. 
+
+\input{tables/pred_plots}
+
+Overall, full seq decoding performs worst among the tested settings. The Transformer model is more stable at long horizons because better preserves the global structure. However, all models still show the main trend and direction of the dynamics. 
+
+These comparisons are not fully fair because each model use a different $(Len_\text{in},Len_\text{out},s)$ at its knee point.
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Note} $Len_\text{in}$ is the input sequence length, $Len_\text{out}$ is the predicted sequence length, and $s$ is the windowing stride.
+
+\paragraph{Fair comparison under a fixed windowing setup.}
+For a fairer comparison, we also evaluated all forecasting models using the same windowing configuration $(Len_\text{in},Len_\text{out},s)$.
+
+\input{tables/fair_metrics}
+
+\textbf{Analysis}. The Transformer performs strongly and is competitive with the LSTMs. As we can see in the table, the LSTM Full-Seq model has a much higher free running target loss (about 0.71) than the other models, because it was trained only with teacher forcing and masked modeling, so it didn't learn how to deal with an accumulation of errors when it was running in full autoregressive mode.
+
+\input{tables/pred_plots_fair}
+
+\noindent\textbf{Attention analysis (Transformer).}
+
+\vspace{\baselineskip}
+
+\noindent\textbf{Note.} We report attention maps only from the \textbf{decoder} of the TRN Hybrid knee-point configuration, using sample 0 and attention head 1, because they are the most interpretable for forecasting.
+
+\vspace{\baselineskip}
+
+\input{tables/attention_maps}
+
+The decoder self-attention maps (\texttt{dec/l0/self}, \texttt{dec/l1/self}) show a clear diagonal pattern, which is expected for causal decoding. This means each predicted step mainly uses the previously generated outputs.
+
+\vspace{\baselineskip}
+
+The cross-attention maps show that the two decoder layers work in a complementary way. The \texttt{dec/l0/cross} is step-dependent: the focus over the input timesteps changes as the generated output timestep changes. We also observe a strong concentration on the last part of the input window when predicting the first output steps, which is coherent because early forecasts are strongly conditioned on the most recent observed data. The \texttt{dec/l1/cross} is mostly step-invariant: it forms vertical bands, meaning that the model attends to the same input regions even when the output timestep changes. This suggests that layer l1 extracts more global information from the input that is useful across the whole forecast horizon.
+
+\subsection{Super-resolution (imputation)}
+\label{sec:results_superres}
+
+\input{tables/sr}
+
+For super-resolution, the model performs well in general: it fills the holes while keeping the main trend. Errors tend to be higher where the dynamics change sharply.
+
+\noindent\textbf{Note.} Unlike forecasting, in this super-resolution setting, we do not use the free running probes or the training strategies (e.g., scheduled sampling).
+
+\subsection*{Code}
+All code, configurations, and scripts used for training, evaluation, and plotting are available in the project repository:
+\href{https://github.com/GiuseppeRudi/qubit-evolution-dl}{qubit-evolution-dl}.
+
+\noindent Additional plots and detailed results (hyperparameter tuning and free running evaluation) are also included.

@@ -1,69 +1,79 @@
-# ============================
-# Git ignore for tf-project
-# ============================
-
-# Python bytecode & cache
+# Python caches and tooling
 __pycache__/
 *.py[cod]
 *$py.class
-.copilot
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# C extensions
-*.so
-
-# Virtual environments
+# Virtual environments and local configuration
 .venv/
 venv/
 env/
-.env/
 .conda/
 .conda_env/
+.env
+.env.*
+!.env.example
 pip-wheel-metadata/
 
-# Build / distribution
+# Build and packaging outputs
 build/
 dist/
 *.egg-info/
 .eggs/
 
-# Jupyter
+# Notebook state
 .ipynb_checkpoints/
 
-# Logs / temp
+# Logs and temporary files
 logs/
 tmp/
 temp/
+*.log
 *.tmp
 
-# IDE / editor configs
-.vscode/
+# Editors and assistants
 .idea/
+.vscode/
 *.sublime-project
 *.sublime-workspace
 *.swp
 *.swo
+*~
+.copilot/
+.cursor-server/
+.vscode-server/
+.windsurf-server/
 
-# OS-specific
+# Operating-system metadata
 .DS_Store
 Thumbs.db
 
-# Large data / training artifacts
-data/trajectories.csv
-
-# Docker stuff (keep Dockerfile, ignore extra local files)
-docker-compose.override.yml
-*.local.yml
-.lightning_studio/on_stop.sh
-.gitignore
-.wget-hsts
-.cursor-server
-.vscode-server
-.windsurf-server
-.lightning_studio/.studiorc
-.lightning_studio/on_start.sh
-.keras/keras.json
-
-# training artifacts
+# Local datasets and experiment artifacts
+data/*
+!data/.gitkeep
 runs/
+outputs/
+*.keras
 *.h5
 *.weights.h5
+*.npz
+*.npy
+*.db
+*.sqlite
+*.sqlite3
+
+# Local-only experiment configuration
+configs/debug.yaml
+
+# Local Docker overrides
+docker-compose.override.yml
+*.local.yml
+
+# Platform-specific state
+.lightning_studio/
+.keras/
+.wget-hsts

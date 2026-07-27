@@ -1,0 +1,43 @@
+\begin{frame}{Free-Running Evaluation}
+\begin{columns}[T,onlytextwidth]
+
+% -------- Left: short text + smaller table --------
+\column{0.50\textwidth}
+\vspace{1em}
+
+% --- Left column content (structured) ---
+\vspace{2em}
+
+\textbf{Why:} training loss is optimistic (assisted inputs)
+
+\vspace{3.5em}
+\begin{block}{Probes}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{l c l}
+\hline
+\textbf{Probe} & \textbf{When} & \textbf{Purpose} \\
+\hline
+\texttt{fr\_phase} & every 2 epochs & feedback at current horizon \\
+\texttt{fr\_target} & end of phase & full-horizon performance \\
+\texttt{fr\_curve} & end of phase & error vs horizon \\
+\hline
+\end{tabular}
+\end{block}
+
+
+% -------- Right: two plots stacked --------
+\column{0.50\textwidth}
+\vspace{-3em}
+\begin{figure}
+  \centering
+  \includegraphics[width=\linewidth,height=0.40\textheight,keepaspectratio]{../figures/loss1_1_hybrid_trn.jpg}
+  \vspace{0.15em}
+  \includegraphics[width=\linewidth,height=0.40\textheight,keepaspectratio]{../figures/loss1_2_hybrid_trn.jpg}
+  \caption{Loss on TRN Hybrid.}
+\end{figure}
+
+\end{columns}
+\end{frame}

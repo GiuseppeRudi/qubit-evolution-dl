@@ -1,0 +1,68 @@
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.0pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lccc|ccc|ccc|ccc}
+\toprule
+& \multicolumn{3}{c}{LSTM Full-seq} & \multicolumn{3}{c}{LSTM Step-wise} & \multicolumn{3}{c}{LSTM Hybrid} & \multicolumn{3}{c}{TRN Hybrid} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}
+Hyperparameter & Hp1 & Hp2 & Hp3 & Hp1 & Hp2 & Hp3 & Hp1 & Hp2 & Hp3 & Hp1 & Hp2 & Hp3 \\
+\midrule
+lr              & $4.6e{-4}$ & $\textbf{5e{-4}}$ & $4.6e{-4}$
+                & $9.7e{-4}$ & $6.7e{-4}$ & $\textbf{7e{-4}}$
+                & $\textbf{8.9e{-4}}$ & $8.3e{-4}$ & $6e{-4}$
+                & $2.7e{-4}$ & $6.2e{-4}$ & $\textbf{6.2e{-4}}$ \\
+
+clip\_norm      & 0.8699 & \textbf{1.4600} & 0.6743
+                & 0.6470 & 0.5780 & \textbf{0.8157}
+                & \textbf{0.7241} & 0.7573 & 0.7361
+                & 0.1014 & 0.1650 & \textbf{0.1819} \\
+
+batch\_size     & 64 & \textbf{64} & 64
+                & 32 & 32 & \textbf{32}
+                & \textbf{32} & 32 & 32
+                & 32 & 32 & \textbf{32} \\
+
+latent\_dim     & 256 & \textbf{256} & 256
+                & 192 & 192 & \textbf{192}
+                & \textbf{192} & 192 & 192
+                & --- & --- & --- \\
+
+num\_heads      & --- & --- & ---
+                & --- & --- & ---
+                & --- & --- & ---
+                & 4 & 4 & \textbf{2} \\
+
+dim\_model      & --- & --- & ---
+                & --- & --- & ---
+                & --- & --- & ---
+                & 256 & 192 & \textbf{128} \\
+
+ff\_dim         & --- & --- & ---
+                & --- & --- & ---
+                & --- & --- & ---
+                & 1536 & 1536 & \textbf{1536} \\
+
+num\_layers     & --- & --- & ---
+                & --- & --- & ---
+                & --- & --- & ---
+                & 2 & 2 & \textbf{2} \\
+
+dropout         & --- & --- & ---
+                & --- & --- & ---
+                & --- & --- & ---
+                & 0.1134 & 0.1164 & \textbf{0.0555} \\
+
+\midrule
+Score $\downarrow$ &
+0.6582 & \textbf{0.6576} & 0.6578 &
+0.2811 & 0.2694 & \textbf{0.2680} &
+\textbf{0.1719} & 0.1721 & 0.1722 &
+0.2351 & 0.2103 & \textbf{0.1987} \\
+\bottomrule
+\end{tabular}
+\caption{Level-1 Optuna tuning. For each model we report only the best three configurations (Hp1--Hp3). }
+\label{tab:level1_hp_top3_all}
+\end{table}

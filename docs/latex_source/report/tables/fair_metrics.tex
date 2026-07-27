@@ -1,0 +1,18 @@
+\begin{table}[H]
+\centering
+\small
+
+\label{tab:fair_metrics}
+\begin{tabular}{lcc}
+\toprule
+Model & FR\_target $\downarrow$ & MSE $\downarrow$ \\
+\midrule
+LSTM Full-seq & 0.7170 & 0.0081 \\
+LSTM Step-wise & 0.2266 & 0.1252 \\
+LSTM Hybrid & 0.2510 & 0.1720 \\
+TRN Hybrid & 0.2444 & 0.0145 \\
+\bottomrule
+\end{tabular}
+
+\caption{Metrics comparison under a fixed windowing setup $(Len_\text{in},Len_\text{out},s)=(200, 50, 20)$.}
+\end{table}

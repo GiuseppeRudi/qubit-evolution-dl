@@ -60,18 +60,13 @@ def get_device():
         print(f"   - {name} ")
 
 def deep_merge_dict(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
-    """
-    Deep merge:
-    - dict + dict => merge ricorsivo
-    - qualsiasi altra cosa (incluse list) => override sovrascrive
-    """
+
     result: dict[str, Any] = deepcopy(dict(base))
 
     for k, v_over in override.items():
         if k in result and isinstance(result[k], dict) and isinstance(v_over, dict):
             result[k] = deep_merge_dict(result[k], v_over)
         else:
-            # qui includiamo list/None/scalari: sovrascrive
             result[k] = deepcopy(v_over)
 
     return result

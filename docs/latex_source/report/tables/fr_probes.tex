@@ -1,0 +1,15 @@
+\begin{table}[H]
+\centering
+\small
+\caption{Free-running probes used during training.}
+\label{tab:fr_probes}
+\begin{tabular}{llll}
+\toprule
+Probe & Output timesteps & When & Purpose \\
+\midrule
+\texttt{fr\_phase}  & \texttt{phase}  & every 2 epochs & Fast feedback at the current curriculum/phase horizon \\
+\texttt{fr\_target} & \texttt{global} & end of phase   & Performance at the full forecasting horizon (\texttt{output\_seq\_len}) \\
+\texttt{fr\_curve}  & \{0.2,0.4,0.6\}  & end of phase   & Error growth vs. horizon (short/medium/long range) \\
+\bottomrule
+\end{tabular}
+\end{table}

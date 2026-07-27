@@ -1,0 +1,195 @@
+\section{Models}
+\label{sec:models}
+
+\subsection{Models overview}
+\label{sec:models_overview}
+
+Figure~\ref{fig:roadmap} provides a temporal roadmap of the model development in this project: as the work progressed, we moved from simpler baselines to more advanced architectures and training strategies.  For each model, we explain the main limitations caused by theoretical or structural constraints and from unimplemented features.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{../figures/model_roadmap.jpg}
+  \caption{Roadmap of the developed models and decoder modes.}
+  \label{fig:roadmap}
+\end{figure}
+
+\noindent\textbf{Note.} Some limitations are deferred to Section~\ref{sec:future} (\nameref{sec:future}).
+
+We formulate super-resolution as a simple imputation task: starting from a sequence with regularly missing time steps, the model receives the input where missing points are replaced by a fixed mask value and learns to predict only the missing values. We compute the loss on missing points (or on all points with a smaller weight on observed ones) to focus training on reconstruction quality. 
+
+\subsection{Model Architectures}
+
+\textbf{Notation}: $B$ = batch size, $T_{in}$ = input length,  $T_{dec}$ denotes the decoder sequence length, which can be the full output length $T_{out}$ or the current curriculum horizon $T_{hor}$,
+$D$ = feature dimension, $d_{lat}$ = latent dimension, $d_{model}$ = model dimension,
+$d_{ff}$ = feed-forward dimension, $H$ = attention heads, $W$ = window size,
+$N$ = number of stacked blocks. All hyperparameters are configured via YAML files.
+
+\subsubsection{Hybrid LSTM}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Component} & \textbf{Layer} & \textbf{Output shape} \\
+\hline
+\multirow{2}{*}{Encoder}
+  & LSTM$_1$                & $(B,\,T_{in},\,d_{lat})$ \\
+  & LSTM$_2$                & states $h_1,c_1,h_2,c_2$ \\
+\hline
+\multirow{5}{*}{Decoder}
+  & LSTM$_1$                & $(B,\,T_{dec},\,d_{lat})$ \\
+  & LSTM$_2$                & $(B,\,T_{dec},\,d_{lat})$ \\
+  & Dense + ReLU            & $(B,\,T_{dec},\,128)$ \\
+  & Dropout                 & $(B,\,T_{dec},\,128)$ \\
+  & Dense                   & $(B,\,T_{dec},\,D)$ \\
+\hline
+\end{tabular}
+\end{table}
+
+In full-seq mode, the decoder LSTM is called once on the whole decoder input sequence. In step-wise mode, the model explicitly iterates over the output horizon and calls a one-step decoder at each timestep.
+
+
+
+\subsubsection{Hybrid Transformer}
+
+
+
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Component} & \textbf{Layer} & \textbf{Output shape} \\
+\hline
+\multirow{4}{*}{Encoder}
+  & Dense + Pos.\ Embedding + Dropout & $(B,\,T_{in},\,d_{model})$ \\
+  & $\times N$\; LayerNorm + MHA (unmasked) + Residual & $(B,\,T_{in},\,d_{model})$ \\
+  & $\times N$\; LayerNorm + FFN ($d_{ff}$) + Residual & $(B,\,T_{in},\,d_{model})$ \\
+  & Memory $\mathbf{M}$ (not a layer)      & $(B,\,T_{in},\,d_{model})$ \\
+\hline
+\multirow{5}{*}{Decoder}
+  & Dense + Pos.\ Embedding + Dropout & $(B,\,T_{dec},\,d_{model})$ \\
+  & $\times N$\; LayerNorm + Causal MHA + Residual & $(B,\,T_{dec},\,d_{model})$ \\
+  & $\times N$\; LayerNorm + Cross-Attn ($K,V$ from $\mathbf{M}$) + Residual & $(B,\,T_{dec},\,d_{model})$ \\
+  & $\times N$\; LayerNorm + FFN ($d_{ff}$) + Residual & $(B,\,T_{dec},\,d_{model})$ \\
+  & Dense                    & $(B,\,T_{dec},\,D)$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Super-Resolution Transformer}
+
+The SR Transformer is encoder-only and uses the same blocks as the Hybrid Transformer encoder. The two differences are: the input has an extra binary mask channel ($D{+}1$) that marks which timesteps are missing, and the loss gives more weight to missing positions than observed ones.
+
+\vspace{2em}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\hline
+\textbf{Component} & \textbf{Layer} & \textbf{Output shape} \\
+\hline
+Input projection  & Dense + Pos.\ Embedding + Dropout & $(B,\,W,\,d_{model})$ \\
+                  & $\times N$\; EncoderBlocks (as Hybrid TRN) & $(B,\,W,\,d_{model})$ \\
+Output            & Dense & $(B,\,W,\,D)$ \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Training strategies}
+
+
+\noindent\textbf{Important.} The content of the following subsection applies only to \emph{forecasting} models; the \emph{super-resolution} setting does not include these training additions.
+
+\input{tables/phases_yaml_options}
+
+
+\subsubsection{Curriculum}
+\label{sec:curriculum}
+
+The model is configured to predict a target sequence of length \texttt{output\_seq\_len}. However, during training we apply a phase-wise curriculum: instead of computing the loss over the full horizon from the beginning, at each phase $k$ we only backpropagate the error on an effective horizon
+$H_k = c_k \cdot \texttt{output\_seq\_len}$,
+where $c_k$ is the $k$-th entry of \texttt{curriculum} \cite{bengio2009curriculum}. This allows the model to learn step by step, starting from shorter predictions and progressively reaching the full horizon.
+
+\textbf{Example.} If \texttt{output\_seq\_len}$=50$ and \texttt{curriculum}$=[0.2,\,1.0]$, then in the first phase we compute the loss only on the first $H_1=0.2\cdot 50=10$ predicted steps, while in the second phase we use the full horizon $H_2=1.0\cdot 50=50$.
+
+
+\subsubsection{Prediction mode (\texttt{all} vs \texttt{horizon})}
+\label{sec:prediction_mode}
+
+We also implemented \texttt{prediction\_mode} to control how predictions are produced when using a curriculum. In graph mode, if the predicted length changes across epochs (because the curriculum horizon changes), the training graph may need to be rebuilt (re-tracing), which adds overhead \cite{tensorflow_tffunction_guide}. For this reason we provide two options:
+\begin{itemize}
+  \item \texttt{all}: the model always predicts \texttt{output\_seq\_len}, but we compute and backpropagate the loss only up to the current horizon.
+  \item \texttt{horizon}: the model predicts only up to the horizon, and the loss is computed on the same range.
+\end{itemize}
+
+\noindent\textbf{Trade-off.} \texttt{all} keeps the graph stable but can be slower, since we still predict the full \texttt{output\_seq\_len} even for small horizons. \texttt{horizon} can be faster, but changing horizons can trigger re-tracing.
+
+\subsection{Free-running evaluation}
+\label{sec:freerun}
+
+During training, loss computed with teacher forcing or masked modeling can be too optimistic, because the model is partially guided by ground-truth inputs. To check the real inference behaviour, we added a \emph{free-running evaluation} at specific points \cite{bengio2015scheduled}. We ran an \texttt{inference\_model} in autoregressive mode (i.e., without any help from targets) and computed losses for a part of the validation (or test) data. This helps seeing if there is exposure bias and error accumulated over time. We use three probes:
+
+\input{tables/fr_probes}
+
+\noindent\textbf{Note.} \texttt{phase} means the current phase horizon, \texttt{global} means the global output timesteps, while for \texttt{fr\_curve} we put a list of ratios compared to the global output timesteps.
+
+\vspace{1em}
+
+Overall, \texttt{fr\_phase} is useful for regular monitoring each phase, \texttt{fr\_target} tracks the final goal at the desired horizon, and \texttt{fr\_curve} tells us if the errors grow smoothly or explode as the prediction length increases. These signals help to see if the model is actually getting better at making predictions, not only in assisted training.
+
+\subsection{Optuna - Hyperparameter tuning}
+\label{sec:hyper}
+
+We performed hyperparameter optimization in two stages: Level-1 tunes optimizer/training and model-capacity parameters, Level-2 is initialized from the best configuration found at Level-1, taking \texttt{learning\_rate} and \texttt{clip\_norm} from a range of $\pm 30\%$. We didn't fix a single best Level-1 setup, because changing windowing hyperparameters (input/output sequence length and stride) can alter the optimal training and model settings. For each model we performed 20 epochs either for level 1 and 2.
+
+We defined a scalar score to rank Optuna trials as a weighted combination of some evaluation metrics.
+
+\begin{equation}
+\text{Score}
+= 0.70\,L_{\text{fr\_target}}
++ 0.25\,L_{\text{fr\_curve}}
++ 0.05\,L_{\text{fr\_phase}}
+\end{equation}
+
+\textbf{Level 1}
+
+
+\input{tables/optuna_level1_params}
+
+The batch size affects the noise of the gradient estimate.
+This, affects the step size of the optimizer at each update. 
+
+\begin{equation}
+\mathrm{lr}_{\mathrm{eff}}=\mathrm{lr}_{\mathrm{ref}}\left(\frac{B}{B_0}\right)^{\alpha},
+\qquad B_0=64,\ \alpha=0.5.
+\end{equation}
+
+If we tune \texttt{learning\_rate} and \texttt{batch\_size} independently, some trials may become unstable (too large steps with small batches) or unnecessarily slow (too small steps with large batches). 
+For this reason, we treat the learning rate suggested by Optuna as a reference value and rescale it with the batch size to keep the update scale more consistent across trials, improving stability and making the comparison between configurations fairer \cite{goyal2017largeminibatch}.
+
+\paragraph{Level 2}
+
+In Level 2 we tune three windowing hyperparameters - \texttt{input\_seq\_len}, \texttt{output\_seq\_len}, and the windowing \texttt{stride}. 
+This leads to a bi-objective trade-off, summarized in \Cref{tab:l2_objectives}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Level-2 multi-objective tuning goals.}
+\label{tab:l2_objectives}
+\begin{tabular}{ll}
+\toprule
+Objective & Direction \\
+\midrule
+Score  & minimize ($\downarrow$) \\
+Output length  & maximize ($\uparrow$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Since there is no single best solution, we plot the Pareto front, which collects the non-dominated trade-offs between the objectives. We then select the knee point as a good compromise \cite{deb2002nsga2}.
+
+\input{tables/optuna_level2_pareto}
+
+

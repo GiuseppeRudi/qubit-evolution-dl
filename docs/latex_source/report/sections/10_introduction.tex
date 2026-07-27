@@ -1,0 +1,12 @@
+\section{Introduction}
+\label{sec:intro}
+
+\textbf{Quantum computing} is a promising approach, but studying and simulating many interacting \textbf{qubits} is difficult. The main reason is that the size of the quantum state grows exponentially, and the qubits can develop complex correlations. For this reason, \textbf{data-driven methods} are useful: they can learn temporal patterns directly from observed trajectories.
+
+
+In our setting we monitor \textbf{magnetization} and \textbf{correlation} signals, where the correlation of one qubit can depend on all the others. Because these interactions are non-local, the dynamics are hard to model, so we use data-driven methods that learn temporal patterns directly from observed trajectories.
+
+
+In this report, we use deep learning to model qubit time series with two prediction tasks: (i) \textbf{forecasting} future time steps from a short observation window and (ii) \textbf{super-resolution}, reconstructing missing points.
+
+We compare two deep learning frameworks: an approach based on \textbf{LSTM} and one based on \textbf{Transformer (TRN)}. Overall, we built five seq2seq models: three LSTM forecasting models with different decoder modes, one TRN model for \textbf{forecasting}, and one TRN model for \textbf{super-resolution}. All models, except for the last one we talked about, follow an encoder - decoder structure, where an encoder maps the input sequence to a latent representation and a decoder generates the output sequence. For the forecasting models, we study three decoding strategies: \textbf{full-seq}, \textbf{step-wise}, and a \textbf{hybrid}. The term \textbf{hybrid} refers to the decoder's ability to operate in both full-seq and step-wise modes in order to adapt based on the chosen strategy.

@@ -1,0 +1,82 @@
+
+% \usetheme{Madrid}         
+% \usetheme{CambridgeUS}
+% \usetheme{Boadilla}
+
+\usetheme{Boadilla}
+
+\usepackage{lmodern}
+\usepackage{sansmath}
+\sansmath
+
+\definecolor{netA}{RGB}{31,119,180}
+\definecolor{netB}{RGB}{255,127,14}
+
+% QR-code
+\usepackage{qrcode}
+
+\setbeamercolor{title}{fg=black}
+\setbeamercolor{frametitle}{fg=black}
+
+
+\setbeamercolor{alerted text}{fg=netB}
+
+
+\setbeamercolor{block title}{fg=black, bg=netA!15}
+\setbeamercolor{block body}{fg=black, bg=netA!5}
+
+\setbeamercolor{block title alerted}{fg=black, bg=netB!20}
+\setbeamercolor{block body alerted}{fg=black, bg=netB!8}
+
+
+\setbeamercolor{alerted text}{fg=netB}
+ 
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+
+\usepackage{amsmath, amssymb, mathtools}
+
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, urlcolor=blue}
+
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{refs.bib}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{caption}[numbered]
+\setbeamersize{text margin left=7mm, text margin right=7mm}
+
+\linespread{1.05}
+
+
+% --- YAML  ---
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  columns=fullflexible,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{black!20},
+  backgroundcolor=\color{black!2},
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=0.2cm,
+  xrightmargin=0.2cm
+}

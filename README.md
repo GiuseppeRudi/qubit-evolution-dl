@@ -1,255 +1,171 @@
+<div align="center">
+
 # Qubit Evolution DL
 
-Qubit Evolution DL is a research-oriented project that uses deep learning models, including LSTM and Transformer architectures, to model the **time evolution of multi-qubit systems** as a **sequence modeling** problem.
+**Deep-learning models for forecasting and reconstructing quantum dynamics**
 
-Given a past window of a quantum trajectory, the models can **predict future dynamics** through Forecasting or **reconstruct missing timesteps** through Super-Resolution.
+![Project status](https://img.shields.io/badge/status-completed%20research-4c1)
+![Python](https://img.shields.io/badge/Python-3.12-3776ab)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-LSTM%20%7C%20Transformer-ff6f00)
+![Tasks](https://img.shields.io/badge/tasks-forecasting%20%7C%20super--resolution-6f42c1)
 
----
+</div>
 
-## What this repository provides
+> **Project status:** completed academic research prototype. The repository is
+> preserved as the software artifact of a university project and is not under
+> active product development.
 
-- A complete **training pipeline** driven by a **single YAML configuration file**.
-- Two model families:
-  - **LSTM** baselines: Full-Seq, Step-Wise, and Hybrid decoding.
-  - **Transformer (TRN)** models: Hybrid encoder-decoder and Super-Resolution variants.
-- A consistent **inference layer** based on adapters, supporting teacher forcing and free-running evaluation.
-- Utilities for:
-  - dataset splitting and windowing;
-  - forecasting and super-resolution experiments;
-  - saving training artifacts, predictions, splits, and metadata;
-  - generating prediction plots and attention heatmaps.
+## Overview
 
----
+Qubit Evolution DL investigates whether sequence models can learn the temporal
+dynamics of an interacting quantum system from simulated observables. The
+project addresses two related tasks:
 
-## Project structure
+- **Forecasting:** infer future observables from an initial observation window.
+- **Temporal super-resolution:** reconstruct missing time steps from sparse
+  measurements.
 
-```text
-.
-├── main.py                     # Project entry point
-├── configs/                    # Experiment YAML configurations
-├── src/qubit/                  # Core package
-├── scripts/                    # Data download and plotting utilities
-├── tuning/                     # Optuna tuning pipeline
-├── docs/                       # Setup, configuration, tuning and plotting docs
-├── reports/                    # Final report and slides
-├── data/                       # Local dataset folder, not tracked by Git
-├── outputs/                    # Generated runs and artifacts
-├── Dockerfile                  # CPU-only Docker image
-├── docker-compose.yml          # CPU-only Docker Compose setup
-├── environment.yml             # Local Conda environment
-├── requirements.txt            # Base local requirements
-├── requirements-docker.txt     # Docker CPU requirements
-└── requirements-rtx50.txt      # Extra dependencies for RTX 50 local setup
+The implementation provides a configuration-driven TensorFlow pipeline covering
+data preparation, model training, free-running evaluation, hyperparameter
+optimization, and scientific visualization.
+
+## Research setting
+
+The experiments use trajectories generated from the **PXP model**, a constrained
+spin-chain model commonly used to study quantum many-body dynamics.
+
+| Property | Value |
+|---|---:|
+| Qubits | 10 |
+| Simulated trajectories | 400 |
+| Time interval | 0–20 s |
+| Sampling interval | 0.02 s |
+| Samples per trajectory | 1,001 |
+| Observables per time step | 10 magnetizations + 45 pairwise correlations |
+
+## Model roadmap
+
+The study progresses from recurrent baselines to attention-based forecasting
+and reconstruction models.
+
+![Roadmap of the five sequence models implemented in the project](docs/images/model-roadmap.jpg)
+
+| Model | Architecture | Primary task |
+|---|---|---|
+| LSTM Full-Seq | LSTM encoder–decoder | Forecasting |
+| LSTM Step-Wise | Autoregressive LSTM | Forecasting |
+| LSTM Hybrid | Hybrid recurrent encoder–decoder | Forecasting |
+| Transformer Hybrid | Transformer encoder–decoder | Forecasting |
+| Transformer SR | Encoder-only Transformer | Super-resolution |
+
+## Experimental pipeline
+
+```mermaid
+flowchart LR
+    A["PXP trajectories"] --> B["Trajectory-level split"]
+    B --> C["Scaling and windowing"]
+    C --> D["YAML experiment configuration"]
+    D --> E["LSTM or Transformer"]
+    E --> F["Training strategy"]
+    F --> G["Free-running inference"]
+    G --> H["Metrics, predictions and plots"]
 ```
 
----
+Depending on the model, training combines teacher forcing, autoregressive
+rollouts, masked modeling, scheduled sampling, and curriculum strategies.
+Evaluation includes free-running probes designed to expose the gap between
+assisted training and autonomous prediction.
 
-## Execution modes
+## Representative results
 
-The project supports two execution modes.
+### Forecasting
 
-### 1. Docker mode
+The hybrid Transformer generally follows the direction and broad shape of
+short-horizon dynamics. Prediction error increases with the forecast horizon,
+particularly for the more difficult correlation observables.
 
-This is the recommended mode for **reproducibility** and for running the project on machines that do not have a configured NVIDIA GPU.
+![Hybrid Transformer forecast compared with the ground truth](docs/images/hybrid-transformer-forecast.jpg)
 
-Docker is intentionally CPU-only in this repository. 
+### Super-resolution
 
-Use this mode when you want a clean and portable execution environment.
+The encoder-only Transformer reconstructs missing samples while preserving the
+main temporal trend. The largest residuals occur around rapid changes in the
+signal.
 
-### 2. Local GPU mode
+![Transformer reconstruction of missing temporal samples](docs/images/super-resolution-reconstruction.jpg)
 
-Use this mode if you want to train with GPU acceleration on a local **Linux** or **WSL Ubuntu** environment.
+These figures illustrate representative experiments rather than a claim of
+production-grade physical simulation. Longer free-running forecasts remain
+sensitive to accumulated error and exposure bias.
 
-GPU execution is handled outside Docker through Conda and `scripts/install_tf.py`, which installs either the official TensorFlow package or a custom TensorFlow build for RTX 50-series GPUs when needed.
+## Tuning and interpretability
 
----
+Hyperparameter search is organized as a two-level Optuna workflow. The second
+level treats prediction score and output horizon as competing objectives,
+producing a Pareto front from which a balanced knee-point configuration can be
+selected.
 
-## Quick start with Docker 
+| Multi-objective search | Cross-attention inspection |
+|---|---|
+| ![Pareto front for the hybrid Transformer](docs/images/hybrid-transformer-pareto.jpg) | ![Transformer decoder cross-attention heatmap](docs/images/transformer-cross-attention.jpg) |
 
-Build the Docker image:
+Attention maps complement numerical metrics by showing which input positions
+the decoder uses while producing its forecast.
+
+## Quick start
+
+The most reproducible entry point is the Docker environment:
 
 ```bash
 docker compose build
-```
-
-Start an interactive container:
-
-```bash
 docker compose run --rm app bash
-```
-
-Once inside the container, download the dataset:
-
-```bash
 python scripts/download_data.py
-```
-
-Then run an experiment:
-
-```bash
 python main.py --run-cfg trn_hybrid
 ```
 
-You can replace `trn_hybrid` with any available configuration from `configs/`.
+For Conda installation, GPU notes, configuration options, all run commands,
+tuning, plotting, and troubleshooting, see the dedicated
+**[configuration and execution guide](CONFIGURATION.md)**.
 
-Examples:
-
-```bash
-python main.py --run-cfg lstm_step_wise
-python main.py --run-cfg trn_sr
-```
-
-To exit the container:
-
-```bash
-exit
-```
-
----
-
-## Quick start with local Conda
-
-Use this mode when running locally on WSL/Linux, especially if GPU acceleration is required.
-
-Create the Conda environment:
-
-```bash
-conda env create -f environment.yml
-conda activate qubit
-```
-
-Install TensorFlow:
-
-```bash
-python scripts/install_tf.py
-```
-
-The installation script checks the available NVIDIA GPU. If an RTX 50-series GPU is detected, it installs the dedicated TensorFlow build; otherwise, it installs the official TensorFlow package.
-
-Download the dataset:
-
-```bash
-python scripts/download_data.py
-```
-
-Run an experiment:
-
-```bash
-python main.py --run-cfg trn_hybrid
-```
-
----
-
-## Dataset
-
-To download it, run:
-
-```bash
-python scripts/download_data.py
-```
-
-The dataset will be saved under:
+## Repository structure
 
 ```text
-data/
+qubit-evolution-dl/
+├── configs/              # Experiment YAML files
+├── data/                 # Local dataset location
+├── docker/               # Container requirements
+├── docs/                 # Guides, paper, slides and LaTeX sources
+├── scripts/              # Data-download and visualization utilities
+├── src/qubit/
+│   ├── callbacks/        # Training callbacks
+│   ├── core/             # Data pipeline and experiment core
+│   ├── evaluation/       # Evaluation utilities
+│   ├── inference/        # Model-specific inference adapters
+│   ├── models/           # LSTM and Transformer architectures
+│   ├── strategies/       # Training strategies
+│   └── utils/            # Shared helpers
+├── tuning/               # Optuna optimization workflow
+├── main.py               # Main experiment entry point
+└── environment.yml       # Conda environment definition
 ```
 
+## Documentation
 
----
+- [Configuration and execution](CONFIGURATION.md)
+- [Complete configuration reference](docs/example.yaml)
+- [Hyperparameter tuning](docs/tuning.md)
+- [Plotting guide](docs/plotting.md)
+- [Research report](docs/report.pdf)
+- [Project presentation](docs/slideshow.pdf)
+- [Report LaTeX source](docs/latex_source/report)
+- [Presentation LaTeX source](docs/latex_source/slideshow)
 
-## Running experiments
+## Academic context
 
-Experiments are selected through YAML configuration files stored in `configs/`.
+The project was developed by **Giuseppe Rudi** and **Francesco Cristiano** in
+the Artificial Intelligence and Computer Science programme at the University
+of Calabria.
 
-Basic command:
-
-```bash
-python main.py --run-cfg <config_name>
-```
-
-Example:
-
-```bash
-python main.py --run-cfg trn_hybrid
-```
-
-The configuration name should match a YAML file in `configs/`, without the `.yaml` extension.
-
-For example:
-
-```text
-configs/trn_hybrid.yaml      ->  --run-cfg trn_hybrid
-configs/lstm_step_wise.yaml  ->  --run-cfg lstm_step_wise
-configs/trn_sr.yaml          ->  --run-cfg trn_sr
-```
-
----
-
-## Outputs and artifacts
-
-After training, the program creates a run directory containing the artifacts generated by the experiment.
-
-Depending on the configuration, this may include:
-
-- `model.keras` or an equivalent saved model file;
-- `data_splits.npz`;
-- `predictions.npz`;
-- `meta.json`;
-- loss curves;
-- attention maps for Transformer runs;
-- prediction plots.
-
-The output folder name includes information such as the model type, variant, decoder mode, experiment name, and timestamp. This keeps different runs isolated and reproducible.
-
----
-
-## Plotting
-
-After an experiment has produced saved artifacts, plots can be generated with the scripts in `scripts/`.
-
-Prediction plots:
-
-```bash
-python scripts/plot_from_data.py
-```
-
-Attention heatmaps:
-
-```bash
-python scripts/plot_attention_maps.py
-```
-
-See `docs/plotting.md` for the detailed usage.
-
----
-
-## Hyperparameter tuning
-
-The project includes an Optuna-based tuning pipeline.
-
-See:
-
-```text
-docs/tuning.md
-```
-
-for details about the tuning workflow, search space, scoring, and dedicated tuning configuration files.
-
----
-
-## Where to read next
-
-Detailed documentation is split into focused files:
-
-- `docs/setup.md`  
-  Installation instructions and environment notes for local and Docker execution.
-
-- `docs/example.yaml`  
-  Explanation of the main experiment YAML structure: dataset, windowing, model parameters, training phases, inference, and artifact saving.
-
-- `docs/tuning.md`  
-  How to run Optuna and how the dedicated tuning YAML controls the search space and scoring.
-
-- `docs/plotting.md`  
-  How to use the plotting scripts for predictions and attention maps.
-
+No software license is currently included. Unless a license is added, the
+repository should be treated as an academic reference artifact rather than as
+reusable open-source software.

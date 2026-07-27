@@ -1,0 +1,56 @@
+\begin{frame}{Curriculum \& Prediction Mode (Forecasting)}
+
+\vspace{-1em}
+
+\small
+\begin{itemize}
+  \item \textbf{Curriculum:}
+\end{itemize}
+
+\vspace{0.5em}
+\footnotesize
+\textbf{Example (output\_seq\_len = 80):}\quad
+$H_k = c_k \cdot 80$, \quad where $H_k$ is the horizon at phase $k$.
+\vspace{0.8em}
+
+\centering
+\footnotesize
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{c c c}
+\hline
+\textbf{Phase $k$} & \textbf{Curriculum $c_k$} & \textbf{Loss range} \\
+\hline
+1 & 0.4 & $[1:32]$ \\
+2 & 0.8 & $[1:64]$ \\
+3 & 1.0 & $[1:80]$ \\
+\hline
+\end{tabular}
+
+\vspace{0.35em}
+\scriptsize
+\textit{In \texttt{all}, we still predict 80 steps each phase; in \texttt{horizon}, we predict only $H_k$.}
+
+
+\vspace{1.5em}
+
+\small
+\begin{itemize}
+  \item \textbf{Prediction Mode:}
+\end{itemize}
+
+\vspace{0.5em}
+\centering
+\small
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c c p{0.32\linewidth}}
+\hline
+\textbf{Mode} & \textbf{Pred length} & \textbf{Loss on} & \textbf{Notes} \\
+\hline
+\texttt{all} & \texttt{output\_seq\_len} & $[1:H_k]$ & stable graph, more compute \\
+\texttt{horizon} & $H_k$ & $[1:H_k]$ & less compute, may re-trace \\
+\hline
+\end{tabular}
+
+\end{frame}

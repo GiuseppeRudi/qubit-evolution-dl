@@ -49,7 +49,7 @@ class StrategyLayer(layers.Layer):
             trainable=False
         )
 
-       # total number of epoch for the current strategy => Es. Teacher forcing => 5 epochs 
+        # total number of epoch for the current strategy => Es. Teacher forcing => 5 epochs 
         self.phase_epochs = self.add_weight(
             name="phase_epochs", shape=(), dtype=tf.int32,
             initializer=tf.keras.initializers.Constant(0),

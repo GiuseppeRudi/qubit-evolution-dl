@@ -1,0 +1,24 @@
+\begin{frame}{Model Roadmap}
+\vspace{-0.2em}
+\begin{figure}
+  \centering
+  \includegraphics[width=0.95\linewidth]{model_roadmap.jpg} 
+\end{figure}
+
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{7pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c c}
+\hline
+\textbf{Decoder mode} & \textbf{TF / MM} & \textbf{AR / SS} \\
+\hline
+FULL\_SEQ  & \textbf{parallel} & -- \\
+STEP\_WISE & \textbf{step-wise} & \textbf{step-wise} \\
+HYBRID     & \textbf{parallel} & \textbf{step-wise} \\
+\hline
+\end{tabular}
+\end{center}
+
+\end{frame}

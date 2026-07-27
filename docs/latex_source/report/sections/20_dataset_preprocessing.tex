@@ -1,0 +1,24 @@
+\section{Dataset and Preprocessing}
+\label{sec:data}
+
+\subsection{Dataset}
+
+Our input dataset contains trajectories generated from the PXP model with $N=10$ qubits. The dynamics are sampled every $\Delta t=0.02\,\mathrm{s}$ up to $T_{\mathrm{fin}}=20\,\mathrm{s}$, giving $T=T_{\mathrm{fin}}/\Delta t+1=1001$ time steps per trajectory (with $N_{\mathrm{traj}}=400$ trajectories in total).
+Each trajectory is stored as a matrix with $T$ rows and $ 1+N(N+1)/2$ columns. The first column is time $t$, the next $N$ columns are the magnetizations $(m_1,\dots,m_{10})$, and the remaining $45$ columns are the pairwise correlations $(c_{12},c_{13},\dots,c_{1\,10},c_{23},\dots,c_{9\,10})$.
+
+\subsection{Preprocessing}
+
+
+Figure~\ref{fig:preproc} summarizes the full data preparation workflow, from loading the raw trajectories to producing the final tensors that are used as inputs and targets for the different model fits. Before building the sliding windows for each split (train/validation/test), we apply standardization to the data to improve training stability and to make the different variables comparable in scale.
+
+\begin{figure}[H]
+
+  \centering
+  \includegraphics[width=\linewidth]{../figures/preprocessing_pipeline.pdf}
+  \caption{Preprocessing pipeline and tensor shapes across stages.}
+  \label{fig:preproc}
+\end{figure}
+
+
+\noindent\textbf{Note.}
+In \textit{super-resolution}, \texttt{input\_seq\_len} is the number of observed points (every \texttt{sr.stride} steps), while the model predicts the sequence including missing points: $\texttt{output\_seq\_len}=\texttt{input\_seq\_len}\cdot\texttt{sr.stride}$.

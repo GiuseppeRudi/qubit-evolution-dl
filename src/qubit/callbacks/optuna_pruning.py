@@ -13,7 +13,7 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
         monitors: list[str],   
         debug: bool = True,
         print_every: int = 1,
-        history_limit: int = 200,  # quanti trial passati usare per stats
+        history_limit: int = 200, 
         use_completed_only: bool = True
     ):
         
@@ -52,11 +52,9 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
         is_mo = self._is_multi_objective()
 
         # customised report: save the best so far
-        # (leggero: salva solo l’ultimo valore e il best)
         best_key = f"best_{key}"
         prev_best = self.trial.user_attrs.get(best_key)
 
-        # regola best: loss -> min, altri -> max (adatta se vuoi)
         improved = False
         if prev_best is None:
             improved = True
@@ -87,7 +85,6 @@ class OptunaPruningCallback(tf.keras.callbacks.Callback):
                         f"| margin={delta:+.6g} ({pct:+.2f}%)"
                     )
 
-        # pruning SOLO se single-objective
         if not is_mo:
             self.trial.report(value, step=epoch)
             if self.trial.should_prune():

@@ -1,0 +1,22 @@
+\section{Future work}
+\label{sec:future}
+
+
+
+Right now, our Level-2 selection currently focuses on minimizing the score while maximizing \texttt{output\_seq\_len}. In future work, we can extend it by also considering \texttt{input\_seq\_len}. Optimizing only the score and \texttt{output\_seq\_len} can favor configurations that get good results simply by using a longer input window, to have more context. However, another model can reach a similar score and horizon with a shorter \texttt{input\_seq\_len}, which is preferable because it reduces memory and performance. So, we can think like this for the model selection: (i) minimize score, (ii) maximize \texttt{output\_seq\_len}, and (iii) minimize \texttt{input\_seq\_len}, for example, using a three-dimensional Pareto front.
+
+
+Autoregressive decoding and scheduled sampling are both step-by-step: each prediction depends on the output generated at the previous step. This dependency limits parallelization and makes both training and inference slow, especially for long horizons.
+
+Scheduled sampling has also some limitations:
+\begin{itemize}
+  \item It \textbf{does not fully remove exposure bias}. This means that errors can still get worse when the model must rely on its own predictions.
+
+  \item It also \textbf{creates a mismatch between train and test}, because training mixes ground truth inputs and model generated inputs in a way that is different from inference.
+  
+  \item In some cases it can be unstable and return suboptimal or unpredictable behaviour.
+  
+\end{itemize}
+
+To reduce the step-wise limitation, a practical direction is to use more parallelizable variants. 
+For Transformers, a simple option is \emph{two-pass scheduled sampling}, which applies scheduled sampling through a two pass decoding strategy while keeping most computation parallel \cite{mihaylova2019scheduledtransformers}.
